@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 
-const API_BASE = "http://localhost:5050";
-
 const palette = {
   bg: "#070B16",
   panel: "#0B1220",
@@ -534,7 +532,7 @@ function LessonTutor({ phase, title, fullText, phases, progress, setProgress }) 
     setAnswer(lang === "ur" ? "جواب تیار کیا جا رہا ہے..." : "Preparing answer...");
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -842,7 +840,7 @@ function GlobalTutor() {
     setLoading(true);
     setA("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -5331,7 +5329,7 @@ _Sent via AI Advocate Ops Hub_`;
       );
 }
 
-      const TABS = ["🏠 Overview", "👤 Profile", "💰 Fees", "🎯 Job Eval", "✉️ Proposals", "⚡ Connects", "📈 Growth", "📋 Daily Logs", "🎯 Commission", "🚀 Agency", "🏢 Top Rated Cos", "🛒 Catalog", "📞 Discovery", "💰 Rates", "🛡️ JSS", "💬 WhatsApp", "🚀 Boost", "✓ Verification", "🚦 Status", "📚 AI Learn", "🎨 Brand"];
+      const TABS = ["🏠 Overview", "👤 Profile", "💰 Fees", "🎯 Job Eval", "✉️ Proposals", "⚡ Connects", "📈 Growth", "📋 Daily Logs", "🎯 Commission", "🚀 Agency", "🏢 Top Rated Companies", "🛒 Catalog", "📞 Discovery Call", "💰 Rate Strategy", "🛡️ JSS Recovery", "💬 WhatsApp", "🚀 Boost Proposals", "✓ Verification", "🚦 Status Dashboard", "📚 AI Learning Module", "🎨 Brand Gallery"];
       const VIEWS = [Overview, ProfileView, FeesView, JobEvalView, ProposalView, ConnectsView, GrowthView, DailyLogs, CommissionView, AgencyView, TopRatedCompanies, CatalogView, DiscoveryCallView, RateStrategyView, JSSRecoveryView, WhatsAppGeneratorView, BoostProposalsView, VerificationView, StatusDashboard, AILearningView, BrandGalleryView];
 
 
