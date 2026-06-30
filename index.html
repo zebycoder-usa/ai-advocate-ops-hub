@@ -51,7 +51,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="brand"><div class="logo">A</div><div><b>AI Advocate · Live Ops Command</b><div class="s">Saqib's PERSONAL freelancer profile · US-only · single login</div></div></div>
+    <div class="brand"><div class="logo">A</div><div><b>AI Advocate · Live Ops Command</b><div class="s">Saqib's PERSONAL freelancer profile · US + Europe · single login</div></div></div>
     <div class="who">
       <select id="role-select" title="Who are you?"></select>
       <div class="clock" id="clock">…</div>
@@ -78,7 +78,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       </div>
       <div class="card">
         <div class="eyebrow" style="color:var(--red)">Hard ban — instant skip, 0 connects</div>
-        <p class="note" style="margin-top:8px">Industries: Banking/Finance/Trading/Crypto/Forex · Govt/Military/Defense/ITAR/GovCloud/FedRAMP/CMMC. Countries: India, Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200 · 20+ proposals · survey/test jobs · on-site 2+ days/week.</p>
+        <p class="note" style="margin-top:8px">Industries: Banking/Finance/Trading/Crypto/Forex · Govt/Military/Defense/ITAR/GovCloud/FedRAMP/CMMC. Countries: India, Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200 · 20+ proposals · survey/test jobs · on-site 2+ days/week. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>
       </div>
     </div>
     <div class="card" style="margin-top:12px">
@@ -274,7 +274,7 @@ var TEMPLATES = [
 var SCORING = {
   client:[['Payment verified','+2 / 0'],['Hire rate >50% / 20–50% / under','2 / 1 / 0'],['Spend $1k–$50k sweet spot / $50k+ whale / $1–1k / $0','2 / 1 / 1 / 0'],['Some review history','+1']],
   job:[['Scope: specific / somewhat / vague','2 / 1 / 0'],['Budget meets $60hr or $1000 fixed','2 / 1 / 0'],['Proposals <5–9 / 10–19 / 20+','2 / 1 / 0'],['Long-term potential','+1']],
-  match:[['Stack match strong / partial / none','3 / 2 / 0'],['Direct portfolio proof','+1'],['US-based / timezone fit','+1']]
+  match:[['Stack match strong / partial / none','3 / 2 / 0'],['Direct portfolio proof','+1'],['Allowed region (US/Europe) fit','+1']]
 };
 
 var SOURCES = [
@@ -472,7 +472,7 @@ function runEval(){
   var det='<div class="src" style="margin-top:10px"><b>What I read from the post:</b> '
     +'budget '+(P.budgetType?(P.budgetType==='fixed'?('fixed $'+(P.amount!=null?P.amount:'?')):('$'+(P.amount!=null?P.amount:'?')+'/hr')):'not found')
     +' · proposals '+(P.proposalsLow!=null?(P.proposalsLow+'+'):'not found')
-    +' · '+(P.worldwide?'Worldwide':(P.usOnly?'US only':'location not found'))
+    +' · '+(P.region&&P.region!=='Other'?('region: '+P.region):(P.worldwide?'Worldwide':'location not stated'))
     +' · payment '+(P.verified?'verified':'not verified')
     +' · spend '+(P.spent!=null?('$'+P.spent):'?')
     +' · rating '+(P.rating!=null?P.rating:'?')
@@ -528,10 +528,28 @@ function stackFor(c){
 }
 function echoProblem(job){
   var s=(job||"").replace(/\s+/g," ").trim();
-  var m=s.match(/(?:need|looking for|want|require|build|integrate|automate|fix|develop|create|help with)\s+([^.,;\n]{6,70})/i);
+  var m=s.match(/(?:need|looking for|want|require|build|integrate|automate|fix|develop|create|help with)\s+([^.,;\n]{6,80})/i);
   var ph = m ? m[1].trim() : (s.slice(0,60)||"the system described in your post");
   ph = ph.replace(/[.\s]+$/,"");
-  return ph.charAt(0).toLowerCase()+ph.slice(1); // lower first letter only; keep acronyms like RAG/API intact
+  // drop a dangling trailing fragment (e.g. a cut-off next sentence like "We a"):
+  // strip trailing function words / pronouns that no real problem phrase would end on
+  var STOP=/\s+(?:a|an|and|or|to|for|with|the|of|in|on|at|that|this|we|our|i|you|it|they|is|are|be|as|by)$/i;
+  while(STOP.test(ph)) ph=ph.replace(STOP,"");
+  // natural capitalisation + article: keep ALL-CAPS acronyms intact (AI, RAG, API, LLM...),
+  // lowercase a normal leading word, and add the right article for a bare acronym noun phrase.
+  var first=ph.split(/\s+/)[0]||"";
+  var ART={AI:"an",API:"an",LLM:"an",ML:"an",NLP:"an",MVP:"an",SDK:"an",ERP:"an",AWS:"an",
+           RAG:"a",SaaS:"a",UI:"a",UX:"a",CRM:"a",GPT:"a",SQL:"a"};
+  if(/^(?:a|an|the|some|our|your|my|this|that)\b/i.test(ph)){
+    ph = ph.charAt(0).toLowerCase()+ph.slice(1);          // already has a determiner
+  } else if(ART.hasOwnProperty(first)){
+    ph = ART[first]+" "+ph;                                 // bare acronym -> add article, keep case
+  } else if(/^[A-Z]{2,}$/.test(first)){
+    /* other all-caps acronym, no mapped article -> leave it as-is */
+  } else {
+    ph = ph.charAt(0).toLowerCase()+ph.slice(1);           // normal word -> lowercase first letter
+  }
+  return ph;
 }
 /* TASK 1: problem-first, first person, real stack, no invented metrics/names, ends on ONE question.
    120-160 words for the full proposal. Free template mode (works with no API key);
@@ -694,10 +712,10 @@ function renderScoring(){
 }
 function renderRules(){
   document.getElementById('rules').innerHTML=
-    '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 20+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects.</p></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 29 June)</div><p class="note" style="margin-top:6px">US-only jobs paying <b>over $60/hr</b>, or one-time fixed <b>$1000+</b>. Bid rate set per job by Saqib/Usman, usually <b>$70–90/hr</b>.</p></div>'
+    '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 20+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p></div>'
+    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 29 June)</div><p class="note" style="margin-top:6px">Allowed regions: <b>United States and Europe</b> (India and Bangladesh remain banned countries). Jobs paying <b>over $60/hr</b>, or one-time fixed <b>$1000+</b>. Bid rate set per job by Saqib/Usman, usually <b>$70–90/hr</b>.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Fees (June 2026)</div><p class="note" style="margin-top:6px">Old 20/10/5% tiers retired May 2025. Freelancer fee variable 0–15%, shown before submit (~10% typical; AI specialists often 0–5%). Connects $0.15 each — standard 6 = $0.90, large up to 16 = $2.40. Freelancer Plus $19.99/mo. ID badge = 35 connects ($5.25). PKR payout via Direct to Local Bank $0.99 (personal accounts). Quote = desired net ÷ 0.90.</p></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US-only jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
+    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US or Europe jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
 }
 
 /* ============================ ASK AI (demo + live) ============================ */
@@ -707,10 +725,10 @@ function buildContext(){
   var tmpl=TEMPLATES.map(function(t){return t.c+' '+t.t;}).join('; ');
   return 'You are the AI Advocate Upwork Operations Co-Pilot for AI ADVOCATE HOLDING LLC. Answer ONLY from this context; if something is not here, say so.\n'
    +'BIDDING PROFILE: all bidding is on Saqib\u2019s PERSONAL freelancer profile (NOT the agency). Single login, one person at a time: VPN Houston, separate browser, no personal Upwork, log out then message the next person.\n'
-   +'APPLY THRESHOLD (Saqib 29 June): US-only, over $60/hr or $1000+ fixed. Bid rate set per job by Saqib/Usman, usually $70-90/hr.\n'
+   +'APPLY THRESHOLD (Saqib 29 June): allowed regions United States and Europe (India and Bangladesh banned), over $60/hr or $1000+ fixed. Bid rate set per job by Saqib/Usman, usually $70-90/hr.\n'
    +'ROSTER & SLOTS (ad-hoc daily): '+roster+'. Bidders = Sadia, Subhan, Hamza, Fiza. Excused from bidding ≥1 month: Kaleem, Sana, Ayesha, Adil. Owners (Saqib, Waqas), Usman (manager) and Zeb (builder) act anytime, no slot. Zeb mostly on Waqas\u2019s CVS project + builds the tooling.\n'
    +'HARD BANS (instant skip, 0 connects): Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC; India & Bangladesh clients; Umbrage, Stewart, CVS Health, Lynx; fixed <$200, 20+ proposals, survey/test jobs, on-site 2+ days/week.\n'
-   +'19-POINT SCORE: Client/7 (payment verified, hire rate, $1k-50k spend sweet spot, reviews) + Job/7 (scope, meets budget, proposals count, long-term) + Match/5 (stack, portfolio proof, US fit). Apply 14+, review 11-13, skip <=10.\n'
+   +'19-POINT SCORE: Client/7 (payment verified, hire rate, $1k-50k spend sweet spot, reviews) + Job/7 (scope, meets budget, proposals count, long-term) + Match/5 (stack, portfolio proof, US/Europe region fit). Apply 14+, review 11-13, skip <=10.\n'
    +'TEMPLATES: '+tmpl+'.\n'
    +'PROFILE — Saqib: Senior Full Stack | SaaS/GenAI/LLM/FastAPI; FastAPI/React/Python/LangGraph/CrewAI/RAG; U Houston MS DS + Cornell BASc; 3 jobs, 5.0.\n'
    +'FEES (June 2026): variable 0-15% (shown before submit), connects $0.15 each, Plus $19.99/mo, ID badge 35 connects, PKR via local bank $0.99. Quote = net / 0.90.\n'
@@ -726,9 +744,9 @@ function demoAnswer(q){
   if(/slot|window|time|hour|shift/.test(s)) return 'Bidder windows are picked daily (ad-hoc), single login on Saqib\u2019s personal profile. Defaults: Fiza 19–20, Subhan 20–21, Sadia 21–22, Hamza 22–23 PKT. Owners, Usman and Zeb act anytime.';
   if(/excus|kaleem|sana|ayesha|adil/.test(s)) return 'Kaleem, Sana, Ayesha and Adil are excused from Upwork bidding for at least one month (Saqib, 29 June).';
   if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
-  if(/threshold|apply|budget|rate|\$60|\$1000/.test(s)) return 'Apply threshold: US-only, over $60/hr or $1000+ fixed (Saqib, 29 June). Bid usually $70–90/hr, set per job by Saqib/Usman.';
+  if(/threshold|apply|budget|rate|\$60|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India and Bangladesh banned), over $60/hr or $1000+ fixed (Saqib, 29 June). Bid usually $70–90/hr, set per job by Saqib/Usman.';
   if(/profile|agency|personal/.test(s)) return 'All bidding is on Saqib\u2019s PERSONAL freelancer profile, not the agency. Single login, one person at a time.';
-  return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, US-only, over $60/hr or $1000+ fixed; score 19 points (apply 14+); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
+  return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, allowed regions United States and Europe (India and Bangladesh banned), over $60/hr or $1000+ fixed; score 19 points (apply 14+); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
 }
 async function askAI(){
   var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
