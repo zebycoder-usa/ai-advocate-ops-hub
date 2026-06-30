@@ -367,32 +367,36 @@ function chk(id){var e=document.getElementById(id);return e?e.checked:false;}
 function setVal(id,v){var e=document.getElementById(id); if(e==null)return; if(e.type==='checkbox')e.checked=!!v; else e.value=v;}
 /* ---- read the pasted Upwork job and detect bans/threshold automatically ---- */
 function parseJob(text){
-  var t=(text||'').replace(/\u2013|\u2014/g,'-'); var low=t.toLowerCase();
+  var t=(text||'').replace(/–|—/g,'-'); var low=t.toLowerCase();
   var P={budgetType:null,amount:null,proposalsLow:null,worldwide:false,usOnly:false,verified:false,spent:null,rating:null,hireRate:null,bans:[],flags:[]};
-  if(/fixed-?price/i.test(t)) P.budgetType='fixed'; else if(/\/hr|per hour|hourly/i.test(t)) P.budgetType='hourly';
-  var m=t.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed-?price/i)||t.match(/fixed-?price[^$]{0,40}\$ ?([\d,]+(?:\.\d+)?)/i);
-  if(!m) m=t.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
+  if(/fixed[-\s]?price/i.test(t)) P.budgetType='fixed'; else if(/\/\s?hr|per hour|hourly|an?\s+hour/i.test(t)) P.budgetType='hourly';
+  var m=t.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed[-\s]?price/i)||t.match(/fixed[-\s]?price[^$\d]{0,40}\$? ?([\d,]+(?:\.\d+)?)/i);
+  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
+  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*(?:an?\s+hour|per hour)/i);
+  if(!m) m=t.match(/([\d,]+(?:\.\d+)?)\s*(?:dollars?|usd)\b/i);
   if(!m) m=t.match(/\$ ?([\d,]+(?:\.\d+)?)/);
   if(m) P.amount=parseFloat(m[1].replace(/,/g,''));
   var pp=t.match(/proposals?:?\s*\n?\s*(\d+)\s*(?:to|-)\s*(\d+)/i)||t.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*proposals/i);
   if(pp) P.proposalsLow=parseInt(pp[1],10);
-  else{var p2=t.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
+  else{
+    var lt=t.match(/(?:less than|fewer than|under)\s*(\d+)\s*proposals/i)||t.match(/proposals?:?\s*(?:less than|fewer than|under)\s*(\d+)/i);
+    if(lt) P.proposalsLow=parseInt(lt[1],10);
+    else{var p2=t.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i)||t.match(/(\d+)\s*\+?\s*proposals/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
+  }
   P.worldwide=/\bworldwide\b/i.test(t);
-  P.usOnly=/u\.?s\.?\.?\s*only|united states only|us only|only us\b/i.test(t);
-  P.verified=/payment (?:method )?verified/i.test(t);
-  var sp=t.match(/\$ ?([\d.]+)\s*([km])?\s*total spent/i);
-  if(sp){var n=parseFloat(sp[1]);var u=(sp[2]||'').toLowerCase();P.spent=u==='k'?n*1000:u==='m'?n*1e6:n;}
-  var rt=t.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
+  P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(t);
+  P.verified=/payment (?:method )?verified|verified payment/i.test(t);
+  var sp=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
+  if(sp){var n=parseFloat(sp[1].replace(/,/g,''));var u=(sp[2]||'').toLowerCase();P.spent=u==='k'?n*1000:u==='m'?n*1e6:n;}
+  var rt=t.match(/([\d.]+)\s*stars?\b/i)||t.match(/([\d.]+)\s*\/\s*5\b/i)||t.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
   var hr=t.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
-  // HARD BANS (override everything)
   if(P.budgetType==='fixed' && P.amount!=null && P.amount<200) P.bans.push('Fixed-price under $200 ($'+P.amount+')');
   if(P.proposalsLow!=null && P.proposalsLow>=20) P.bans.push('20+ proposals already');
-  if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
+  if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
   if(/\b(government|federal agency|military|defense|defence|itar|fedramp|cmmc|govcloud|gov cloud)\b/i.test(low)) P.bans.push('Banned industry (govt/defense)');
   if(/\b(umbrage|stewart|cvs health|lynx)\b/i.test(low)) P.bans.push('Banned company');
   if(/(on-?site|in[- ]person)[^.]{0,40}(2|3|4|5)\s*days?/i.test(low)) P.bans.push('On-site 2+ days/week');
   if(/\bsurvey\b|\btest (?:job|task)\b|\bquestionnaire\b/i.test(low)) P.flags.push('Possible survey/test job - verify');
-  // THRESHOLD (Saqib rule: US-only, >$60/hr or $1000+ fixed)
   if(P.worldwide && !P.usOnly) P.flags.push('Not US-only (posted Worldwide)');
   var belowBudget = P.budgetType==='fixed' ? (P.amount!=null && P.amount<1000) : P.budgetType==='hourly' ? (P.amount!=null && P.amount<60) : false;
   if(belowBudget) P.flags.push('Below threshold ('+(P.budgetType==='fixed'?'fixed <$1000':'<$60/hr')+')');
