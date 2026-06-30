@@ -106,7 +106,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       <div class="card">
         <div class="eyebrow">2 · Client + fit signals</div>
         <div class="chk"><input type="checkbox" id="c-verified" checked><label for="c-verified">Payment verified</label></div>
-        <div class="chk"><input type="checkbox" id="c-us" checked><label for="c-us">Client is US-based</label></div>
+        <div class="chk"><input type="checkbox" id="c-us" checked><label for="c-us">Client in allowed region (US/Europe)</label></div>
         <label class="lbl">Client total spend</label>
         <select id="c-spend" class="field"><option value="0">$0 / new</option><option value="2" selected>$1k–$50k (sweet spot)</option><option value="1">$50k+ (whale — replies less)</option><option value="1b">$1–$1k</option></select>
         <label class="lbl">Client hire rate</label>
@@ -122,7 +122,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     </div>
     <div class="flex" style="margin-top:12px">
       <button class="btn" onclick="runEval()">Evaluate (19-point)</button>
-      <button class="btn gold" onclick="genProposal('priority')">Generate priority proposal (300–499w)</button>
+      <button class="btn gold" onclick="genProposal('priority')">Generate proposal (120–160w)</button>
       <button class="btn ghost" onclick="genProposal('speed')">Speed bid (&lt;50w)</button>
     </div>
     <div id="eval-out" style="margin-top:12px"></div>
@@ -287,6 +287,11 @@ var SOURCES = [
 
 /* ============================ STORAGE (Claude shared + localStorage fallback) ============================ */
 var mem = {pipeline:[], activity:[]};
+var pasteStart=null, decisionSecs=null; // TASK 3: paste-to-decision timer
+/* ---- TASK 2: configurable allowed regions (US + Europe by default) ---- */
+function getAllowedRegions(){ try{ if(LS_OK){var v=localStorage.getItem('aia_allowed_regions'); if(v) return JSON.parse(v);} }catch(e){} return ['US','Europe']; }
+function setAllowedRegions(arr){ try{ if(LS_OK) localStorage.setItem('aia_allowed_regions', JSON.stringify(arr)); }catch(e){} }
+function toggleRegion(r,on){ var a=getAllowedRegions(); var i=a.indexOf(r); if(on&&i<0)a.push(r); if(!on&&i>=0)a.splice(i,1); setAllowedRegions(a); }
 var STORAGE_OK = (typeof window!=='undefined' && !!window.storage);
 var LS_OK = (function(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true;}catch(e){return false;}})();
 async function load(k,fallback){try{
@@ -385,6 +390,10 @@ function parseJob(text){
   }
   P.worldwide=/\bworldwide\b/i.test(t);
   P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(t);
+  /* ---- TASK 2: region detection. US + Europe allowed; India/Bangladesh hard ban ---- */
+  P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|england|scotland|wales|ireland|germany|german|france|french|spain|spanish|italy|italian|netherlands|dutch|belgium|sweden|swedish|norway|denmark|danish|finland|finnish|poland|polish|portugal|portuguese|austria|austrian|switzerland|swiss|czech|greece|greek|romania|hungary|berlin|munich|london|paris|madrid|amsterdam|stockholm|dublin|zurich|lisbon|warsaw)\b/i.test(t);
+  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune)\b/i.test(t) && !/\bindiana\b/i.test(low);
+  P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : ((P.usOnly||/\bunited states\b/i.test(t))?'US':'Other'));
   P.verified=/payment (?:method )?verified|verified payment/i.test(t);
   var sp=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
   if(sp){var n=parseFloat(sp[1].replace(/,/g,''));var u=(sp[2]||'').toLowerCase();P.spent=u==='k'?n*1000:u==='m'?n*1e6:n;}
@@ -395,9 +404,10 @@ function parseJob(text){
   if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
   if(/\b(government|federal agency|military|defense|defence|itar|fedramp|cmmc|govcloud|gov cloud)\b/i.test(low)) P.bans.push('Banned industry (govt/defense)');
   if(/\b(umbrage|stewart|cvs health|lynx)\b/i.test(low)) P.bans.push('Banned company');
+  if(P.isBanCountry) P.bans.push('Client in India/Bangladesh (hard ban)');
   if(/(on-?site|in[- ]person)[^.]{0,40}(2|3|4|5)\s*days?/i.test(low)) P.bans.push('On-site 2+ days/week');
   if(/\bsurvey\b|\btest (?:job|task)\b|\bquestionnaire\b/i.test(low)) P.flags.push('Possible survey/test job - verify');
-  if(P.worldwide && !P.usOnly) P.flags.push('Not US-only (posted Worldwide)');
+  if(P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)<0) P.flags.push('Outside allowed regions ('+P.region+') — review, not auto-skip');
   var belowBudget = P.budgetType==='fixed' ? (P.amount!=null && P.amount<1000) : P.budgetType==='hourly' ? (P.amount!=null && P.amount<60) : false;
   if(belowBudget) P.flags.push('Below threshold ('+(P.budgetType==='fixed'?'fixed <$1000':'<$60/hr')+')');
   P.belowBudget=belowBudget;
@@ -408,7 +418,7 @@ function autofill(P){
   if(P.amount!=null) setVal('b-amt',String(P.amount));
   if(P.proposalsLow!=null) setVal('j-props', P.proposalsLow>=20?'3':P.proposalsLow>=10?'2':P.proposalsLow>=5?'1':'0');
   setVal('c-verified',P.verified);
-  if(P.worldwide && !P.usOnly) setVal('c-us',false); else if(P.usOnly) setVal('c-us',true);
+  setVal('c-us', P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)>=0);
   if(P.spent!=null) setVal('c-spend', (P.spent>=1000&&P.spent<=50000)?'2':P.spent>50000?'1':P.spent>0?'1b':'0');
   if(P.hireRate!=null) setVal('c-hire', P.hireRate>=50?'2':P.hireRate>=20?'1':'0');
   setVal('j-ban', P.bans.length>0);
@@ -449,11 +459,10 @@ function runEval(){
   if(P.bans.length || chk('j-ban')){
     ban=true; decision='SKIP — HARD BAN';
     reasons=(P.bans.length?P.bans.slice():['Marked as HARD BAN (manual)']).concat(P.flags);
-  } else if((P.worldwide&&!P.usOnly)||P.belowBudget){
+  } else if(P.belowBudget){
     decision='SKIP — below Saqib rule';
-    if(P.worldwide&&!P.usOnly) reasons.push('Not US-only (rule: US clients only)');
-    if(P.belowBudget) reasons.push(P.budgetType==='fixed'?'Fixed under $1000 (min for fixed)':'Under $60/hr (min hourly)');
-    P.flags.forEach(function(f){ if(f.indexOf('Not US-only')<0 && f.indexOf('Below threshold')<0) reasons.push(f); });
+    reasons.push(P.budgetType==='fixed'?'Fixed under $1000 (min for fixed)':'Under $60/hr (min hourly)');
+    P.flags.forEach(function(f){ if(f.indexOf('Below threshold')<0) reasons.push(f); });
   } else {
     var s=scoreManual(); cli=s.cli;job=s.job;mat=s.mat;total=s.total;decision=s.decision; reasons=P.flags.slice();
   }
@@ -469,11 +478,13 @@ function runEval(){
     +' · rating '+(P.rating!=null?P.rating:'?')
     +' · hire '+(P.hireRate!=null?(P.hireRate+'%'):'?')+'. <i>Auto-filled the boxes — adjust any you can verify, then Evaluate again.</i></div>';
   var t=pickTemplate();
+  if(pasteStart!=null && decisionSecs==null){ decisionSecs=(performance.now()-pasteStart)/1000; }
+  var timerHtml = decisionSecs!=null ? ('<div class="note" style="margin-top:8px">⏱ Paste to decision: <b>'+(decisionSecs<10?decisionSecs.toFixed(1):Math.round(decisionSecs))+' seconds</b></div>') : '';
   var html='<div class="card"><div class="flex" style="justify-content:space-between;align-items:flex-start">'
     +'<div><div class="eyebrow">Decision</div><div class="scorebig" style="color:'+col+'">'+(ban?'SKIP':total+'/19')+'</div><div style="color:'+col+';font-weight:700;margin-top:4px">'+decision+'</div></div>'
     +'<div style="min-width:55%">'+(isSkip?('<p class="note">Do not spend connects. Reasons:</p>'+reasonHtml):(barRow('Client',cli,7)+barRow('Job',job,7)+barRow('Match',mat,5)+reasonHtml))+'</div></div>'
     +(isSkip?'':'<div class="note" style="margin-top:8px">Threshold: <b>14+ apply</b>, 11-13 review, &le;10 skip. Suggested template: <b>'+t.c+' · '+t.t+'</b> · connects '+t.con+' · boost '+t.boost+'</div>')
-    +det+'</div>';
+    +timerHtml+det+'</div>';
   document.getElementById('eval-out').innerHTML=html;
   logAct('evaluate', firstLine(jobText), ban?0:total, decision);
 }
@@ -485,31 +496,72 @@ function clientWords(job){ // pull a specific phrase from the post
   var m=s.match(/(need|looking for|want|require|build|integrate|automate|fix|develop|create)[^.]{8,90}/i);
   return m? m[0].trim().replace(/^[a-z]/,function(x){return x.toLowerCase();}) : s.slice(0,80);
 }
+/* ---- TASK 1: real stack + concrete approach per template type (no invented metrics/names) ---- */
+function stackFor(c){
+  var M={
+   T1:{stack:"Python, LangChain or LlamaIndex, a vector store (Pinecone, Chroma or FAISS) and an LLM API",
+       approach:"retrieval over your own content with grounding and an evaluation step, so the model answers from your data instead of guessing"},
+   T2:{stack:"FastAPI or Django on the backend, React or Next.js on the front end, PostgreSQL or Supabase, Stripe and Docker",
+       approach:"auth, database, payments and the AI logic wired together and deployed as one production app, not a fragile demo"},
+   T3:{stack:"LangGraph or CrewAI in Python, with tool calling, retries and guardrails",
+       approach:"an agent that runs the whole workflow end to end and handles the edge cases, with checks so it fails safely"},
+   T4:{stack:"Python, FastAPI, React and the major LLM APIs",
+       approach:"the smallest working slice first, wired to your real inputs so you can see it run early"},
+   T5:{stack:"a full backend, front end, AI layer and cloud deployment",
+       approach:"owning architecture, security and delivery, so you get one person accountable end to end"},
+   T6:{stack:"AWS, Docker, CI/CD and Kubernetes or SageMaker",
+       approach:"containerising the model and adding pipelines and monitoring, so it runs reliably under real load"},
+   T7:{stack:"n8n, Make or Zapier with webhooks, Google Sheets, Slack and the LLM APIs",
+       approach:"turning the manual steps into one pipeline that runs itself and notifies your team"},
+   T8:{stack:"a Claude or GPT assistant grounded on your content, with retrieval and clear fallbacks",
+       approach:"an assistant that answers from your business, on brand, instead of giving generic replies"},
+   T9:{stack:"FastAPI or Node with OAuth, retries and proper error handling",
+       approach:"two systems talking reliably, with auth and failure handling built in from the start"},
+   T10:{stack:"Python NLP and extraction pipelines over your documents",
+        approach:"turning the unstructured docs into clean structured output you can search and trust"},
+   T11:{stack:"a full stack plus the AI layer, built to extend",
+        approach:"a real, demo-able MVP fast, structured so you can grow it instead of rebuilding it"},
+   T12:{stack:"frontend, backend, AI and deployment handled by one engineer",
+        approach:"owning delivery as part of your team, so there is less coordination overhead for you"}
+  };
+  return M[c]||M.T4;
+}
+function echoProblem(job){
+  var s=(job||"").replace(/\s+/g," ").trim();
+  var m=s.match(/(?:need|looking for|want|require|build|integrate|automate|fix|develop|create|help with)\s+([^.,;\n]{6,70})/i);
+  var ph = m ? m[1].trim() : (s.slice(0,60)||"the system described in your post");
+  ph = ph.replace(/[.\s]+$/,"");
+  return ph.charAt(0).toLowerCase()+ph.slice(1); // lower first letter only; keep acronyms like RAG/API intact
+}
+/* TASK 1: problem-first, first person, real stack, no invented metrics/names, ends on ONE question.
+   120-160 words for the full proposal. Free template mode (works with no API key);
+   live Claude generation plugs in later via the proxy. No personal names, no agency mention. */
 function genProposal(mode){
-  if(!gate('evaluate')) return;
-  var job=val('job-text'); if(!job){document.getElementById('prop-out').innerHTML='<div class="card note">Paste the job post first.</div>';return;}
-  var name=(val('cl-name')||'').trim(); var greet=name?('Hi '+name):'Hi there';
-  var t=pickTemplate(); var prob=clientWords(job); var opener=t.open.replace('[their goal]',prob).replace('[outcome]',prob).replace('[product]',prob).replace('[Restate their exact problem in one line]',cap(prob));
-  var amt=val('b-amt'), bt=val('b-type'); var rate = amt?('My rate for this is around '+(bt==='hourly'?('$'+amt+'/hr'):('$'+amt))+'.'):'';
-  var out='';
-  if(mode==='speed'){
-    out=greet+' — '+opener+' I\u2019ve built exactly this ('+shortProof(t)+'). I can start this week. One question: '+question(job)+'';
+  if(!gate("evaluate")) return;
+  var job=val("job-text");
+  if(!job){ document.getElementById("prop-out").innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
+  var t=pickTemplate(); var sk=stackFor(t.c); var prob=echoProblem(job); var q=question(job);
+  var out="";
+  if(mode==="speed"){
+    out="You need "+prob+" - and you need it to actually work, not just demo. "
+      +"I build exactly this with "+sk.stack.split(/,| and /)[0]+" and the right LLM stack, and I can start this week. "
+      +"One question: "+q;
   } else {
-    out=greet+',\n\n'+cap(opener)+'\n\n'
-      +'From your post, the core of it is: '+prob+'. Here is how I\u2019d approach it:\n'
-      +'1) '+step1(t)+'\n2) '+step2(t)+'\n3) '+step3(t)+'\n\n'
-      +'Why me: '+t.proof+' I own the full stack end to end, so you get architecture, build and deployment from one engineer — less coordination, faster delivery.\n\n'
-      +(rate?rate+' ':'')+'I can share a short plan and a realistic timeline today.\n\n'
-      +'One question to make sure I scope this right: '+question(job)+'\n\n'
-      +'\u2014 Saqib';
+    out="You need "+prob+", done properly rather than half-working.\n\n"
+      +"This is work I do directly. The way I'd build it: "+sk.approach+". "
+      +"Stack: "+sk.stack+". "
+      +"I'd stand up the core first against your real inputs, prove it on your edge cases, then harden and hand it over so your team owns it.\n\n"
+      +"I move fast because I've shipped this kind of system before, so you see a working slice early instead of waiting weeks for a black box. I own the whole build end to end, which means less back-and-forth and a quicker path to something you can ship.\n\n"
+      +"One question to scope it right: "+q;
   }
-  var cover='Cover note (interview message): '+greet+', thanks for reviewing my proposal. I\u2019ve delivered '+shortProof(t)+' with 5.0 results on Upwork. Happy to walk through your '+oneWord(prob)+' on a quick call and share how I\u2019d sequence it. When works for you?';
-  var words=out.trim().split(/\s+/).length;
-  document.getElementById('prop-out').innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==='speed'?'Speed bid':'Priority proposal')+' · ~'+words+' words</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
+  var words=out.trim().split(/\s+/).filter(Boolean).length;
+  var rangeNote=(mode!=="speed" && (words<120||words>160)) ? " (aim 120-160)" : "";
+  var cover="Thanks for reviewing this. I've worked on this exact kind of problem and can walk you through how I'd approach "+oneWord(prob)+" on a quick call, including how I'd sequence the first build. When works for you?";
+  document.getElementById("prop-out").innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+' - '+words+' words'+rangeNote+'</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
     +'<code class="block" data-copy>'+esc(out)+'</code>'
     +'<div class="eyebrow" style="margin-top:12px">Cover / interview message</div><code class="block">'+esc(cover)+'</code>'
-    +'<div class="src" style="margin-top:10px">Built problem-first and personalized — the two changes most correlated with replies (Upwork 2026; GigRadar dataset). No contact info included (Upwork rule). Review with Usman/Saqib before sending.</div></div>';
-  logAct('proposal', firstLine(job), 0, mode==='speed'?'speed draft':'priority draft');
+    +'<div class="src" style="margin-top:10px">Problem-first, first person, real stack named, no invented metrics or names, ends on one question. Free template mode; live Claude generation plugs in later via the proxy. Review before sending.</div></div>';
+  logAct("proposal", firstLine(job), 0, mode==="speed"?"speed draft":"proposal draft");
 }
 function shortProof(t){return t.proof.split('.')[0].replace(/^Saqib[: ]*/,'').toLowerCase().replace(/^[a-z]/,function(x){return x.toUpperCase();});}
 function step1(t){return 'Confirm scope and success criteria, then set up the core ('+oneWord(t.t)+') with your real data/stack.';}
