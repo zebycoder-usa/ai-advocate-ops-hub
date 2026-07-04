@@ -47,6 +47,21 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
 .seg{display:flex;gap:4px;flex-wrap:wrap}
 .seg label{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;color:var(--muted)}
 .seg input{display:none}.seg input:checked+span{color:var(--green);font-weight:700}
+.acc{border:1px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:10px;overflow:hidden}
+.acc-h{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none}
+.acc-badge{width:30px;height:30px;flex:none;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--gold));display:grid;place-items:center;font-weight:800;color:#06120d}
+.acc-title{font-weight:700;flex:1;font-size:15px}
+.acc-doc{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap;text-decoration:none}
+.acc-doc:hover{color:var(--green);border-color:var(--green2)}
+.acc-caret{color:var(--muted);font-size:12px;transition:transform .2s}
+.acc.open .acc-caret{transform:rotate(90deg)}
+.acc-body{display:none;padding:4px 16px 16px}
+.acc.open .acc-body{display:block;animation:f .2s ease}
+.acc-lead{color:var(--muted);font-size:13px;line-height:1.6;margin:6px 0 12px}
+.acc-card{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px}
+.acc-card h4{margin:0 0 6px;font-size:13px;color:var(--text)}
+.acc-card .note{margin:0}.acc-card ul{margin:6px 0 0;padding-left:18px;line-height:1.6}
+.acc-callout{display:flex;gap:10px;align-items:flex-start;background:#0f231b;border:1px solid #1f5a45;border-radius:12px;padding:12px;font-size:13px;color:var(--muted);margin-top:12px}
 </style></head>
 <body>
 <div class="wrap">
@@ -166,6 +181,12 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
   <!-- RULES & FEES -->
   <section class="view" data-view="rules">
     <div id="rules"></div>
+  </section>
+
+  <!-- UPWORK GUIDE -->
+  <section class="view" data-view="guide">
+    <div class="card" style="margin-bottom:12px"><div class="eyebrow">Upwork Guide</div><p class="note" style="margin-top:6px">Distilled from Upwork's official Help Center (293 articles reviewed, verified July 2026) — facts, figures and steps only. Tap a section to expand; use <b>Open full document ↗</b> for the complete Google Doc.</p></div>
+    <div id="guide"></div>
   </section>
 
   <!-- ASK AI -->
@@ -328,7 +349,7 @@ function inSlot(m){
 function canAct(m){ if(!m) return false; if(m.kind==='excused') return false; if(m.kind==='bidder') return inSlot(m); return true; }
 
 /* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['ai','Ask AI']];
+var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
 function initNav(){
   var nav=document.getElementById('nav');
   VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
@@ -718,6 +739,107 @@ function renderRules(){
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US or Europe jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
 }
 
+/* ============================ UPWORK GUIDE (accordion, from UPWORK_GUIDE_CONTENT.md) ============================ */
+var GUIDE=[
+ {L:'A',t:'Getting Started & Eligibility',url:'https://docs.google.com/document/d/15h7pU_WKewxWRPmpgAYDwPTPmjF1ayVFQ3BMNDgB6QY/edit?usp=sharing',
+  lead:'How Upwork works and who is allowed to join and bid.',
+  cards:[
+   {h:'What Upwork is',b:'A global marketplace connecting freelancers and clients. Freelancer flow: build a strong profile → find jobs → send tailored proposals → deliver → get paid securely. "Best Match" leans on profile + job-post data, so keep both accurate and keyword-rich.'},
+   {h:'Who can join',b:'Upwork serves 180+ countries but not everywhere. You must be 18+ (or the age of majority) and handle your own work-authorization rules.'},
+   {h:'Connects (bidding currency)',b:['Used for proposals, boosting and the Availability Badge. $0.15 each, sold in bundles; verified billing method required.','Per-proposal cost varies by job and can change while live — check the post.','Free: Basic 10/mo · Freelancer Plus 100/mo. Refunded if a client withdraws the post; not for jobs you don’t win.']},
+   {h:'Freelancer Plus ($19.99/mo)',b:'~100 Connects, full Uma access, proposal/job insights, alerts, and 0% fee on Direct Contracts.'}
+  ],
+  callout:'Restricted by US law (cannot register/use Upwork): Russia and Belarus (operations suspended May 2022), Iran, North Korea, Cuba and Cuban nationals, Crimea, the LPR and DPR regions, plus anyone on the US SDN list. The list changes. Previously suspended users cannot return — new accounts get closed.'},
+ {L:'B',t:'Profile & Verification',url:'https://docs.google.com/document/d/1N0lfDIkHF3ZUGTgZL7drCUVR7bK9r2GuPqCFY7qZCss/edit?usp=sharing',
+  lead:'Completeness and verification drive visibility, trust and hire rate.',
+  cards:[
+   {h:'Build a 100% profile',b:'Cover work history, education & certifications, languages, availability, and a real portfolio. Bio: action verbs, keywords, one clear value proposition. For Saqib: lead with true AI/LLM/RAG/FastAPI metrics; state the MS in Data Science; never list a credential not on the live profile.'},
+   {h:'One account, many profiles',b:'One account per login/email, holding one freelancer + one agency + multiple client profiles, each with its own contracts and finances. Switch via the dropdown under your profile photo.'},
+   {h:'Identity verification',b:'The blue identity-verification badge signals trust. Verify with a government ID (sometimes ID + proof of address), a camera/video check, and your phone number. Some US-only jobs need location verification; KYC info may be requested. The badge costs Connects, not cash.'},
+   {h:'Availability Badge',b:'A blue "Available now" badge (bought with Connects) that earns more invites and shows in search; clients can filter by it. Weekly cost varies with demand and you set a max you’ll spend.'},
+   {h:'Account controls',b:'You manage dark/light mode, AI preferences, and how your name displays.'}
+  ],
+  callout:'A VPN is allowed only if used properly — not to fake your location.'},
+ {L:'C',t:'Finding Work & Proposals',url:'https://docs.google.com/document/d/15azeAv-gHUoEX0OKBbjkX21jFlCdsRR8B8KA8X-wStg/edit?usp=sharing',
+  lead:'Search, bid, and how the auction and Job Success Score work.',
+  cards:[
+   {h:'Job search',b:'Matches on client category, skills, title, description. Advanced Search supports Boolean (AND / OR / NOT) plus "all words / any words / exact phrase." Job alerts and the job digest email surface matches; saved searches help. Ranking isn’t fully disclosed (so it can’t be gamed).'},
+   {h:'Sending proposals',b:'Bid against a specific post; the Connect cost is shown. Keep it tailored (maps to the T1–T8 templates + 120–180-word skeleton). Freelancer Plus adds bid-range and client-activity insights, and recorded video interviews via Uma.'},
+   {h:'Boosted Proposals (auction)',b:'Bid extra Connects to reach the top of the client’s list. Eligibility depends on match strength; always optional. You set a max bid; a bid table shows others’ ranges; boosted proposals are shown separately (top); ties resolve by a set rule; you can update or re-boost.'},
+   {h:'Direct offers & Direct Contracts',b:['Direct offer: a client offers a contract directly — negotiate, accept, or decline (different from an invitation to apply).','Direct Contracts: bring your own off-platform client onto Upwork; reduced fee, 0% for active Freelancer Plus. Moving a contract off Upwork costs a conversion fee.']},
+   {h:'Project Catalog',b:'Publish pre-scoped, fixed-price/timeline project packages (with images, video, PDF samples); clients buy directly without a proposal.'},
+   {h:'Job Success Score (JSS)',b:'90%+ = strong; 80s = solid with room to grow; ≤79% = challenges. Built from client feedback, contract-ending history, and long-term relationships. An agency’s JSS is the aggregate of its jobs.'}
+  ],
+  callout:'Some auctions are placebo auctions (used to calibrate) and Connects aren’t taken for a placebo boost.'},
+ {L:'D',t:'Payments, Fees & Taxes',url:'https://docs.google.com/document/d/1KAuAaSkC7Taboeq19t6lXSmGzjK0bKVe4u-uyHfLXvs/edit?usp=sharing',
+  lead:'Verified July 2026 — the flat 10% fee is retired; the freelancer fee is now variable.',
+  cards:[
+   {h:'Fees (verified July 2026)',b:['Freelancer service fee: variable 0–15% per contract (NOT a flat 10% — that was retired 1 May 2025); locked at proposal. Blended ~11–13.5%; high-demand AI skills can land lower.','Client marketplace fee 3–10%; contract-initiation fee $0.99–$14.99 (client, per new contract).','Connects $0.15; standard proposal ~6 Connects; Freelancer Plus $19.99/mo.']},
+   {h:'Getting paid & withdrawals',b:'Enter tax info first, then add a withdrawal method. Options: Direct to US Bank (ACH, free), Direct to Local Bank (needs bank codes; Pakistan $0.99 to a personal account — PKR to business accounts is rejected), Payoneer and PayPal (timing/fees vary), US wire ~$30. A reserve balance can briefly hold funds; holiday payment delays happen.'},
+   {h:'Weekly billing (hourly)',b:'Period Mon 00:00 → Sun 23:59 UTC; client invoiced Monday, reviews Mon–Fri; earnings available the following Wednesday (~10 days). Log time with the Desktop App.'},
+   {h:'Taxes',b:'Tax info is required before withdrawal. US persons (Saqib) file Form W-9. Upwork handles various local taxes elsewhere (India GST + TDS, Australia/Singapore GST, Switzerland/Colombia/Vietnam VAT, etc.).'}
+  ],
+  callout:'Rate rule: gross = net ÷ (1 − quoted fee). Because the fee is variable, read the exact % on each proposal before quoting.'},
+ {L:'E',t:'Protection & Disputes',url:'https://docs.google.com/document/d/1NxafJDuB2P0fHVOPFw10rs2oJBEPWhrdTFQ7hd9Yy0c/edit?usp=sharing',
+  lead:'What qualifies for payment protection, and what to do when a client goes silent.',
+  cards:[
+   {h:'Hourly Payment Protection — qualify',b:'Client has a verified billing method; track time with the Desktop App; work matches the contract; stay within the weekly limit. Manual time outside these rules is not protected.'},
+   {h:'Fixed-Price Protection — qualify',b:'Don’t start until the milestone is fully funded in project funds (escrow); only escrowed funds are covered; confirm the client’s payment method is verified.'},
+   {h:'Client goes silent',b:['Hourly: end anytime; properly-logged protected hours still pay on the normal cycle.','Fixed: complete + submit the milestone (Deliver work → active contracts), then wait 14 days for auto-release.']},
+   {h:'Disputes',b:['Fixed-price: if a client won’t release a funded milestone, file a dispute on an active or ended contract; Upwork provides a non-binding resolution / mediation step.','Hourly: a client can dispute your hours — respond with work-diary evidence.','Refunds (client-side): a client may request a refund within 180 days; the freelancer decides full/partial/none.']}
+  ],
+  callout:'Off-platform work voids protection: only escrowed (fixed) or Desktop-App-tracked (hourly) work is covered.'},
+ {L:'F',t:'Contracts, Time & Feedback',url:'https://docs.google.com/document/d/1dzvJcPodhDWstx_PmwjTZM_lCl-Id71AMr5Q_acaJW4/edit?usp=sharing',
+  lead:'The Desktop App, managing contracts, and the end-of-contract review.',
+  cards:[
+   {h:'The Desktop App',b:'Logs hourly time via the time tracker (screenshots + activity), which builds the work diary — required for full Hourly Protection. Supports manual time (less protection). Common fixes: reinstall, re-login, clear cached uploads if time or contracts don’t appear.'},
+   {h:'Managing contracts',b:'Tracked vs manual time, activity tags, to-do lists, and the contract workroom. Upwork may pause a contract (billing/verification) until resolved. You can propose milestone changes or rate changes and end a contract from its menu.'},
+   {h:'Feedback',b:'End-of-contract review has a 14-day window: public review + private note (old private star rating removed). A review is required to end a contract; public reviews can be edited within the window. You can also give feedback to clients.'}
+  ],
+  callout:'A review is required to end a contract; the 14-day feedback window lets you edit public reviews before it closes.'},
+ {L:'G',t:'Agencies on Upwork',url:'https://docs.google.com/document/d/1IHZaAOKXxoaCO-WRubg259z6u8D3Z1R3vbQ0ymfGW5U/edit?usp=sharing',
+  lead:'AI Advocate’s operating model — read closely.',
+  cards:[
+   {h:'How agencies work',b:'An agency is a team under one profile. Clients hire the agency (owner, a manager, or a member); payments go to the agency, which pays its own members by internal agreement.'},
+   {h:'Agency Plus plan ($19.99/mo)',b:'Gives the agency its own Connects (100/cycle) and the ability to bid as the agency. Agency Connects follow cycle-end rules (they don’t roll indefinitely). An agency can run alongside a personal Freelancer Plus.'},
+   {h:'Members',b:'Add/remove members; members are exclusive (work only under this agency) or non-exclusive (also work independently). Assign a specific member to a proposal, or submit without an assigned member per the agency’s settings.'},
+   {h:'Operating',b:'Manage the agency’s rate and visibility, its proposals and offers, and its finances. You can create, close, or leave an agency. Agency contracts function like individual contracts but roll up to the agency’s JSS.'}
+  ],
+  callout:'Reminder: all current bidding is on Saqib’s PERSONAL freelancer profile — the agency profile is not used for bidding right now.'},
+ {L:'H',t:'Trust, Safety & Support',url:'https://docs.google.com/document/d/128yxSbSBWjQa9S6Qw1QhqZTKAkbRj9Kk4YjNnvVMv6w/edit?usp=sharing',
+  lead:'Spot scams, report abuse, secure the account, and where to get help.',
+  cards:[
+   {h:'Scam red flags',b:'Unrealistic pay or vague posts; pressure to talk off-platform before a contract; free-work "tests"; requests to pay/be paid outside Upwork. Keep all comms and payment on Upwork — off-platform activity voids protection and violates ToS.'},
+   {h:'Reporting',b:'Flag pre-contract contact sharing, off-platform payment, fake profiles, copyrighted logos, or threats. Reports are confidential; you can block/unblock users.'},
+   {h:'Secure your account',b:'Password (required), security question, mobile number, and an authenticator app (highest level — enable it). Manage in Account Settings → Password and security. Only enter credentials on the real Upwork site/app; verify email legitimacy first.'},
+   {h:'Account management',b:'Check account health in settings; you can reactivate a freelancer account, fix login issues, and appeal a suspension. Suspensions can be permanent.'},
+   {h:'Support & status',b:'Reach support from the Help Center (Get Support / log in). Upwork publishes a live system-status page (marketplace, messages, payments) — check it first before assuming an app-side bug.'}
+  ],
+  callout:'Debug order: Upwork Status → account health → ops-hub. Keep all comms and payment on Upwork — off-platform activity voids protection and violates ToS.'}
+];
+function toggleGuide(i){var el=document.getElementById('acc-'+i);if(el)el.classList.toggle('open');}
+function renderGuide(){
+  var el=document.getElementById('guide');if(!el)return;
+  el.innerHTML=GUIDE.map(function(g,i){
+    var cards=g.cards.map(function(c){
+      var body=Array.isArray(c.b)?('<ul class="note">'+c.b.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'):('<p class="note">'+esc(c.b)+'</p>');
+      return '<div class="acc-card"><h4>'+esc(c.h)+'</h4>'+body+'</div>';
+    }).join('');
+    return '<div class="acc" id="acc-'+i+'">'
+      +'<div class="acc-h" onclick="toggleGuide('+i+')">'
+        +'<span class="acc-badge">'+g.L+'</span>'
+        +'<span class="acc-title">'+esc(g.t)+'</span>'
+        +'<a class="acc-doc" href="'+g.url+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open full document ↗</a>'
+        +'<span class="acc-caret">▶</span>'
+      +'</div>'
+      +'<div class="acc-body">'
+        +'<p class="acc-lead">'+esc(g.lead)+'</p>'
+        +cards
+        +'<div class="acc-callout"><span>⚠️</span><div>'+esc(g.callout)+'</div></div>'
+      +'</div></div>';
+  }).join('');
+}
+
 /* ============================ ASK AI (demo + live) ============================ */
 var AGENCY_CONTEXT = buildContext();
 function buildContext(){
@@ -765,7 +887,7 @@ function renderAiMode(){
 /* ============================ BOOT ============================ */
 function renderAll(){renderAccess();renderCommand();renderPipeline();renderReport();renderRoster();tickClock();}
 async function boot(){
-  initRole(); initNav(); renderTemplates(); renderProfiles(); renderScoring(); renderRules(); renderAiMode();
+  initRole(); initNav(); renderTemplates(); renderProfiles(); renderScoring(); renderRules(); renderGuide(); renderAiMode();
   mem.pipeline=await load('pipeline',[]); mem.activity=await load('activity',[]);
   AGENCY_CONTEXT=buildContext();
   renderAll();
