@@ -254,42 +254,42 @@ var PROFILES = {
 };
 
 var TEMPLATES = [
-  {c:'T1',t:'LLM / RAG / GenAI build',when:'Job mentions RAG, chatbot on data, knowledge base, hallucination, vector DB',rate:'$70–90/hr',con:'6',boost:'Only if high-value + few proposals',
-   open:'You need [their goal] without the model making things up — that is a retrieval + grounding problem, not a prompt problem.',
+  {c:'T1',t:'LLM / RAG / GenAI build',when:'Job mentions RAG, chatbot on data, knowledge base, hallucination, vector DB',rate:'$70-90/hr',con:'6',boost:'Only if high-value + few proposals',
+   open:'You need [their goal] without the model making things up, that is a retrieval + grounding problem, not a prompt problem.',
    proof:'Saqib built a RAG SaaS and a multi-agent SaaS (both 5.0). Pinecone/Chroma/FAISS + LangChain/LlamaIndex.'},
-  {c:'T2',t:'Full-stack SaaS / FastAPI + React',when:'SaaS MVP, dashboard, API + frontend, Stripe, auth',rate:'$70–90/hr',con:'6',boost:'No (unless premium)',
-   open:'You want a production SaaS, not a wrapper — auth, DB, payments and the AI logic wired together and deployed.',
+  {c:'T2',t:'Full-stack SaaS / FastAPI + React',when:'SaaS MVP, dashboard, API + frontend, Stripe, auth',rate:'$70-90/hr',con:'6',boost:'No (unless premium)',
+   open:'You want a production SaaS, not a wrapper, auth, DB, payments and the AI logic wired together and deployed.',
    proof:'Saqib ships full stack: FastAPI/Django + React/Next + PostgreSQL/Supabase + Stripe + AWS/Docker, 99.9% uptime.'},
-  {c:'T3',t:'Agentic AI / multi-agent / automation',when:'LangGraph, CrewAI, autonomous agents, scraping, workflow automation',rate:'$70–90/hr',con:'6',boost:'No',
-   open:'You want an agent that actually completes the workflow end to end, with guardrails — not a demo that breaks on edge cases.',
+  {c:'T3',t:'Agentic AI / multi-agent / automation',when:'LangGraph, CrewAI, autonomous agents, scraping, workflow automation',rate:'$70-90/hr',con:'6',boost:'No',
+   open:'You want an agent that actually completes the workflow end to end, with guardrails, not a demo that breaks on edge cases.',
    proof:'Saqib built LangGraph/CrewAI multi-agent systems that browse, scrape and execute; delivered a multi-agent SaaS (5.0).'},
-  {c:'T4',t:'Fast speed-bid (under 10 proposals)',when:'Fresh post, <10 proposals — speed beats polish',rate:'set by job',con:'6',boost:'Never',
+  {c:'T4',t:'Fast speed-bid (under 10 proposals)',when:'Fresh post, <10 proposals, speed beats polish',rate:'set by job',con:'6',boost:'Never',
    open:'[Restate their exact problem in one line].',
    proof:'One-line proof + one question. Submit in minutes while the post is new.'},
-  {c:'T5',t:'Director / VP / Head of AI (decision-maker)',when:'Title-level client, strategic hire',rate:'$80–90/hr',con:'6–8',boost:'Always boost',
-   open:'You are hiring for [outcome] at the org level — you need someone who owns architecture and delivery, not a task-taker.',
+  {c:'T5',t:'Director / VP / Head of AI (decision-maker)',when:'Title-level client, strategic hire',rate:'$80-90/hr',con:'6-8',boost:'Always boost',
+   open:'You are hiring for [outcome] at the org level, you need someone who owns architecture and delivery, not a task-taker.',
    proof:'Saqib owns the whole stack end to end; speaks architecture, security and deployment, not just code.'},
-  {c:'T6',t:'MLOps / SageMaker / Kubernetes',when:'Deployment, scaling, pipelines, infra for ML',rate:'$80–90/hr',con:'6',boost:'If premium',
-   open:'Your model works — now it has to run reliably at scale. That is an MLOps and infra problem.',
+  {c:'T6',t:'MLOps / SageMaker / Kubernetes',when:'Deployment, scaling, pipelines, infra for ML',rate:'$80-90/hr',con:'6',boost:'If premium',
+   open:'Your model works, now it has to run reliably at scale. That is an MLOps and infra problem.',
    proof:'Saqib: AWS, Docker, CI/CD, scalable deployments with 99.9%+ uptime.'},
-  {c:'T7',t:'Workflow automation (n8n / Make / Zapier)',when:'Connect tools, automate ops, webhooks, Sheets/Slack',rate:'$60–80/hr',con:'6',boost:'No',
-   open:'You are doing [repetitive task] by hand — that is a multi-step automation that can run itself and notify your team.',
+  {c:'T7',t:'Workflow automation (n8n / Make / Zapier)',when:'Connect tools, automate ops, webhooks, Sheets/Slack',rate:'$60-80/hr',con:'6',boost:'No',
+   open:'You are doing [repetitive task] by hand, that is a multi-step automation that can run itself and notify your team.',
    proof:'Multi-node pipelines integrating APIs, Google Sheets, OpenAI/Claude, webhooks and Slack.'},
-  {c:'T8',t:'AI chatbot / assistant for a business',when:'Website assistant, support bot, internal assistant',rate:'$60–85/hr',con:'6',boost:'No',
-   open:'You want a chatbot that answers from YOUR business — accurate, on-brand, and not generic.',
+  {c:'T8',t:'AI chatbot / assistant for a business',when:'Website assistant, support bot, internal assistant',rate:'$60-85/hr',con:'6',boost:'No',
+   open:'You want a chatbot that answers from YOUR business, accurate, on-brand, and not generic.',
    proof:'Custom GPT-4o/Claude assistants grounded on client data; Saqib catalog has a $350 chatbot offering.'},
-  {c:'T9',t:'API integration / backend fix',when:'Connect 2 systems, REST/OAuth, debug backend',rate:'$60–80/hr',con:'6',boost:'No',
+  {c:'T9',t:'API integration / backend fix',when:'Connect 2 systems, REST/OAuth, debug backend',rate:'$60-80/hr',con:'6',boost:'No',
    open:'You need [system A] and [system B] talking reliably with proper auth and error handling.',
    proof:'Secure high-performance REST APIs, OAuth, multi-service backends (FastAPI/Node).'},
-  {c:'T10',t:'Data / NLP / document extraction',when:'Parse PDFs, extract structured data, classify, analyse',rate:'$60–85/hr',con:'6',boost:'No',
+  {c:'T10',t:'Data / NLP / document extraction',when:'Parse PDFs, extract structured data, classify, analyse',rate:'$60-85/hr',con:'6',boost:'No',
    open:'You have unstructured [docs/data] and need clean structured output you can trust and search.',
    proof:'NLP + extraction pipelines; AI resume-ranking & parsing system in portfolio.'},
-  {c:'T11',t:'AI MVP for a startup / founder',when:'Founder, "build my AI product", investor demo',rate:'$70–90/hr',con:'6–8',boost:'If competitive',
-   open:'You are validating [product] — you need a real, demo-able MVP fast, built to extend, not throwaway.',
+  {c:'T11',t:'AI MVP for a startup / founder',when:'Founder, "build my AI product", investor demo',rate:'$70-90/hr',con:'6-8',boost:'If competitive',
+   open:'You are validating [product], you need a real, demo-able MVP fast, built to extend, not throwaway.',
    proof:'Delivered MVPs from concept to shippable; full stack + AI in one engineer.'},
-  {c:'T12',t:'Long-term / retainer / staff-aug',when:'Ongoing, part-time, "join our team", monthly',rate:'$70–85/hr',con:'6',boost:'No',
-   open:'You want a reliable engineer embedded with your team long-term — owning delivery, not just tickets.',
-   proof:'Saqib is one engineer who covers frontend, backend, AI and deployment — less coordination overhead for you.'}
+  {c:'T12',t:'Long-term / retainer / staff-aug',when:'Ongoing, part-time, "join our team", monthly',rate:'$70-85/hr',con:'6',boost:'No',
+   open:'You want a reliable engineer embedded with your team long-term, owning delivery, not just tickets.',
+   proof:'Saqib is one engineer who covers frontend, backend, AI and deployment, less coordination overhead for you.'}
 ];
 
 var SCORING = {
@@ -614,7 +614,7 @@ function genProposal(mode){
 function shortProof(t){return t.proof.split('.')[0].replace(/^Saqib[: ]*/,'').toLowerCase().replace(/^[a-z]/,function(x){return x.toUpperCase();});}
 function step1(t){return 'Confirm scope and success criteria, then set up the core ('+oneWord(t.t)+') with your real data/stack.';}
 function step2(t){return 'Build the working slice end to end, test it against your edge cases, and show you a demo early.';}
-function step3(t){return 'Harden, document, and hand over so your team owns it — no dependency on me.';}
+function step3(t){return 'Harden, document, and hand over so your team owns it, no dependency on me.';}
 function question(job){var s=(job||'').toLowerCase();
   if(/rag|data|documents|knowledge/.test(s)) return 'roughly how much data/how many documents should it search, and where does it live?';
   if(/api|integrat|webhook/.test(s)) return 'which systems need to talk to each other, and do you already have API access/keys?';
@@ -852,7 +852,7 @@ function renderGuide(){
 /* ============================ ASK AI (demo + live) ============================ */
 var AGENCY_CONTEXT = buildContext();
 function buildContext(){
-  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). Rate: $55/hr Saqib, $45-55/hr agency. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). Match budget point = $55/hr or $200+ fixed. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work.`;
+  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). Rate: $55/hr Saqib, $45-55/hr agency. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). Match budget point = $55/hr or $200+ fixed. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work. PROPOSAL AND COVER LETTER OUTPUT RULES - when you generate or write a proposal or a cover letter, follow these exactly: Always output two labelled blocks: "PROPOSAL:" then "COVER LETTER:". Both must be complete and ready to paste, nothing left blank. NEVER output placeholders or bracketed blanks such as [their requirement], [metric], [name], or [detail]. If a specific number is unknown, write a true qualitative sentence instead. NEVER invent a metric, tool, employer, title, or result. Use only facts true of Saqib and traceable to real work (honesty gate). NEVER use em dashes or en dashes. Use commas, periods, or short sentences. Write in natural, humanized, spoken English, the way a confident senior engineer actually talks. Contractions are fine. No corporate filler, no "I am the perfect fit", no "Dear Hiring Manager". Shape: open with the client's exact problem in their own words; give one or two true proof points; show you read the post; give a 2 to 3 step plan; end with one specific question. Proposal length 120 to 180 words. Cover letter 2 to 4 sentences.`;
 }
 
 var chat=[];
@@ -874,7 +874,7 @@ async function askAI(){
   var live=false;
   try{
     var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:AGENCY_CONTEXT,messages:chat})});
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,messages:chat})});
     if(resp.ok){var data=await resp.json();var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');if(txt){pushMsg('ai',txt);chat.push({role:'assistant',content:txt});live=true;}}
   }catch(e){}
   if(!live){var a=demoAnswer(q);pushMsg('ai',a);chat.push({role:'assistant',content:a});}
