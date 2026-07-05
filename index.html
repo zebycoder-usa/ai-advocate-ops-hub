@@ -593,32 +593,31 @@ function echoProblem(job){
 /* TASK 1: problem-first, first person, real stack, no invented metrics/names, ends on ONE question.
    120-160 words for the full proposal. Free template mode (works with no API key);
    live Claude generation plugs in later via the proxy. No personal names, no agency mention. */
-function genProposal(mode){
+async function genProposal(mode){
   if(!gate("evaluate")) return;
-  var job=val("job-text");
-  if(!job){ document.getElementById("prop-out").innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
-  var t=pickTemplate(); var sk=stackFor(t.c); var prob=echoProblem(job); var q=question(job);
-  var out="";
-  if(mode==="speed"){
-    out="You need "+prob+" - and you need it to actually work, not just demo. "
-      +"I build exactly this with "+sk.stack.split(/,| and /)[0]+" and the right LLM stack, and I can start this week. "
-      +"One question: "+q;
-  } else {
-    out="You need "+prob+", done properly rather than half-working.\n\n"
-      +"This is work I do directly. The way I'd build it: "+sk.approach+". "
-      +"Stack: "+sk.stack+". "
-      +"I'd stand up the core first against your real inputs, prove it on your edge cases, then harden and hand it over so your team owns it.\n\n"
-      +"I move fast because I've shipped this kind of system before, so you see a working slice early instead of waiting weeks for a black box. I own the whole build end to end, which means less back-and-forth and a quicker path to something you can ship.\n\n"
-      +"One question to scope it right: "+q;
+  var el=document.getElementById("prop-out");
+  var jd=val("job-text");
+  if(!jd){ el.innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
+  el.innerHTML='<div class="card note">Generating proposal...</div>';
+  var ask='Write a winning Upwork proposal and intro message for this job, following your PROPOSAL '
+    +'OUTPUT RULES exactly. Output ONLY the two labelled blocks (PROPOSAL and INTRO MESSAGE), '
+    +'no score, no preamble.\n\nJOB:\n'+jd;
+  if(mode==="speed") ask+=' Keep the proposal on the shorter side, about 120 words.';
+  try{
+    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
+      messages:[{role:'user',content:ask}]})});
+    if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Proposal generation failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
+    var data=await resp.json();
+    var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+    if(!txt){ el.innerHTML='<div class="card note">The model returned no text. Try again.</div>'; return; }
+    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
+      +'<div class="md" data-copy>'+mdToHtml(txt)+'</div>'
+      +'<div class="src" style="margin-top:10px">Generated live by Claude from the job post and the agency brief. Review before sending.</div></div>';
+    logAct("proposal", firstLine(jd), 0, mode==="speed"?"speed draft":"proposal draft");
+  }catch(e){
+    el.innerHTML='<div class="card note">Proposal generation error: '+esc(String(e&&e.message?e.message:e))+'</div>';
   }
-  var words=out.trim().split(/\s+/).filter(Boolean).length;
-  var rangeNote=(mode!=="speed" && (words<120||words>160)) ? " (aim 120-160)" : "";
-  var cover="Thanks for reviewing this. I've worked on this exact kind of problem and can walk you through how I'd approach "+oneWord(prob)+" on a quick call, including how I'd sequence the first build. When works for you?";
-  document.getElementById("prop-out").innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+' - '+words+' words'+rangeNote+'</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
-    +'<code class="block" data-copy>'+esc(out)+'</code>'
-    +'<div class="eyebrow" style="margin-top:12px">Cover / interview message</div><code class="block">'+esc(cover)+'</code>'
-    +'<div class="src" style="margin-top:10px">Problem-first, first person, real stack named, no invented metrics or names, ends on one question. Free template mode; live Claude generation plugs in later via the proxy. Review before sending.</div></div>';
-  logAct("proposal", firstLine(job), 0, mode==="speed"?"speed draft":"proposal draft");
 }
 function shortProof(t){return t.proof.split('.')[0].replace(/^Saqib[: ]*/,'').toLowerCase().replace(/^[a-z]/,function(x){return x.toUpperCase();});}
 function step1(t){return 'Confirm scope and success criteria, then set up the core ('+oneWord(t.t)+') with your real data/stack.';}
