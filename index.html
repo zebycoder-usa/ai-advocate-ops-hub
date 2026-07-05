@@ -421,7 +421,7 @@ function parseJob(text){
   var rt=t.match(/([\d.]+)\s*stars?\b/i)||t.match(/([\d.]+)\s*\/\s*5\b/i)||t.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
   var hr=t.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
   if(P.budgetType==='fixed' && P.amount!=null && P.amount<200) P.bans.push('Fixed-price under $200 ($'+P.amount+')');
-  if(P.proposalsLow!=null && P.proposalsLow>=20) P.bans.push('20+ proposals already');
+  /* Proposal saturation is NOT a ban — it is scored as a penalty in runEval (see SAT_PENALTY). */
   if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
   if(/\b(government|federal agency|military|defense|defence|itar|fedramp|cmmc|govcloud|gov cloud)\b/i.test(low)) P.bans.push('Banned industry (govt/defense)');
   if(/\b(umbrage|stewart|cvs health|lynx)\b/i.test(low)) P.bans.push('Banned company');
@@ -455,7 +455,7 @@ function scoreManual(){
   var pr=val('j-props'); job+= (pr==='0'||pr==='1')?2:(pr==='2'?1:0); job+= chk('j-long')?1:0; if(job>7)job=7;
   var mat=0; mat+=(+val('m-match')); mat+=chk('m-proof')?1:0; mat+=chk('c-us')?1:0; if(mat>5)mat=5;
   var total=cli+job+mat;
-  var decision = total>=14?'APPLY':(total>=11?'REVIEW with Usman/Saqib':'SKIP — low score');
+  var decision = total>=14 ? ((total>=16 && mat>=4)?'APPLY WITH BOOST':'APPLY STANDARD') : 'SKIP — low score';
   return {total:total,cli:cli,job:job,mat:mat,decision:decision};
 }
 function barRow(label,v,max){return '<div style="margin:6px 0"><div class="flex" style="justify-content:space-between"><span class="note">'+label+'</span><span class="note">'+v+'/'+max+'</span></div><div class="bar"><i style="width:'+(100*v/max)+'%"></i></div></div>';}
@@ -485,10 +485,19 @@ function runEval(){
     reasons.push(P.budgetType==='fixed'?'Fixed under $1000 (min for fixed)':'Under $60/hr (min hourly)');
     P.flags.forEach(function(f){ if(f.indexOf('Below threshold')<0) reasons.push(f); });
   } else {
-    var s=scoreManual(); cli=s.cli;job=s.job;mat=s.mat;total=s.total;decision=s.decision; reasons=P.flags.slice();
+    var s=scoreManual(); cli=s.cli;job=s.job;mat=s.mat;total=s.total; reasons=P.flags.slice();
+    /* Proposal saturation penalty (50+). Tune this one value; set to 3 to weight saturation harder. */
+    const SAT_PENALTY = 2;
+    var satPen = 0;
+    if(P.proposalsLow!=null){
+      if(P.proposalsLow>=50){ satPen=SAT_PENALTY; reasons.push('50+ proposals — heavily saturated (score -'+SAT_PENALTY+')'); }
+      else if(P.proposalsLow>=20){ satPen=1; reasons.push('20-50 proposals — busy (score -1)'); }
+    }
+    total-=satPen; if(total<0)total=0;
+    decision = total>=14 ? ((total>=16 && mat>=4)?'APPLY WITH BOOST':'APPLY STANDARD') : 'SKIP — low score';
   }
   var isSkip = ban || decision.indexOf('SKIP')===0;
-  var col= decision.indexOf('APPLY')===0?'var(--green)':(decision.indexOf('REVIEW')===0?'var(--amber)':'var(--red)');
+  var col= decision.indexOf('APPLY')===0?'var(--green)':'var(--red)';
   var reasonHtml = reasons.length?('<ul class="note" style="margin:8px 0 0 18px;padding:0">'+reasons.map(function(r){return '<li>'+esc(r)+'</li>';}).join('')+'</ul>'):'';
   var det='<div class="src" style="margin-top:10px"><b>What I read from the post:</b> '
     +'budget '+(P.budgetType?(P.budgetType==='fixed'?('fixed $'+(P.amount!=null?P.amount:'?')):('$'+(P.amount!=null?P.amount:'?')+'/hr')):'not found')
@@ -504,7 +513,7 @@ function runEval(){
   var html='<div class="card"><div class="flex" style="justify-content:space-between;align-items:flex-start">'
     +'<div><div class="eyebrow">Decision</div><div class="scorebig" style="color:'+col+'">'+(ban?'SKIP':total+'/19')+'</div><div style="color:'+col+';font-weight:700;margin-top:4px">'+decision+'</div></div>'
     +'<div style="min-width:55%">'+(isSkip?('<p class="note">Do not spend connects. Reasons:</p>'+reasonHtml):(barRow('Client',cli,7)+barRow('Job',job,7)+barRow('Match',mat,5)+reasonHtml))+'</div></div>'
-    +(isSkip?'':'<div class="note" style="margin-top:8px">Threshold: <b>14+ apply</b>, 11-13 review, &le;10 skip. Suggested template: <b>'+t.c+' · '+t.t+'</b> · connects '+t.con+' · boost '+t.boost+'</div>')
+    +(isSkip?'':'<div class="note" style="margin-top:8px">Threshold: <b>16-19 (Match 4+) apply with boost</b>, 14-15 apply standard, below 14 skip. Suggested template: <b>'+t.c+' · '+t.t+'</b> · connects '+t.con+' · boost '+t.boost+'</div>')
     +timerHtml+det+'</div>';
   document.getElementById('eval-out').innerHTML=html;
   logAct('evaluate', firstLine(jobText), ban?0:total, decision);
@@ -722,7 +731,7 @@ function renderScoring(){
   var el=document.getElementById('scoring');
   function tbl(rows){return '<table>'+rows.map(function(r){return '<tr><td>'+r[0]+'</td><td class="muted" style="text-align:right">'+r[1]+'</td></tr>';}).join('')+'</table>';}
   el.innerHTML='<div class="card"><div class="eyebrow">The 19-point score — why this works</div>'
-    +'<p class="note" style="margin-top:6px">Three buckets. Apply at <b>14+</b>, review 11–13, skip ≤10. Hard bans override to SKIP. It is tuned to the two things the data says actually drive replies: <b>fit</b> and <b>a verified, mid-tier client</b> — not chasing whales or perfect 5-star clients.</p></div>'
+    +'<p class="note" style="margin-top:6px">Three outcomes. <b>16-19 with Match 4+</b> apply with boost, 14-15 apply standard, below 14 skip. Hard bans override to SKIP. It is tuned to the two things the data says actually drive replies: <b>fit</b> and <b>a verified, mid-tier client</b> — not chasing whales or perfect 5-star clients.</p></div>'
     +'<div class="grid g3" style="margin-top:12px">'
     +'<div class="card"><div class="eyebrow">Client · /7</div>'+tbl(SCORING.client)+'</div>'
     +'<div class="card"><div class="eyebrow">Job · /7</div>'+tbl(SCORING.job)+'</div>'
@@ -843,7 +852,7 @@ function renderGuide(){
 /* ============================ ASK AI (demo + live) ============================ */
 var AGENCY_CONTEXT = buildContext();
 function buildContext(){
-  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). Rate: $55/hr Saqib, $45-55/hr agency. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; 50+ existing proposals; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). Match budget point = $55/hr or $200+ fixed. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal-count penalty: under 50 none; 50+ auto-skip. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work.`;
+  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). Rate: $55/hr Saqib, $45-55/hr agency. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). Match budget point = $55/hr or $200+ fixed. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work.`;
 }
 
 var chat=[];
@@ -851,14 +860,14 @@ function pushMsg(role,text){chat.length&&role==='user'?null:null; var c=document
 function demoAnswer(q){
   var s=q.toLowerCase();
   if(/ban|skip|avoid|black/.test(s)) return 'Hard bans (instant skip, 0 connects): Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC; clients in India or Bangladesh; companies Umbrage, Stewart, CVS Health, Lynx; fixed under $200, 20+ proposals, survey/test jobs, on-site 2+ days/week.';
-  if(/score|19|point|evaluate/.test(s)) return '19-point score: Client/7 + Job/7 + Match/5. Apply at 14+, review 11–13, skip ≤10. Hard bans override to skip. Mid-tier verified clients ($1k–$50k) score highest.';
+  if(/score|19|point|evaluate/.test(s)) return '19-point score: Client/7 + Job/7 + Match/5. 16-19 with Match 4+ apply with boost; 14-15 apply standard; below 14 skip. Hard bans override to skip. Mid-tier verified clients ($1k–$50k) score highest.';
   if(/fee|connect|cost|charge|payout|pkr/.test(s)) return 'Fees: variable 0–15% shown before submit (~10% typical). Connects $0.15 each (6 = $0.90). Plus $19.99/mo. ID badge 35 connects. PKR via Direct to Local Bank $0.99. Quote = net ÷ 0.90.';
   if(/slot|window|time|hour|shift/.test(s)) return 'Bidder windows are picked daily (ad-hoc), single login on Saqib\u2019s personal profile. Defaults: Fiza 19–20, Subhan 20–21, Sadia 21–22, Hamza 22–23 PKT. Owners, Usman and Zeb act anytime.';
   if(/excus|kaleem|sana|ayesha|adil/.test(s)) return 'Kaleem, Sana, Ayesha and Adil are excused from Upwork bidding for at least one month (Saqib, 29 June).';
   if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
   if(/threshold|apply|budget|rate|\$60|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India and Bangladesh banned), over $60/hr or $1000+ fixed (Saqib, 29 June). Bid usually $70–90/hr, set per job by Saqib/Usman.';
   if(/profile|agency|personal/.test(s)) return 'All bidding is on Saqib\u2019s PERSONAL freelancer profile, not the agency. Single login, one person at a time.';
-  return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, allowed regions United States and Europe (India and Bangladesh banned), over $60/hr or $1000+ fixed; score 19 points (apply 14+); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
+  return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, allowed regions United States and Europe (India and Bangladesh banned), over $60/hr or $1000+ fixed; score 19 points (16-19 with Match 4+ boost, 14-15 standard, below 14 skip); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
 }
 async function askAI(){
   var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
