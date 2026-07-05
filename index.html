@@ -39,6 +39,15 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 .chat{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;padding:4px}
 .msg{padding:9px 11px;border-radius:10px;font-size:13px;max-width:90%}
 .msg.user{align-self:flex-end;background:#13352a;border:1px solid #1f5a45}.msg.ai{align-self:flex-start;background:var(--bg2);border:1px solid var(--line)}.msg.sys{align-self:center;color:var(--muted);font-size:12px}
+.msg .md{margin:.45em 0;line-height:1.5}
+.msg table.md{border-collapse:collapse;width:100%;margin:.5em 0;font-size:13px}
+.msg table.md th,.msg table.md td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+.msg table.md th{background:var(--card);font-weight:600}
+.msg h3.md,.msg h4.md,.msg h5.md,.msg h6.md{margin:.6em 0 .25em;font-weight:700}
+.msg hr.md{border:none;border-top:1px solid var(--line);margin:.6em 0}
+.msg ul.md,.msg ol.md{margin:.3em 0 .3em 1.25em;padding:0}
+.msg li{margin:.15em 0}
+.msg code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:.9em}
 .tmpl{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--bg2)}
 .src{font-size:12px;color:var(--muted);border-left:2px solid var(--gold);padding:4px 0 4px 10px;margin:8px 0}
 code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;line-height:1.5}
@@ -856,7 +865,39 @@ function buildContext(){
 }
 
 var chat=[];
-function pushMsg(role,text){chat.length&&role==='user'?null:null; var c=document.getElementById('chat');var d=document.createElement('div');d.className='msg '+(role==='user'?'user':role==='sys'?'sys':'ai');d.textContent=text;c.appendChild(d);c.scrollTop=c.scrollHeight;}
+function mdToHtml(src){
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function inline(s){return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>');}
+  var lines=String(src||'').replace(/\r/g,'').split('\n'),out=[],i=0;
+  while(i<lines.length){
+    var ln=lines[i];
+    if(/\|/.test(ln)&&i+1<lines.length&&/^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(lines[i+1])){
+      var hd=ln.split('|').map(function(c){return c.trim();});
+      if(hd[0]==='')hd.shift(); if(hd[hd.length-1]==='')hd.pop();
+      i+=2; var rows=[];
+      while(i<lines.length&&/\|/.test(lines[i])){
+        var cs=lines[i].split('|').map(function(c){return c.trim();});
+        if(cs[0]==='')cs.shift(); if(cs[cs.length-1]==='')cs.pop();
+        rows.push(cs); i++;
+      }
+      out.push('<table class="md"><thead><tr>'+hd.map(function(h){return '<th>'+inline(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+inline(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>');
+      continue;
+    }
+    if(/^\s*---+\s*$/.test(ln)){out.push('<hr class="md">');i++;continue;}
+    var h=ln.match(/^(#{1,6})\s+(.*)$/);
+    if(h){var lv=Math.min(h[1].length+2,6);out.push('<h'+lv+' class="md">'+inline(h[2])+'</h'+lv+'>');i++;continue;}
+    if(/^\s*[-*]\s+/.test(ln)){var it=[];while(i<lines.length&&/^\s*[-*]\s+/.test(lines[i])){it.push('<li>'+inline(lines[i].replace(/^\s*[-*]\s+/,''))+'</li>');i++;}out.push('<ul class="md">'+it.join('')+'</ul>');continue;}
+    if(/^\s*\d+\.\s+/.test(ln)){var oi=[];while(i<lines.length&&/^\s*\d+\.\s+/.test(lines[i])){oi.push('<li>'+inline(lines[i].replace(/^\s*\d+\.\s+/,''))+'</li>');i++;}out.push('<ol class="md">'+oi.join('')+'</ol>');continue;}
+    if(/^\s*$/.test(ln)){i++;continue;}
+    var para=[ln];i++;
+    while(i<lines.length&&!/^\s*$/.test(lines[i])&&!/^#{1,6}\s/.test(lines[i])&&!/^\s*---+\s*$/.test(lines[i])&&!/\|/.test(lines[i])&&!/^\s*[-*]\s+/.test(lines[i])&&!/^\s*\d+\.\s+/.test(lines[i])){para.push(lines[i]);i++;}
+    out.push('<p class="md">'+para.map(inline).join('<br>')+'</p>');
+  }
+  return out.join('');
+}
+function pushMsg(role,text){chat.length&&role==='user'?null:null; var c=document.getElementById('chat');var d=document.createElement('div');d.className='msg '+(role==='user'?'user':role==='sys'?'sys':'ai');if(role==='ai'){ d.innerHTML=mdToHtml(text); } else { d.textContent=text; }c.appendChild(d);c.scrollTop=c.scrollHeight;}
 function demoAnswer(q){
   var s=q.toLowerCase();
   if(/ban|skip|avoid|black/.test(s)) return 'Hard bans (instant skip, 0 connects): Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC; clients in India or Bangladesh; companies Umbrage, Stewart, CVS Health, Lynx; fixed under $200, 20+ proposals, survey/test jobs, on-site 2+ days/week.';
