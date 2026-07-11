@@ -1,953 +1,589 @@
-<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Advocate · Live Ops Command</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Advocate — Upwork Ops Co-Pilot (v10 Live)</title>
 <style>
-:root{--bg:#0c1410;--bg2:#11201a;--card:#13241d;--line:#24433a;--green:#43d39e;--green2:#2fae84;--gold:#c9a24b;--text:#e8f3ee;--muted:#8fb3a6;--red:#ff7a7a;--amber:#ffcf6b;--bubble:#13352a;--sunken:#0f231b}
-/* Selectable themes: override the six semantic roles (bg / card / line / accent / text / muted) plus --bubble (user chat bubble) and --sunken (inset/track). Emerald is the default. */
-html[data-theme="emerald"]{--bg:#0c1410;--bg2:#11201a;--card:#13241d;--line:#24433a;--green:#43d39e;--green2:#2fae84;--text:#e8f3ee;--muted:#8fb3a6;--bubble:#13352a;--sunken:#0f231b}
-html[data-theme="sapphire"]{--bg:#0b1220;--bg2:#131f33;--card:#131f33;--line:#24344f;--green:#4C8DFF;--green2:#4C8DFF;--text:#e8eef7;--muted:#8ea3c0;--bubble:#172a45;--sunken:#0c1626}
-html[data-theme="violet"]{--bg:#140f1e;--bg2:#201830;--card:#201830;--line:#352a4a;--green:#a78bfa;--green2:#a78bfa;--text:#ece7f7;--muted:#a596c0;--bubble:#2a1f42;--sunken:#17102a}
-html[data-theme="amber"]{--bg:#14100a;--bg2:#211a10;--card:#211a10;--line:#3a2f1c;--green:#f5b544;--green2:#f5b544;--text:#f4eee0;--muted:#c3b088;--bubble:#33260f;--sunken:#17110a}
-html[data-theme="daylight"]{--bg:#f6f8f7;--bg2:#ffffff;--card:#ffffff;--line:#dbe4df;--green:#0f9d74;--green2:#0f9d74;--text:#14201b;--muted:#5b6b64;--bubble:#dff1ea;--sunken:#eef2f0}
-.manual-dim{opacity:.5;pointer-events:none}
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;background:radial-gradient(1200px 600px at 80% -10%,#16302600,#0c1410),var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
-a{color:var(--green)}
-.wrap{max-width:1060px;margin:0 auto;padding:16px}
-.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px}.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--gold));display:grid;place-items:center;font-weight:800;color:#06120d}
-.brand b{font-size:16px}.brand .s{font-size:11px;color:var(--muted)}
-.clock{font-size:12px;color:var(--muted);text-align:right;line-height:1.5}
-.who{display:flex;gap:8px;align-items:center}select,input,textarea{background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 10px;font-size:14px;font-family:inherit}
-textarea{width:100%;min-height:90px;resize:vertical}
-.nav{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
-.nav button{background:var(--bg2);border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:999px;font-size:13px;cursor:pointer}
-.nav button.on{background:linear-gradient(135deg,var(--green2),var(--green));color:#06120d;border-color:transparent;font-weight:700}
-.view{display:none}.view.on{display:block;animation:f .2s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.grid{display:grid;gap:12px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
-@media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
-.card.tight{padding:12px}
-.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
-.stat{font-size:30px;font-weight:800;margin:6px 0 0}.muted{color:var(--muted)}.lbl{font-size:12px;color:var(--muted);display:block;margin:10px 0 4px}
-.field{width:100%}
-.btn{background:linear-gradient(135deg,var(--green2),var(--green));color:#06120d;border:none;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;font-size:14px}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-.btn.gold{background:linear-gradient(135deg,#d8b25a,var(--gold));color:#1a1405}
-.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
-.pill.ok{color:var(--green);border-color:#1f5a45;background:#0f2a20}.pill.no{color:var(--red);border-color:#5a2020;background:#2a0f0f}.pill.warn{color:var(--amber);border-color:#5a4a1f;background:#2a230f}.pill.anytime{color:var(--gold);border-color:#5a4a1f;background:#221c0c}
-table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-.row-lock{opacity:.5}
-.bar{height:8px;border-radius:6px;background:var(--sunken);overflow:hidden;border:1px solid var(--line)}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--green2),var(--green))}
-.scorebig{font-size:40px;font-weight:800;line-height:1}
-.note{font-size:12px;color:var(--muted)}
-.kbd{font-family:ui-monospace,Menlo,monospace;background:#0f231b;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px}
-.banner{display:flex;gap:10px;align-items:flex-start;background:#0f231b;border:1px solid #1f5a45;border-radius:12px;padding:12px;font-size:13px;color:var(--muted)}
-.chat{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;padding:4px}
-.msg{padding:9px 11px;border-radius:10px;font-size:13px;max-width:90%}
-.msg.user{align-self:flex-end;background:var(--bubble);border:1px solid #1f5a45}.msg.ai{align-self:flex-start;background:var(--bg2);border:1px solid var(--line)}.msg.sys{align-self:center;color:var(--muted);font-size:12px}
-.msg .md{margin:.45em 0;line-height:1.5}
-.msg table.md{border-collapse:collapse;width:100%;margin:.5em 0;font-size:13px}
-.msg table.md th,.msg table.md td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
-.msg table.md th{background:var(--card);font-weight:600}
-.msg h3.md,.msg h4.md,.msg h5.md,.msg h6.md{margin:.6em 0 .25em;font-weight:700}
-.msg hr.md{border:none;border-top:1px solid var(--line);margin:.6em 0}
-.msg ul.md,.msg ol.md{margin:.3em 0 .3em 1.25em;padding:0}
-.msg li{margin:.15em 0}
-.msg code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:.9em}
-.tmpl{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--bg2)}
-.src{font-size:12px;color:var(--muted);border-left:2px solid var(--gold);padding:4px 0 4px 10px;margin:8px 0}
-code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;line-height:1.5}
-.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.chk{display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0}
-.seg{display:flex;gap:4px;flex-wrap:wrap}
-.seg label{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;color:var(--muted)}
-.seg input{display:none}.seg input:checked+span{color:var(--green);font-weight:700}
-.acc{border:1px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:10px;overflow:hidden}
-.acc-h{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none}
-.acc-badge{width:30px;height:30px;flex:none;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--gold));display:grid;place-items:center;font-weight:800;color:#06120d}
-.acc-title{font-weight:700;flex:1;font-size:15px}
-.acc-doc{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap;text-decoration:none}
-.acc-doc:hover{color:var(--green);border-color:var(--green2)}
-.acc-caret{color:var(--muted);font-size:12px;transition:transform .2s}
-.acc.open .acc-caret{transform:rotate(90deg)}
-.acc-body{display:none;padding:4px 16px 16px}
-.acc.open .acc-body{display:block;animation:f .2s ease}
-.acc-lead{color:var(--muted);font-size:13px;line-height:1.6;margin:6px 0 12px}
-.acc-card{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px}
-.acc-card h4{margin:0 0 6px;font-size:13px;color:var(--text)}
-.acc-card .note{margin:0}.acc-card ul{margin:6px 0 0;padding-left:18px;line-height:1.6}
-.acc-callout{display:flex;gap:10px;align-items:flex-start;background:#0f231b;border:1px solid #1f5a45;border-radius:12px;padding:12px;font-size:13px;color:var(--muted);margin-top:12px}
-</style></head>
+  :root{
+    --ink:#1a1614; --ink2:#2a2320; --paper:#f7f4ef; --card:#fffdfa;
+    --coral:#d97757; --coral2:#c15f3c; --sand:#ece5da; --line:#e3d9cc;
+    --good:#2e7d55; --warn:#c98a2b; --bad:#c0453b; --muted:#8a7f74;
+    --shadow:0 10px 40px rgba(60,40,25,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    background:radial-gradient(1200px 600px at 10% -10%,#fbe7dc 0%,transparent 55%),
+               radial-gradient(1000px 700px at 110% 10%,#efe6da 0%,transparent 50%),var(--paper);
+    color:var(--ink);min-height:100vh}
+  .wrap{max-width:1120px;margin:0 auto;padding:22px 18px 60px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--coral),var(--coral2));
+    display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px;box-shadow:var(--shadow);
+    animation:pulse 3.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .brand h1{font-size:18px;margin:0;letter-spacing:-.3px}
+  .brand small{color:var(--muted);font-size:12px}
+  .pill{font-size:11px;padding:4px 10px;border-radius:999px;background:var(--sand);color:var(--ink2);font-weight:600}
+  .pill.live{background:#e5f4ec;color:var(--good)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow);
+    animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .grid{display:grid;gap:16px}
+  @media(min-width:820px){.grid.two{grid-template-columns:1.4fr .9fr}}
+  label{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:12px 0 6px}
+  input,select,textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:11px;
+    font-size:14px;font-family:inherit;background:#fff;color:var(--ink);transition:.15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--coral);box-shadow:0 0 0 3px rgba(217,119,87,.15)}
+  textarea{min-height:150px;resize:vertical;line-height:1.5}
+  .btn{appearance:none;border:none;cursor:pointer;font-weight:700;font-size:14px;padding:12px 18px;border-radius:12px;
+    background:linear-gradient(135deg,var(--coral),var(--coral2));color:#fff;transition:.15s;box-shadow:0 6px 18px rgba(193,95,60,.28)}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.03)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:#fff;color:var(--ink2);border:1px solid var(--line);box-shadow:none}
+  .btn.sm{padding:8px 12px;font-size:12px;border-radius:10px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0}
+  .tab{padding:9px 15px;border-radius:11px;background:#fff;border:1px solid var(--line);cursor:pointer;
+    font-weight:700;font-size:13px;color:var(--ink2)}
+  .tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .hidden{display:none}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat b{font-size:26px;letter-spacing:-.5px}
+  .stat span{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .timer{font-variant-numeric:tabular-nums;font-size:34px;font-weight:800;letter-spacing:-.5px}
+  .barwrap{background:var(--sand);border-radius:999px;height:12px;overflow:hidden;margin-top:6px}
+  .bar{height:100%;background:linear-gradient(90deg,var(--coral),var(--coral2));border-radius:999px;transition:width .5s}
+  .badge{display:inline-block;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:800}
+  .b-boost{background:#e5f4ec;color:var(--good)} .b-std{background:#eef4fd;color:#2f6bd0}
+  .b-border{background:#fdf3e1;color:var(--warn)} .b-skip{background:#fbe9e7;color:var(--bad)} .b-ban{background:#2a2320;color:#fff}
+  .reasons li{margin:6px 0;font-size:13px;line-height:1.45}
+  .flags li{margin:6px 0;font-size:13px;color:var(--bad);font-weight:600}
+  .out{background:#fbf8f3;border:1px dashed var(--line);border-radius:12px;padding:14px;white-space:pre-wrap;
+    font-size:13px;line-height:1.55;margin-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.5px;cursor:pointer}
+  .gate{background:linear-gradient(135deg,#2a2320,#3a302a);color:#fff;border:none}
+  .gate .stat span{color:#c9beb2}
+  .gate .dot{width:9px;height:9px;border-radius:50%;background:var(--coral);display:inline-block;margin-right:6px;
+    box-shadow:0 0 0 0 rgba(217,119,87,.7);animation:ring 1.8s infinite}
+  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(217,119,87,.6)}70%{box-shadow:0 0 0 10px rgba(217,119,87,0)}100%{box-shadow:0 0 0 0 rgba(217,119,87,0)}}
+  .toast{position:fixed;right:18px;bottom:18px;background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;
+    font-size:13px;box-shadow:var(--shadow);opacity:0;transform:translateY(10px);transition:.25s;max-width:340px;z-index:99}
+  .toast.show{opacity:1;transform:none}
+  .note{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+  .kpi .card{padding:14px}
+</style>
+</head>
 <body>
 <div class="wrap">
-  <div class="top">
-    <div class="brand"><div class="logo">A</div><div><b>AI Advocate · Live Ops Command</b><div class="s">Saqib's PERSONAL freelancer profile · US + Europe · single login</div></div></div>
-    <div class="who">
-      <label class="s" for="theme-select">Theme</label>
-      <select id="theme-select" title="Colour theme" onchange="setTheme(this.value)"><option value="emerald">Emerald</option><option value="sapphire">Sapphire</option><option value="violet">Violet</option><option value="amber">Amber</option><option value="daylight">Daylight</option></select>
-      <select id="role-select" title="Who are you?"></select>
-      <div class="clock" id="clock">…</div>
-    </div>
-  </div>
-
-  <div id="access" class="banner" style="margin-top:12px"></div>
-
-  <div class="nav" id="nav"></div>
-
-  <!-- COMMAND -->
-  <section class="view on" data-view="command">
-    <div class="grid g4">
-      <div class="card tight"><div class="eyebrow">Shortlisted</div><div class="stat" id="s-short">0</div></div>
-      <div class="card tight"><div class="eyebrow">Awaiting approval</div><div class="stat" id="s-await">0</div></div>
-      <div class="card tight"><div class="eyebrow">Approved</div><div class="stat" id="s-appr">0</div></div>
-      <div class="card tight"><div class="eyebrow">Applied today</div><div class="stat" id="s-applied">0</div></div>
-    </div>
-    <div class="grid g2" style="margin-top:12px">
-      <div class="card">
-        <div class="eyebrow">Whose hour is it now</div>
-        <div id="whose" style="margin-top:8px"></div>
-        <div class="note" style="margin-top:8px">Windows are <b>ad-hoc</b> — picked daily in the group because only one person can be on Saqib's profile at a time. Defaults below are the 29 June windows; edit per day.</div>
-      </div>
-      <div class="card">
-        <div class="eyebrow" style="color:var(--red)">Hard ban — instant skip, 0 connects</div>
-        <p class="note" style="margin-top:8px">Industries: Banking/Finance/Trading/Crypto/Forex · Govt/Military/Defense/ITAR/GovCloud/FedRAMP/CMMC. Countries: India, Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200 · 20+ proposals · survey/test jobs · on-site 2+ days/week. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>
+  <header>
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>
+        <h1>AI Advocate — Upwork Ops Co-Pilot</h1>
+        <small>v10 · Powered by Claude · AI ADVOCATE HOLDING LLC</small>
       </div>
     </div>
-    <div class="card" style="margin-top:12px">
-      <div class="eyebrow">Today's roster</div>
-      <table style="margin-top:8px"><thead><tr><th>Member</th><th>Role</th><th>Today's window (PKT)</th><th>Status now</th></tr></thead><tbody id="roster"></tbody></table>
+    <div class="row">
+      <span id="modePill" class="pill">checking…</span>
+      <span id="userPill" class="pill hidden"></span>
+      <button id="logoutBtn" class="btn ghost sm hidden" onclick="doLogout()">Leave / Log out</button>
     </div>
-  </section>
+  </header>
 
-  <!-- EVALUATE & PROPOSE -->
-  <section class="view" data-view="evaluate">
-    <div class="grid g2">
+  <!-- LOGIN -->
+  <section id="loginView">
+    <div class="grid two">
       <div class="card">
-        <div class="eyebrow">1 · Paste the Upwork job</div>
-        <textarea id="job-text" oninput="syncManualState()" placeholder="Paste the full job post here (title + description). The more text, the better the proposal."></textarea>
-        <label class="lbl">Client first name (from job or reviews) — biggest single lift</label>
-        <input class="field" id="cl-name" placeholder="e.g. Michael (leave blank if unknown)">
-        <div class="g2 grid" style="margin-top:6px">
-          <div><label class="lbl">Budget type</label>
-            <select id="b-type" class="field"><option value="hourly">Hourly</option><option value="fixed">Fixed</option></select></div>
-          <div><label class="lbl">Amount (USD)</label><input class="field" id="b-amt" placeholder="e.g. 75 or 2500"></div>
+        <h2 style="margin:0 0 4px">Welcome back 👋 Who's on shift?</h2>
+        <p class="note">Pick your name and step in. Your session timer starts the moment you enter, and every JD you evaluate, every proposal you copy, and your sign-out are all logged automatically — with your name — here and in the Google Sheet.</p>
+        <label>Your name</label>
+        <select id="nameSel"></select>
+        <label>PIN (optional — leave blank if your team doesn't use one)</label>
+        <input id="pin" type="password" placeholder="optional" autocomplete="off"/>
+        <div class="row" style="margin-top:16px">
+          <button class="btn" onclick="doLogin()">Enter the app →</button>
         </div>
-        <label class="lbl">Proposals already submitted</label>
-        <select id="j-props" class="field"><option value="1">Under 20</option><option value="2">20-50 (busy)</option><option value="3">50+ (heavily saturated)</option></select>
+        <p class="note" id="loginMsg"></p>
       </div>
-      <div class="card" id="signal-card">
-        <div class="eyebrow">2 · Client + fit signals</div>
-        <div class="chk"><input type="checkbox" id="c-verified" checked><label for="c-verified">Payment verified</label></div>
-        <div class="chk"><input type="checkbox" id="c-us" checked><label for="c-us">Client in allowed region (US/Europe)</label></div>
-        <label class="lbl">Client total spend</label>
-        <select id="c-spend" class="field"><option value="0">$0 / new</option><option value="2" selected>$1k–$50k (sweet spot)</option><option value="1">$50k+ (whale — replies less)</option><option value="1b">$1–$1k</option></select>
-        <label class="lbl">Client hire rate</label>
-        <select id="c-hire" class="field"><option value="2">Over 50%</option><option value="1" selected>20–50%</option><option value="0">Under 20% / unknown</option></select>
-        <label class="lbl">Scope clarity</label>
-        <select id="j-scope" class="field"><option value="2">Specific deliverables</option><option value="1" selected>Somewhat clear</option><option value="0">Vague</option></select>
-        <label class="lbl">Skill match to Saqib's stack</label>
-        <select id="m-match" class="field"><option value="3" selected>Strong (FastAPI/React/GenAI/RAG/agents)</option><option value="2">Partial</option><option value="0">None</option></select>
-        <div class="chk"><input type="checkbox" id="m-proof" checked><label for="m-proof">Saqib has direct portfolio proof</label></div>
-        <div class="chk"><input type="checkbox" id="j-long"><label for="j-long">Long-term / ongoing potential</label></div>
-        <div class="chk"><input type="checkbox" id="j-ban"><label for="j-ban">Matches a HARD BAN (industry/country/company/condition)</label></div>
+      <div class="card gate">
+        <div class="stat"><span>Saqib profile status</span></div>
+        <div id="gateLogin" style="margin-top:8px;font-size:14px;line-height:1.5">Loading gateway…</div>
       </div>
     </div>
-    <div class="flex" style="margin-top:12px">
-      <button class="btn" onclick="runEval()">Evaluate (19-point)</button>
-      <button class="btn gold" onclick="genProposal('priority')">Generate proposal (120–160w)</button>
-      <button class="btn ghost" onclick="genProposal('speed')">Speed bid (&lt;50w)</button>
+  </section>
+
+  <!-- APP -->
+  <section id="appView" class="hidden">
+    <div class="tabs">
+      <div class="tab active" data-tab="dash" onclick="tab('dash')">🏠 Dashboard</div>
+      <div class="tab" data-tab="eval" onclick="tab('eval')">🎯 Evaluate a JD</div>
+      <div class="tab" data-tab="prop" onclick="tab('prop')">✍️ Proposal &amp; Cover</div>
+      <div class="tab" data-tab="pipe" onclick="tab('pipe')">🗂️ Pipeline</div>
+      <div class="tab" data-tab="analytics" onclick="tab('analytics')">📊 Analytics</div>
+      <div class="tab" data-tab="logs" onclick="tab('logs')">📜 Logs</div>
     </div>
-    <div id="eval-out" style="margin-top:12px"></div>
-    <div id="prop-out" style="margin-top:12px"></div>
-  </section>
 
-  <!-- PIPELINE -->
-  <section class="view" data-view="pipeline">
-    <div class="card"><div class="eyebrow">Pipeline</div>
-      <p class="note" style="margin-top:6px">Bidders can move rows only during their window. Owners (Saqib, Waqas) and Usman approve anytime. Every action auto-logs to the Daily Report — no manual sheet entry.</p>
-      <table style="margin-top:8px"><thead><tr><th>Job</th><th>Score</th><th>Stage</th><th>By</th><th>Action</th></tr></thead><tbody id="pipe"></tbody></table>
+    <!-- DASH -->
+    <div id="tab-dash" class="grid two">
+      <div class="card">
+        <div class="stat"><span>Session time</span><div class="timer" id="timer">00:00:00</div></div>
+        <div class="barwrap"><div class="bar" id="shiftBar" style="width:0%"></div></div>
+        <p class="note" id="shiftNote"></p>
+        <div class="row" style="margin-top:14px">
+          <div class="stat"><b id="sJD">0</b><span>JDs evaluated</span></div>
+          <div class="stat" style="margin-left:24px"><b id="sProp">0</b><span>Proposals made</span></div>
+          <div class="stat" style="margin-left:24px"><b id="sCopy">0</b><span>Copies logged</span></div>
+        </div>
+      </div>
+      <div class="card gate">
+        <div class="stat"><span><span class="dot"></span>Gateway — shared profile</span></div>
+        <div id="gateDash" style="margin-top:8px;font-size:14px;line-height:1.55"></div>
+      </div>
     </div>
-  </section>
 
-  <!-- DAILY REPORT -->
-  <section class="view" data-view="report">
-    <div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">Auto daily report — <span id="rep-date"></span></div><button class="btn ghost" onclick="copyReport()">Copy report</button></div>
-      <p class="note" style="margin-top:6px">Generated automatically from in-app actions (evaluate / shortlist / approve / apply). This is what replaces manual entry of repetitive logs.</p>
-      <table style="margin-top:8px"><thead><tr><th>Member</th><th>Evaluated</th><th>Shortlisted</th><th>Applied</th><th>Skipped (ban/low)</th></tr></thead><tbody id="rep-body"></tbody></table>
-      <div class="eyebrow" style="margin-top:16px">Activity feed (today)</div>
-      <div id="feed" style="margin-top:8px"></div>
+    <!-- EVAL -->
+    <div id="tab-eval" class="hidden">
+      <div class="grid two">
+        <div class="card">
+          <h3 style="margin:0 0 4px">Paste the job description</h3>
+          <p class="note">Claude reads it, runs the full 19-point v9.1 score, and logs everything with a timestamp and your name. No fabricated numbers — unknown fields simply earn no point.</p>
+          <textarea id="jd" placeholder="Paste the full Upwork job post here…"></textarea>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+            <div><label>Budget type</label><select id="btype"><option value="hourly">Hourly</option><option value="fixed">Fixed</option></select></div>
+            <div><label>Budget amount (USD)</label><input id="budget" type="number" placeholder="e.g. 60 or 1500"/></div>
+            <div><label>Client country (blank = unknown)</label><input id="country" placeholder="USA / UK / unknown"/></div>
+            <div><label>Proposals already sent</label><input id="props" type="number" placeholder="e.g. 12"/></div>
+            <div><label>Payment verified?</label><select id="payv"><option value="yes">Yes</option><option value="no">No / unknown</option></select></div>
+            <div><label>Client reviews</label><input id="reviews" type="number" placeholder="e.g. 3 (blank ok)"/></div>
+            <div><label>Client rating</label><input id="rating" type="number" step="0.1" placeholder="e.g. 4.9"/></div>
+            <div><label>Total spent (USD)</label><input id="spent" type="number" placeholder="e.g. 5000"/></div>
+            <div><label>Hires</label><input id="hires" type="number" placeholder="e.g. 67"/></div>
+            <div><label>Hire rate (%)</label><input id="hirerate" type="number" placeholder="e.g. 51"/></div>
+            <div><label>Avg $/hr paid (hourly)</label><input id="avghr" type="number" placeholder="e.g. 69"/></div>
+          </div>
+          <div class="row" style="margin-top:14px">
+            <button class="btn" onclick="runEval()">Evaluate &amp; log →</button>
+            <button class="btn ghost" onclick="askGuardian()">Ask the co-pilot a question</button>
+          </div>
+          <p class="note">Qualitative Job/Match points (500+ words, deliverables, stack named, timeline, professional writing, portfolio fit) are auto-detected from your text; the client fields above feed the Client score directly.</p>
+        </div>
+        <div class="card" id="evalOut">
+          <p class="note">Your evaluation will appear here with a decision badge, the /19 breakdown, and the honest logic behind it.</p>
+        </div>
+      </div>
     </div>
-  </section>
 
-  <!-- TEMPLATES -->
-  <section class="view" data-view="templates">
-    <div class="card"><div class="eyebrow">Proposal templates</div><p class="note" style="margin-top:6px">Skeletons only — the Evaluate tab fills them per job. Personalisation is what wins; never mass-blast. Pick by job type.</p></div>
-    <div id="tmpl-list" class="grid" style="margin-top:12px"></div>
-  </section>
+    <!-- PROP -->
+    <div id="tab-prop" class="hidden">
+      <div class="card">
+        <h3 style="margin:0 0 4px">Proposal &amp; Cover Letter</h3>
+        <p class="note">Runs on the last JD you evaluated. If the score is 14+ (or a borderline 13) you get a ready-to-paste PROPOSAL plus a short INTRO MESSAGE. If it's below that, you get the detailed, logical reasons NOT to apply instead — front end and backend both logged with your name. Every copy is timestamped.</p>
+        <div class="row"><button class="btn" onclick="makeProposal()">Generate for last JD →</button></div>
+        <div id="propOut"></div>
+      </div>
+    </div>
 
-  <!-- PROFILES -->
-  <section class="view" data-view="profiles">
-    <div id="profiles"></div>
-  </section>
+    <!-- PIPELINE -->
+    <div id="tab-pipe" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h3 style="margin:0">Pipeline — jobs you evaluated this session</h3>
+          <span class="note">Click a column header to sort.</span>
+        </div>
+        <div id="pipeOut" style="overflow:auto;margin-top:10px"></div>
+      </div>
+    </div>
 
-  <!-- SCORING -->
-  <section class="view" data-view="scoring">
-    <div id="scoring"></div>
-  </section>
+    <!-- ANALYTICS -->
+    <div id="tab-analytics" class="hidden">
+      <div class="card">
+        <h3 style="margin:0 0 10px">Session analytics</h3>
+        <div class="kpi" id="kpiRow"></div>
+        <p class="note" id="analyticsNote" style="margin-top:12px"></p>
+      </div>
+    </div>
 
-  <!-- RULES & FEES -->
-  <section class="view" data-view="rules">
-    <div id="rules"></div>
-  </section>
-
-  <!-- UPWORK GUIDE -->
-  <section class="view" data-view="guide">
-    <div class="card" style="margin-bottom:12px"><div class="eyebrow">Upwork Guide</div><p class="note" style="margin-top:6px">Distilled from Upwork's official Help Center (293 articles reviewed, verified July 2026) — facts, figures and steps only. Tap a section to expand; use <b>Open full document ↗</b> for the complete Google Doc.</p></div>
-    <div id="guide"></div>
-  </section>
-
-  <!-- ASK AI -->
-  <section class="view" data-view="ai">
-    <div id="ai-mode" class="banner" style="margin-bottom:12px"></div>
-    <div class="card">
-      <div class="chat" id="chat"></div>
-      <div class="flex" style="margin-top:10px"><input class="field" id="ai-in" placeholder="Ask about bans, scoring, fees, templates, the flow, or a job…" style="flex:1" onkeydown="if(event.key==='Enter')askAI()"><button class="btn" onclick="askAI()">Ask</button></div>
+    <!-- LOGS -->
+    <div id="tab-logs" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h3 style="margin:0">Activity log</h3>
+          <button class="btn ghost sm" onclick="renderLogs()">Refresh</button>
+        </div>
+        <div id="logsOut" style="overflow:auto;margin-top:10px"></div>
+      </div>
     </div>
   </section>
 </div>
+<div id="toast" class="toast"></div>
 
+<!-- ===== engine (inlined, identical to tested engine.js) ===== -->
 <script>
-/* ============================ DATA ============================ */
-var TEAM = [
-  {id:'saqib', name:'Saqib Shahzad', role:'Owner P1', kind:'owner'},
-  {id:'waqas', name:'Waqas Riaz', role:'Owner P2', kind:'owner'},
-  {id:'usman', name:'Usman Saeed', role:'Manager', kind:'manager'},
-  {id:'zeb',   name:'Jahanzaib (Zeb)', role:'Builder', kind:'builder'},
-  {id:'fiza',  name:'Fiza', role:'Bidder', kind:'bidder', slot:{start:'19:00',end:'20:00'}},
-  {id:'subhan',name:'Subhan', role:'Bidder', kind:'bidder', slot:{start:'20:00',end:'21:00'}},
-  {id:'sadia', name:'Sadia', role:'Bidder', kind:'bidder', slot:{start:'21:00',end:'22:00'}},
-  {id:'hamza', name:'Hamza', role:'Bidder', kind:'bidder', slot:{start:'22:00',end:'23:00'}},
-  {id:'kaleem',name:'Kaleem', role:'Excused (≥1 month)', kind:'excused'},
-  {id:'sana',  name:'Sana', role:'Design · excused from bidding', kind:'excused'},
-  {id:'ayesha',name:'Ayesha', role:'UI · excused from bidding', kind:'excused'},
-  {id:'adil',  name:'Adil', role:'Excused (≥1 month)', kind:'excused'}
-];
+var AIAdvocateEngine=(function(){function has(t,x){return (t||"").toLowerCase().indexOf(x)!==-1}
+function wordCount(t){return (t||"").trim().split(/\s+/).filter(Boolean).length}
+var BC=["india","bangladesh","pakistan"],BCO=["umbrage","stewart","cvs health","lynx"],
+BW=["banking operations","live trading","day trading","forex","crypto","cryptocurrency","weapons","defense system","military system"];
+function checkHardBans(jd,c){c=c||{};var t=(jd||"")+" "+(c.company||"");
+for(var i=0;i<BW.length;i++)if(has(t,BW[i]))return{banned:true,reason:"Banned work type: "+BW[i]};
+for(var j=0;j<BCO.length;j++)if(has(t,BCO[j]))return{banned:true,reason:"Conflict of interest company: "+BCO[j]};
+if(c.country){var cc=c.country.toLowerCase();for(var k=0;k<BC.length;k++)if(cc.indexOf(BC[k])!==-1)return{banned:true,reason:"Banned client country (confirmed): "+c.country}}
+if(c.budgetType==="fixed"&&typeof c.budget==="number"&&c.budget<200)return{banned:true,reason:"Fixed under $200 ($"+c.budget+")"};
+if(has(t,"survey")&&has(t,"test")&&wordCount(jd)<80)return{banned:true,reason:"Looks like a survey/test job disguised as a contract"};
+return{banned:false}}
+function score(input){input=input||{};var jd=input.jd||"",c=input.client||{},isFixed=c.budgetType==="fixed",reasons=[],flags=[];
+var looksNew=c.paymentVerified===true&&((typeof c.reviews==="number"&&c.reviews<5)||c.reviews===undefined)&&((typeof c.totalSpent==="number"&&c.totalSpent<1000)||c.totalSpent===undefined);
+var newClient=c.newClient===true||looksNew;
+var cp=0,cmax=isFixed?6:7;
+if(c.paymentVerified){cp++}else{flags.push("Payment NOT verified")}
+if(typeof c.totalSpent==="number"&&c.totalSpent>=1000)cp++;
+if(typeof c.hires==="number"&&c.hires>=3)cp++;
+if(typeof c.hireRate==="number"&&c.hireRate>=70)cp++;
+if(!isFixed&&typeof c.avgHourlyPaid==="number"&&c.avgHourlyPaid>=25)cp++;
+if(typeof c.rating==="number"&&c.rating>=4.5)cp++;
+if(typeof c.reviews==="number"&&c.reviews>=5)cp++;
+if(newClient){reasons.push("NEW CLIENT SOFTENING: payment is verified but the account is young (few/no reviews, low spend). Missing history points are NOT treated as red flags. A genuine new client is not penalised — judged on budget, clarity and skill-match instead.");flags=flags.filter(function(f){return f!=="Payment NOT verified"})}
+if(c.country){reasons.push("Client region: "+c.country+" (allowed).")}else{reasons.push("Client region: unknown — no region point, scoring continues (not a ban).")}
+var jp=0,wc=wordCount(jd),shortJD=wc<60;
+if(wc>=500)jp++;if(input.reasonableBudget)jp++;if(input.definedDeliverables)jp++;if(input.techStackNamed)jp++;if(input.realisticTimeline)jp++;if(input.professionalWriting)jp++;
+var rf=has(jd,"off platform")||has(jd,"off-platform")||has(jd,"guaranteed results")||has(jd,"telegram")||has(jd,"whatsapp only");
+if(!rf)jp++;else flags.push("Red flag: off-platform / guaranteed-results language");
+if(shortJD){flags.push("SHORT JD ("+wc+" words): not enough detail to fully judge scope.");reasons.push("SHORT-JD NOTE: the description is thin ("+wc+" words). Treat scope/budget/timeline points cautiously and ask the client a scoping question before over-investing Connects. Flagged, not auto-scored as good.")}
+var mp=0;if(input.matchesCoreSpecialization)mp++;if(input.usesHisStack)mp++;if(input.similarPastProject)mp++;if(input.portfolioWorthy)mp++;
+var budgetOk=isFixed?(typeof c.budget==="number"&&c.budget>=200):(typeof c.budget==="number"&&c.budget>=55);if(budgetOk)mp++;
+var proposals=typeof input.proposals==="number"?input.proposals:0,P50=-2,penalty=0,sat="";
+if(proposals>=50){penalty=P50;sat="heavily saturated (50+)"}else if(proposals>=20){penalty=-1;sat="busy (20-50)"}
+if(sat)reasons.push("Proposal saturation: "+sat+" => penalty "+penalty+". This is a SCORE PENALTY, never an auto-skip. If the fit is strong the /19 still decides.");
+var raw=cp+jp+mp,total=raw+penalty,decision,band;
+if(total>=16&&mp>=4){decision="APPLY WITH BOOST";band="16-19"}
+else if(total>=14&&cp>=5&&jp>=5&&mp>=3){decision="APPLY STANDARD";band="14-15"}
+else if(total>=14){decision="APPLY (micro-customise — some per-dimension minimums not met)";band="14-15*"}
+else if(total===13){decision="BORDERLINE (13) — draft a proposal but review the gaps first";band="13"}
+else{decision="SKIP — log reason, 0 connects";band="below 14"}
+return{isFixed:isFixed,newClient:newClient,shortJD:shortJD,client:{points:cp,max:cmax},job:{points:jp,max:7},match:{points:mp,max:5},
+saturation:{proposals:proposals,penalty:penalty,flag:sat},rawTotal:raw,total:total,band:band,decision:decision,proposalAllowed:total>=13,
+reasons:reasons,flags:flags,summary:"Client "+cp+"/"+cmax+" | Job "+jp+"/7 | Match "+mp+"/5 | Total "+total+"/19"}}
+return{score:score,checkHardBans:checkHardBans,wordCount:wordCount}})();
+</script>
 
-var PROFILES = {
-  saqib:{
-    h:"Saqib S. — bidding profile (PERSONAL freelancer)",
-    body:[
-      "Title: Senior Full Stack Engineer | SaaS, GenAI, LLMs & FastAPI Expert",
-      "Location: Sugar Land, TX, USA · Rising Talent · 5.0 (2 reviews) · ID verified",
-      "Profile rate shown: $35/hr (older copy showed $55). BID rate is set per job by Saqib/Usman, usually $70–90/hr.",
-      "Jobs: 3 total (2 completed 5.0 + 1 in progress) · 20 hours · >30 hrs/week available",
-      "Education: University of Houston — MS Data Science (2018–2020); Cornell — BASc Computer Science (2013–2017)",
-      "Skills: FastAPI · React · Python · TypeScript · Node.js · PostgreSQL · MongoDB · RESTful API · Docker · ML · NLP",
-      "Stack: LangChain · LlamaIndex · LangGraph · CrewAI · Flowise · Pinecone/Chroma/FAISS/Weaviate · AWS · CI/CD",
-      "Completed: 'Multi-Agent SaaS Solution' (5.0), 'AI SaaS Product Development' (5.0)",
-      "Project catalog: AI automation workflow $200 · AI assistant on your data (RAG) $400 · AI chatbot $350 · consult $50/30min",
-      "Note (older 2-job copy): same profile before the 3rd job; use the latest 3-job version for proposals."
-    ]
-  },
-  zeb:{
-    h:"Jahanzaib (Zeb) — personal Upwork profile (builder, not on Saqib's profile)",
-    body:[
-      "Title: AI Automation Engineer | Integration Testing | Tech Writer · $18/hr",
-      "Location: Lahore, Pakistan · English Native/Bilingual · ID verified (no IDV badge) · Connects 19 · $500+ earned · 2 jobs",
-      "Education: Government College University, Lahore — BA · GitHub since 2025",
-      "Strengths: 23 n8n production workflows (US Tax Estimator, AI deep-research, RAG Drive→Pinecone, invoice extraction, scraping, lead-qual)",
-      "Also: enterprise integration/QA testing (healthcare & energy), technical content that ranks in US search",
-      "Tools: n8n · Python · Zapier · Google Apps Script · OpenAI/Claude · Slack/webhooks · RAG · QA automation",
-      "Role here: builds the app, sheets, docs, auto-logging for the juniors. Mostly on Waqas's CVS project (~5h) + ~2–3h Upwork tooling. No fixed bidding slot — 'Me and you will manage it' (Saqib)."
-    ]
-  },
-  agency:{
-    h:"AI ADVOCATE HOLDING LLC — agency (parked for bidding)",
-    body:[
-      "Sugar Land, TX, USA. AI development & automation agency: AI-powered apps, workflow automation, scalable SaaS, with strong QA & testing.",
-      "IMPORTANT: all current bidding is on Saqib's PERSONAL freelancer profile. The agency profile is NOT used for bidding right now."
-    ]
+<!-- ===== app logic ===== -->
+<script>
+/* ------- CONFIG: paste your Apps Script Web App URL here after deploy ------- */
+var BACKEND_URL = ""; // e.g. "https://script.google.com/macros/s/AKfy.../exec"
+/* --------------------------------------------------------------------------- */
+
+var TEAM=["Saqib Shahzad","Waqas Riaz","Usman Saeed","Zeb (Jahanzaib)","Sadia","Subhan","Hamza","Fiza","Sana","Ayesha","Kaleem"];
+var KALEEM_NOTE="Kaleem — new team member & learner, part-time (2–4 hrs/day). The co-pilot gives him extra step-by-step guidance.";
+var SHIFT_TARGET_MIN=240;
+var me=null, startTs=null, tick=null, lastEval=null, stats={jd:0,prop:0,copy:0,apply:0,skip:0};
+var localLogs=[]; var evalHistory=[]; var pipeSort={key:"ts",dir:-1};
+var gate={holder:null,holderSince:null,waiting:[],pendingOffer:null};
+
+function $(id){return document.getElementById(id)}
+function toast(m){var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove("show")},3200)}
+function online(){return !!BACKEND_URL}
+
+/* backend call helper — ALWAYS attaches the logged-in user (fixes blank-name bug) */
+function api(action,payload){
+  payload=payload||{};
+  if(me){ payload.name=me; if(payload.entry&&!payload.entry.user) payload.entry.user=me; }
+  if(!online()) return Promise.resolve(offlineApi(action,payload));
+  return fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(Object.assign({action:action},payload))})
+    .then(function(r){return r.json()}).catch(function(e){toast("Backend error — using offline mode");return offlineApi(action,payload)});
+}
+
+/* convenience wrapper so every event carries the user */
+function logEvent(entry){ entry=entry||{}; entry.user=me; return api("log",{entry:entry}); }
+
+/* ---- OFFLINE fallback ---- */
+function offlineApi(action,p){
+  p=p||{};
+  if(action==="login"){var s=joinGate(p.name);return {ok:true,gate:gate,gateStatus:s}}
+  if(action==="logout"){var promoted=leaveGate(p.name);return {ok:true,gate:gate,promoted:promoted}}
+  if(action==="gateAccept"){acceptGate();return{ok:true,gate:gate}}
+  if(action==="gateDecline"){declineGate();return{ok:true,gate:gate}}
+  if(action==="log"){localLogs.unshift(Object.assign({ts:new Date().toISOString()},p.entry));return{ok:true}}
+  if(action==="getLogs"){return {ok:true,logs:localLogs,gate:gate}}
+  if(action==="claude"){return {ok:true,offline:true,text:null}}
+  return {ok:true};
+}
+function joinGate(n){if(!gate.holder){gate.holder=n;gate.holderSince=new Date().toISOString();return "HOLDER"}
+  if(gate.holder===n)return "HOLDER";if(gate.waiting.some(function(w){return w.name===n}))return "ALREADY_WAITING";
+  gate.waiting.push({name:n,bookedAt:new Date().toISOString()});return "WAITING#"+gate.waiting.length}
+function leaveGate(n){if(gate.holder!==n)return null;gate.holder=null;gate.holderSince=null;
+  if(gate.waiting.length){gate.pendingOffer=gate.waiting[0].name;return gate.pendingOffer}gate.pendingOffer=null;return null}
+function declineGate(){if(!gate.pendingOffer)return null;gate.waiting=gate.waiting.filter(function(w){return w.name!==gate.pendingOffer});
+  gate.pendingOffer=gate.waiting.length?gate.waiting[0].name:null;return gate.pendingOffer}
+function acceptGate(){if(!gate.pendingOffer)return null;var n=gate.pendingOffer;gate.waiting=gate.waiting.filter(function(w){return w.name!==n});
+  gate.holder=n;gate.holderSince=new Date().toISOString();gate.pendingOffer=null;return n}
+
+/* ---------- init ---------- */
+(function init(){
+  var sel=$("nameSel");
+  TEAM.forEach(function(n){var o=document.createElement("option");o.value=n;o.textContent=n+(n==="Kaleem"?"  (new · part-time)":"");sel.appendChild(o)});
+  $("modePill").textContent = online()? "LIVE · connected" : "SETUP MODE · add backend URL";
+  $("modePill").className = "pill" + (online()?" live":"");
+  refreshGate();
+})();
+
+function fmtGate(g,forDash){
+  var h=g.holder?("<b>"+esc(g.holder)+"</b> is in Saqib's profile now"+(g.holderSince?(" (since "+new Date(g.holderSince).toLocaleTimeString()+")"):"")):"Profile is <b>free</b> — you can take it.";
+  var wait=g.waiting&&g.waiting.length?("<br>Waiting: "+g.waiting.map(function(w){return esc(w.name)}).join(" → ")):"";
+  var offer=g.pendingOffer?("<br>🎟️ Seat is being offered to <b>"+esc(g.pendingOffer)+"</b> now."):"";
+  var kaleem=g.waiting&&g.waiting.some(function(w){return w.name==="Kaleem"})?("<br><span class='note' style='color:#e9d9cc'>"+KALEEM_NOTE+"</span>"):"";
+  var actions="";
+  if(forDash&&me&&g.pendingOffer===me){actions="<div class='row' style='margin-top:10px'><button class='btn sm' onclick=\"gateAct('accept')\">I'll take it now</button><button class='btn ghost sm' onclick=\"gateAct('decline')\">I'll come later</button></div>"}
+  return "<span class='dot'></span>"+h+wait+offer+kaleem+actions;
+}
+function refreshGate(){api("getLogs",{}).then(function(r){if(r.gate)gate=r.gate;
+  if($("gateLogin"))$("gateLogin").innerHTML=fmtGate(gate,false);
+  if($("gateDash"))$("gateDash").innerHTML=fmtGate(gate,true);})}
+
+/* ---------- auth ---------- */
+function doLogin(){
+  me=$("nameSel").value;
+  api("login",{name:me,pin:$("pin").value||""}).then(function(r){
+    if(r.gate)gate=r.gate;
+    startTs=Date.now();
+    $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
+    $("userPill").classList.remove("hidden");$("userPill").textContent="👤 "+me;
+    $("logoutBtn").classList.remove("hidden");
+    var seat = (r.gateStatus==="HOLDER")?"You have Saqib's profile — you're clear to work.":
+      ("The profile is busy. You're booked as "+ (r.gateStatus||"waiting") +" — the app will ping you here the moment it's your turn.");
+    toast("Welcome, "+me+"! "+seat);
+    startTimer();updateStats();renderGateDash();
+    logEvent({type:"LOGIN",detail:seat});
+  });
+}
+function doLogout(){
+  var ms=Date.now()-startTs, dur=fmtDur(ms), mins=Math.round(ms/60000);
+  logEvent({type:"LOGOUT",detail:"Session "+dur+" · JDs "+stats.jd+" · Proposals "+stats.prop+" · Copies "+stats.copy, durationMin:mins});
+  api("logout",{name:me,durationMs:ms,durationMin:mins,jds:stats.jd,proposals:stats.prop,copies:stats.copy}).then(function(r){
+    if(r.gate)gate=r.gate;
+    var msg = r.promoted? ("Seat handed over — "+r.promoted+" is being offered the profile now.") : "Profile is now free.";
+    clearInterval(tick);
+    $("appView").classList.add("hidden");$("loginView").classList.remove("hidden");
+    $("userPill").classList.add("hidden");$("logoutBtn").classList.add("hidden");
+    refreshGate();
+    toast("Signed out after "+dur+". "+msg+" Your details were updated. See you soon, "+me+"!");
+    me=null;
+  });
+}
+function gateAct(kind){
+  api(kind==="accept"?"gateAccept":"gateDecline",{name:me}).then(function(r){if(r.gate)gate=r.gate;renderGateDash();
+    toast(kind==="accept"?"You've taken the profile — go!":"No problem, passing to the next person.")});
+}
+
+/* ---------- timer ---------- */
+function startTimer(){clearInterval(tick);tick=setInterval(function(){
+  var ms=Date.now()-startTs;$("timer").textContent=fmtDur(ms);
+  var mins=ms/60000,pct=Math.min(100,(mins/SHIFT_TARGET_MIN)*100);
+  $("shiftBar").style.width=pct+"%";
+  $("shiftNote").textContent=(me==="Kaleem")?("Part-time reference: "+Math.round(mins)+" of ~240 min. Nice pace — ask the co-pilot anytime."):("Reference bar vs a 4-hour block: "+Math.round(mins)+" min.");
+},1000)}
+function fmtDur(ms){var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
+  return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(ss).padStart(2,"0")}
+function updateStats(){$("sJD").textContent=stats.jd;$("sProp").textContent=stats.prop;$("sCopy").textContent=stats.copy}
+function renderGateDash(){$("gateDash").innerHTML=fmtGate(gate,true)}
+
+/* ---------- tabs ---------- */
+function tab(id){["dash","eval","prop","pipe","analytics","logs"].forEach(function(t){
+  $("tab-"+t).classList.toggle("hidden",t!==id);
+  var el=document.querySelector('.tab[data-tab="'+t+'"]'); if(el)el.classList.toggle("active",t===id)});
+  if(id==="logs")renderLogs();if(id==="dash")renderGateDash();if(id==="pipe")renderPipe();if(id==="analytics")renderAnalytics();}
+
+/* ---------- evaluate ---------- */
+function num(id){var v=parseFloat($(id).value);return isNaN(v)?undefined:v}
+function runEval(){
+  var jd=$("jd").value.trim();
+  if(!jd){toast("Paste a JD first.");return}
+  var country=$("country").value.trim();
+  var client={
+    budgetType:$("btype").value, budget:num("budget"),
+    country:country||undefined, paymentVerified:$("payv").value==="yes",
+    reviews:num("reviews"), rating:num("rating"), totalSpent:num("spent"),
+    hires:num("hires"), hireRate:num("hirerate"), avgHourlyPaid:num("avghr")
+  };
+  var ban=AIAdvocateEngine.checkHardBans(jd,client);
+  if(ban.banned){
+    var h='<span class="badge b-ban">HARD BAN — SKIP</span><p style="margin-top:12px"><b>'+esc(ban.reason)+'</b></p><p class="note">Checked before scoring. 0 Connects spent. This is a rule from your v9.1 hard-ban list.</p>';
+    $("evalOut").innerHTML=h;lastEval={ban:ban,jd:jd};
+    stats.jd++;stats.skip++;updateStats();
+    evalHistory.unshift({ts:new Date().toISOString(),decision:"HARD BAN",total:"—",country:country||"?",budget:client.budget||"?",summary:ban.reason});
+    logEvent({type:"JD_EVAL",decision:"HARD BAN",detail:ban.reason,country:country,budget:client.budget,score:"—",total:"—"});
+    tab("eval");return;
   }
-};
-
-var TEMPLATES = [
-  {c:'T1',t:'LLM / RAG / GenAI build',when:'Job mentions RAG, chatbot on data, knowledge base, hallucination, vector DB',rate:'$70-90/hr',con:'6',boost:'Only if high-value + few proposals',
-   open:'You need [their goal] without the model making things up, that is a retrieval + grounding problem, not a prompt problem.',
-   proof:'Saqib built a RAG SaaS and a multi-agent SaaS (both 5.0). Pinecone/Chroma/FAISS + LangChain/LlamaIndex.'},
-  {c:'T2',t:'Full-stack SaaS / FastAPI + React',when:'SaaS MVP, dashboard, API + frontend, Stripe, auth',rate:'$70-90/hr',con:'6',boost:'No (unless premium)',
-   open:'You want a production SaaS, not a wrapper, auth, DB, payments and the AI logic wired together and deployed.',
-   proof:'Saqib ships full stack: FastAPI/Django + React/Next + PostgreSQL/Supabase + Stripe + AWS/Docker, 99.9% uptime.'},
-  {c:'T3',t:'Agentic AI / multi-agent / automation',when:'LangGraph, CrewAI, autonomous agents, scraping, workflow automation',rate:'$70-90/hr',con:'6',boost:'No',
-   open:'You want an agent that actually completes the workflow end to end, with guardrails, not a demo that breaks on edge cases.',
-   proof:'Saqib built LangGraph/CrewAI multi-agent systems that browse, scrape and execute; delivered a multi-agent SaaS (5.0).'},
-  {c:'T4',t:'Fast speed-bid (under 10 proposals)',when:'Fresh post, <10 proposals, speed beats polish',rate:'set by job',con:'6',boost:'Never',
-   open:'[Restate their exact problem in one line].',
-   proof:'One-line proof + one question. Submit in minutes while the post is new.'},
-  {c:'T5',t:'Director / VP / Head of AI (decision-maker)',when:'Title-level client, strategic hire',rate:'$80-90/hr',con:'6-8',boost:'Always boost',
-   open:'You are hiring for [outcome] at the org level, you need someone who owns architecture and delivery, not a task-taker.',
-   proof:'Saqib owns the whole stack end to end; speaks architecture, security and deployment, not just code.'},
-  {c:'T6',t:'MLOps / SageMaker / Kubernetes',when:'Deployment, scaling, pipelines, infra for ML',rate:'$80-90/hr',con:'6',boost:'If premium',
-   open:'Your model works, now it has to run reliably at scale. That is an MLOps and infra problem.',
-   proof:'Saqib: AWS, Docker, CI/CD, scalable deployments with 99.9%+ uptime.'},
-  {c:'T7',t:'Workflow automation (n8n / Make / Zapier)',when:'Connect tools, automate ops, webhooks, Sheets/Slack',rate:'$60-80/hr',con:'6',boost:'No',
-   open:'You are doing [repetitive task] by hand, that is a multi-step automation that can run itself and notify your team.',
-   proof:'Multi-node pipelines integrating APIs, Google Sheets, OpenAI/Claude, webhooks and Slack.'},
-  {c:'T8',t:'AI chatbot / assistant for a business',when:'Website assistant, support bot, internal assistant',rate:'$60-85/hr',con:'6',boost:'No',
-   open:'You want a chatbot that answers from YOUR business, accurate, on-brand, and not generic.',
-   proof:'Custom GPT-4o/Claude assistants grounded on client data; Saqib catalog has a $350 chatbot offering.'},
-  {c:'T9',t:'API integration / backend fix',when:'Connect 2 systems, REST/OAuth, debug backend',rate:'$60-80/hr',con:'6',boost:'No',
-   open:'You need [system A] and [system B] talking reliably with proper auth and error handling.',
-   proof:'Secure high-performance REST APIs, OAuth, multi-service backends (FastAPI/Node).'},
-  {c:'T10',t:'Data / NLP / document extraction',when:'Parse PDFs, extract structured data, classify, analyse',rate:'$60-85/hr',con:'6',boost:'No',
-   open:'You have unstructured [docs/data] and need clean structured output you can trust and search.',
-   proof:'NLP + extraction pipelines; AI resume-ranking & parsing system in portfolio.'},
-  {c:'T11',t:'AI MVP for a startup / founder',when:'Founder, "build my AI product", investor demo',rate:'$70-90/hr',con:'6-8',boost:'If competitive',
-   open:'You are validating [product], you need a real, demo-able MVP fast, built to extend, not throwaway.',
-   proof:'Delivered MVPs from concept to shippable; full stack + AI in one engineer.'},
-  {c:'T12',t:'Long-term / retainer / staff-aug',when:'Ongoing, part-time, "join our team", monthly',rate:'$70-85/hr',con:'6',boost:'No',
-   open:'You want a reliable engineer embedded with your team long-term, owning delivery, not just tickets.',
-   proof:'Saqib is one engineer who covers frontend, backend, AI and deployment, less coordination overhead for you.'}
-];
-
-var SCORING = {
-  client:[['Payment verified','+2 / 0'],['Hire rate >50% / 20–50% / under','2 / 1 / 0'],['Spend $1k–$50k sweet spot / $50k+ whale / $1–1k / $0','2 / 1 / 1 / 0'],['Some review history','+1']],
-  job:[['Scope: specific / somewhat / vague','2 / 1 / 0'],['Budget meets $60hr or $1000 fixed','2 / 1 / 0'],['Proposals <5–9 / 10–19 / 20+','2 / 1 / 0'],['Long-term potential','+1']],
-  match:[['Stack match strong / partial / none','3 / 2 / 0'],['Direct portfolio proof','+1'],['Allowed region (US/Europe) fit','+1']]
-};
-
-var SOURCES = [
-  ['Upwork — How to create a proposal that wins (2026)','Problem-first opener; mirror the client\u2019s words; show one matching result.','https://www.upwork.com/resources/how-to-create-a-proposal-that-wins-jobs'],
-  ['GigRadar — 133,872-proposal dataset (Dec 2025–Feb 2026)','Reply 7.45% baseline. "Hey [first name]" 8.50% vs "Hi there" 6.88%. Whales ($500k+) reply 3.85%; mid-tier ($1k–$5k) 8.15%. The 100–149-word middle is dead.','https://gigradar.io/blog/upwork-proposal-templates-that-convert-12-fill-in-the-blank-examples'],
-  ['Getmany — Templates vs personalization (2026)','Personalized proposals reply 8–30%; win rates up to 5x template-only. Hybrid (template + heavy personalization) is what Upwork recommends.','https://getmany.com/blog/winning-upwork-proposals-templates-vs-personalization-compared-2026'],
-  ['Getmany — Proposal writing tips (2026)','Generic 1–3% win; strategic 15–25%. Within 2h of posting = ~50% higher open. Clients shortlist only 5–7 per job.','https://getmany.com/blog/upwork-proposal-writing-tips-win-more-projects-in-2026'],
-  ['SnipeWork — 12 samples (500+ analyzed)','Put the one most specific job detail in sentence one — even swapping in the client\u2019s exact words can double response.','https://snipework.com/blog/upwork-proposal-samples']
-];
-
-/* ============================ STORAGE (Claude shared + localStorage fallback) ============================ */
-var mem = {pipeline:[], activity:[]};
-var pasteStart=null, decisionSecs=null; // TASK 3: paste-to-decision timer
-/* ---- TASK 2: configurable allowed regions (US + Europe by default) ---- */
-function getAllowedRegions(){ try{ if(LS_OK){var v=localStorage.getItem('aia_allowed_regions'); if(v) return JSON.parse(v);} }catch(e){} return ['US','Europe']; }
-function setAllowedRegions(arr){ try{ if(LS_OK) localStorage.setItem('aia_allowed_regions', JSON.stringify(arr)); }catch(e){} }
-function toggleRegion(r,on){ var a=getAllowedRegions(); var i=a.indexOf(r); if(on&&i<0)a.push(r); if(!on&&i>=0)a.splice(i,1); setAllowedRegions(a); }
-var STORAGE_OK = (typeof window!=='undefined' && !!window.storage);
-var LS_OK = (function(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true;}catch(e){return false;}})();
-async function load(k,fallback){try{
-  if(STORAGE_OK){var r=await window.storage.get(k,true);return r?JSON.parse(r.value):fallback;}
-  if(LS_OK){var v=localStorage.getItem('aia_'+k);return v?JSON.parse(v):fallback;}
-  return fallback;}catch(e){return fallback;}}
-async function save(k,v){try{
-  if(STORAGE_OK){await window.storage.set(k,JSON.stringify(v),true);return;}
-  if(LS_OK){localStorage.setItem('aia_'+k,JSON.stringify(v));}}catch(e){}}
-
-/* ============================ IDENTITY + CLOCK ============================ */
-var ME = TEAM[0];
-function initRole(){
-  var sel=document.getElementById('role-select');
-  TEAM.forEach(function(m){var o=document.createElement('option');o.value=m.id;o.textContent=m.name+' · '+m.role;sel.appendChild(o);});
-  var saved=LS_OK?localStorage.getItem('aia_me'):null; if(saved){sel.value=saved;}
-  ME=TEAM.find(function(m){return m.id===sel.value;})||TEAM[0];
-  sel.onchange=function(){ME=TEAM.find(function(m){return m.id===sel.value;});if(LS_OK)localStorage.setItem('aia_me',ME.id);renderAll();};
-}
-function pktNow(){var d=new Date();var u=d.getTime()+d.getTimezoneOffset()*60000;return new Date(u+5*3600000);} // PKT = UTC+5
-function cstNow(){var d=new Date();var u=d.getTime()+d.getTimezoneOffset()*60000;return new Date(u-6*3600000);} // CST = UTC-6
-function hhmm(d){return (''+d.getHours()).padStart(2,'0')+':'+(''+d.getMinutes()).padStart(2,'0');}
-function tickClock(){
-  var p=pktNow(),c=cstNow();
-  document.getElementById('clock').innerHTML='PKT '+hhmm(p)+' · CST '+hhmm(c)+'<br><span class="muted">'+p.toDateString()+'</span>';
-}
-function inSlot(m){
-  if(!m||m.kind!=='bidder'||!m.slot) return m && m.kind!=='excused'; // owners/manager/builder = always true
-  var p=pktNow(); var cur=p.getHours()*60+p.getMinutes();
-  var s=m.slot.start.split(':'),e=m.slot.end.split(':');
-  var a=(+s[0])*60+(+s[1]), b=(+e[0])*60+(+e[1]);
-  return cur>=a && cur<b;
-}
-function canAct(m){ if(!m) return false; if(m.kind==='excused') return false; if(m.kind==='bidder') return inSlot(m); return true; }
-
-/* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
-function initNav(){
-  var nav=document.getElementById('nav');
-  VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
-}
-function go(name,btn){
-  document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-view')===name);});
-  document.querySelectorAll('#nav button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on');
+  var wc=AIAdvocateEngine.wordCount(jd);
+  var s=AIAdvocateEngine.score({
+    jd:jd, client:client, proposals:num("props")||0,
+    reasonableBudget: client.budget!==undefined,
+    definedDeliverables: /deliverable|milestone|scope|requirement|responsibilit/i.test(jd),
+    techStackNamed: /(langchain|langgraph|crewai|rag|fastapi|react|python|llm|openai|anthropic|claude|n8n|mlops|embedding|vector|v0|vercel|supabase)/i.test(jd),
+    realisticTimeline: /(week|month|day|timeline|deadline|ongoing|long.term|hour)/i.test(jd),
+    professionalWriting: wc>=40 && /[.?!]/.test(jd),
+    matchesCoreSpecialization: /(ai|ml|llm|rag|automation|agent|fastapi|data|consult)/i.test(jd),
+    usesHisStack: /(langchain|langgraph|crewai|fastapi|react|python|rag|mlops|n8n|vector|embedding|v0|vercel|supabase)/i.test(jd),
+    similarPastProject: /(rag|chatbot|automation|agent|pipeline|saas|api|consult)/i.test(jd),
+    portfolioWorthy: wc>=150
+  });
+  lastEval={score:s,jd:jd,client:client};
+  stats.jd++; if(s.proposalAllowed && s.total>=14)stats.apply++; else stats.skip++; updateStats();
+  evalHistory.unshift({ts:new Date().toISOString(),decision:s.decision,total:s.total,country:country||"?",budget:client.budget||"?",summary:s.summary});
+  var badge = s.decision.indexOf("BOOST")>-1?"b-boost":s.decision.indexOf("STANDARD")>-1?"b-std":
+    s.decision.indexOf("APPLY")>-1?"b-std":s.decision.indexOf("BORDERLINE")>-1?"b-border":"b-skip";
+  var html='<span class="badge '+badge+'">'+esc(s.decision)+'</span>'+
+    '<h2 style="margin:12px 0 2px">'+esc(s.summary)+'</h2>'+
+    '<div class="barwrap"><div class="bar" style="width:'+(Math.max(0,s.total)/19*100)+'%"></div></div>'+
+    '<div class="row" style="margin-top:12px">'+
+      '<div class="stat"><b>'+s.client.points+'/'+s.client.max+'</b><span>Client</span></div>'+
+      '<div class="stat" style="margin-left:20px"><b>'+s.job.points+'/7</b><span>Job</span></div>'+
+      '<div class="stat" style="margin-left:20px"><b>'+s.match.points+'/5</b><span>Match</span></div>'+
+      '<div class="stat" style="margin-left:20px"><b>'+(s.saturation.penalty||0)+'</b><span>Sat. penalty</span></div>'+
+    '</div>'+
+    (s.newClient?'<p class="note" style="color:var(--good);font-weight:600;margin-top:10px">✅ New-client softening applied.</p>':'')+
+    (s.shortJD?'<p class="note" style="color:var(--warn);font-weight:600">⚠️ Short JD flagged — ask a scoping question.</p>':'')+
+    '<h4 style="margin:14px 0 4px">Why (logic, no assumptions)</h4><ul class="reasons">'+s.reasons.map(function(r){return "<li>"+esc(r)+"</li>"}).join("")+'</ul>'+
+    (s.flags.length?'<h4 style="margin:10px 0 4px">Flags</h4><ul class="flags">'+s.flags.map(function(f){return "<li>"+esc(f)+"</li>"}).join("")+'</ul>':'')+
+    '<div class="row" style="margin-top:14px"><button class="btn" onclick="tab(\'prop\');makeProposal()">'+(s.proposalAllowed?'Draft the proposal →':'See why to skip →')+'</button></div>';
+  $("evalOut").innerHTML=html;
+  logEvent({type:"JD_EVAL",decision:s.decision,client:s.client.points+"/"+s.client.max,job:s.job.points+"/7",match:s.match.points+"/5",
+    total:s.total+"/19",score:s.total+"/19",country:country,budget:client.budget,
+    detail:(s.newClient?"[new-client] ":"")+(s.shortJD?"[short-JD] ":"")+s.decision,summary:s.summary});
+  tab("eval");
 }
 
-/* ============================ ACCESS BANNER + ROSTER ============================ */
-function renderAccess(){
-  var el=document.getElementById('access');
-  if(ME.kind==='excused'){el.innerHTML='<span>\u26d4</span><div><b>'+ME.name+' is excused from Upwork bidding for at least one month</b> (Saqib, 29 June). You can view everything, but shortlist/apply actions are locked.</div>';return;}
-  if(ME.kind==='bidder'){
-    var ok=inSlot(ME);
-    el.innerHTML='<span>'+(ok?'\u2705':'\u23f3')+'</span><div><b>'+ME.name+' · window '+ME.slot.start+'\u2013'+ME.slot.end+' PKT.</b> '+(ok?'You are IN your window — actions unlocked.':'Outside your window — actions are read-only.')+' Single login: VPN Houston, separate browser, no personal Upwork, log out then message the next person.</div>';
+/* ---------- proposal ---------- */
+function makeProposal(){
+  if(!lastEval){$("propOut").innerHTML='<p class="note">Evaluate a JD first.</p>';return}
+  if(lastEval.ban){$("propOut").innerHTML='<span class="badge b-ban">SKIP</span><p style="margin-top:10px">This job hit a hard ban ('+esc(lastEval.ban.reason)+'). No proposal is produced.</p>';return}
+  var s=lastEval.score;
+  if(!s.proposalAllowed){
+    var why='<span class="badge b-skip">DO NOT APPLY (score '+s.total+'/19)</span>'+
+      '<h4 style="margin:12px 0 4px">Detailed, logical reasons to skip</h4><ul class="reasons">'+
+      s.reasons.map(function(r){return "<li>"+esc(r)+"</li>"}).join("")+
+      '<li>Total '+s.total+'/19 is below the 13 floor after all rules and penalties, so a Connect here is poor ROI versus stronger posts.</li>'+
+      (s.flags.length?s.flags.map(function(f){return "<li><b>"+esc(f)+"</b></li>"}).join(""):"")+
+      '</ul><p class="note">Logged front-end and backend with your name and timestamp. Guidance based only on the facts you entered — no fabricated metrics.</p>';
+    $("propOut").innerHTML=why;
+    logEvent({type:"PROPOSAL_SKIP",decision:"Advised skip",detail:"Advised skip",score:s.total+"/19",total:s.total+"/19"});
     return;
   }
-  el.innerHTML='<span>\u2728</span><div><b>'+ME.name+' \u2014 anytime access.</b> Owners (Saqib, Waqas), Usman (manager) and Zeb (builder) can act and approve at any time. No fixed slot.</div>';
-}
-function statusPill(m){
-  if(m.kind==='excused') return '<span class="pill no">Excused</span>';
-  if(m.kind!=='bidder') return '<span class="pill anytime">Anytime</span>';
-  return inSlot(m)?'<span class="pill ok">In window</span>':'<span class="pill warn">Locked</span>';
-}
-function renderRoster(){
-  var b=document.getElementById('roster');b.innerHTML='';
-  TEAM.forEach(function(m){
-    var slot = m.kind==='bidder' ? (m.slot.start+'\u2013'+m.slot.end) : (m.kind==='excused'?'\u2014':'anytime');
-    b.innerHTML+='<tr'+(m.id===ME.id?' style="background:#0f231b"':'')+'><td>'+m.name+'</td><td class="muted">'+m.role+'</td><td>'+slot+'</td><td>'+statusPill(m)+'</td></tr>';
-  });
-  // whose hour
-  var w=document.getElementById('whose');
-  var active=TEAM.filter(function(m){return m.kind==='bidder'&&inSlot(m);});
-  w.innerHTML = active.length ? active.map(function(m){return '<span class="pill ok">'+m.name+' · '+m.slot.start+'\u2013'+m.slot.end+'</span>';}).join(' ') : '<span class="pill warn">No bidder window active right now</span>';
-}
-
-/* ============================ EVALUATOR (19-point) ============================ */
-function val(id){var e=document.getElementById(id);return e?e.value:'';}
-function chk(id){var e=document.getElementById(id);return e?e.checked:false;}
-function setVal(id,v){var e=document.getElementById(id); if(e==null)return; if(e.type==='checkbox')e.checked=!!v; else e.value=v;}
-/* ---- read the pasted Upwork job and detect bans/threshold automatically ---- */
-function parseJob(text){
-  var t=(text||'').replace(/–|—/g,'-'); var low=t.toLowerCase();
-  var P={budgetType:null,amount:null,proposalsLow:null,worldwide:false,usOnly:false,verified:false,spent:null,rating:null,hireRate:null,bans:[],flags:[]};
-  if(/fixed[-\s]?price/i.test(t)) P.budgetType='fixed'; else if(/\/\s?hr|per hour|hourly|an?\s+hour/i.test(t)) P.budgetType='hourly';
-  var m=t.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed[-\s]?price/i)||t.match(/fixed[-\s]?price[^$\d]{0,40}\$? ?([\d,]+(?:\.\d+)?)/i);
-  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
-  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*(?:an?\s+hour|per hour)/i);
-  if(!m) m=t.match(/([\d,]+(?:\.\d+)?)\s*(?:dollars?|usd)\b/i);
-  if(!m) m=t.match(/\$ ?([\d,]+(?:\.\d+)?)/);
-  if(m) P.amount=parseFloat(m[1].replace(/,/g,''));
-  var pp=t.match(/proposals?:?\s*\n?\s*(\d+)\s*(?:to|-)\s*(\d+)/i)||t.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*proposals/i);
-  if(pp) P.proposalsLow=parseInt(pp[1],10);
-  else{
-    var lt=t.match(/(?:less than|fewer than|under)\s*(\d+)\s*proposals/i)||t.match(/proposals?:?\s*(?:less than|fewer than|under)\s*(\d+)/i);
-    if(lt) P.proposalsLow=parseInt(lt[1],10);
-    else{var p2=t.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i)||t.match(/(\d+)\s*\+?\s*proposals/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
-  }
-  P.worldwide=/\bworldwide\b/i.test(t);
-  P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(t);
-  /* ---- TASK 2: region detection. US + Europe allowed; India/Bangladesh hard ban ---- */
-  P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|england|scotland|wales|ireland|germany|german|france|french|spain|spanish|italy|italian|netherlands|dutch|belgium|sweden|swedish|norway|denmark|danish|finland|finnish|poland|polish|portugal|portuguese|austria|austrian|switzerland|swiss|czech|greece|greek|romania|hungary|berlin|munich|london|paris|madrid|amsterdam|stockholm|dublin|zurich|lisbon|warsaw)\b/i.test(t);
-  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune)\b/i.test(t) && !/\bindiana\b/i.test(low);
-  P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : ((P.usOnly||/\bunited states\b/i.test(t))?'US':'Other'));
-  P.verified=/payment (?:method )?verified|verified payment/i.test(t);
-  var sp=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
-  if(sp){var n=parseFloat(sp[1].replace(/,/g,''));var u=(sp[2]||'').toLowerCase();P.spent=u==='k'?n*1000:u==='m'?n*1e6:n;}
-  var rt=t.match(/([\d.]+)\s*stars?\b/i)||t.match(/([\d.]+)\s*\/\s*5\b/i)||t.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
-  var hr=t.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
-  if(P.budgetType==='fixed' && P.amount!=null && P.amount<200) P.bans.push('Fixed-price under $200 ($'+P.amount+')');
-  /* Proposal saturation is NOT a ban — it is scored as a penalty in runEval (see SAT_PENALTY). */
-  if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
-  if(/\b(government|federal agency|military|defense|defence|itar|fedramp|cmmc|govcloud|gov cloud)\b/i.test(low)) P.bans.push('Banned industry (govt/defense)');
-  if(/\b(umbrage|stewart|cvs health|lynx)\b/i.test(low)) P.bans.push('Banned company');
-  if(P.isBanCountry) P.bans.push('Client in India/Bangladesh (hard ban)');
-  if(/(on-?site|in[- ]person)[^.]{0,40}(2|3|4|5)\s*days?/i.test(low)) P.bans.push('On-site 2+ days/week');
-  if(/\bsurvey\b|\btest (?:job|task)\b|\bquestionnaire\b/i.test(low)) P.flags.push('Possible survey/test job - verify');
-  if(P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)<0) P.flags.push('Outside allowed regions ('+P.region+') — review, not auto-skip');
-  var belowBudget = P.budgetType==='fixed' ? (P.amount!=null && P.amount<1000) : P.budgetType==='hourly' ? (P.amount!=null && P.amount<60) : false;
-  if(belowBudget) P.flags.push('Below threshold ('+(P.budgetType==='fixed'?'fixed <$1000':'<$60/hr')+')');
-  P.belowBudget=belowBudget;
-  return P;
-}
-function autofill(P){
-  if(P.budgetType) setVal('b-type',P.budgetType);
-  if(P.amount!=null) setVal('b-amt',String(P.amount));
-  if(P.proposalsLow!=null) setVal('j-props', P.proposalsLow>=20?'3':P.proposalsLow>=10?'2':P.proposalsLow>=5?'1':'0');
-  setVal('c-verified',P.verified);
-  setVal('c-us', P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)>=0);
-  if(P.spent!=null) setVal('c-spend', (P.spent>=1000&&P.spent<=50000)?'2':P.spent>50000?'1':P.spent>0?'1b':'0');
-  if(P.hireRate!=null) setVal('c-hire', P.hireRate>=50?'2':P.hireRate>=20?'1':'0');
-  setVal('j-ban', P.bans.length>0);
-}
-function scoreManual(){
-  var cli=0; cli+= chk('c-verified')?2:0; cli+= (+val('c-hire'));
-  var sp=val('c-spend'); cli+= (sp==='2'?2:(sp==='1'||sp==='1b'?1:0));
-  var fixed=val('b-type')==='fixed';
-  if(!fixed) cli+=1; /* "$25/hr average paid" point is N/A on fixed-price (v9.1) */
-  var cliMax=fixed?6:7; if(cli>cliMax)cli=cliMax;
-  var job=0; job+= (+val('j-scope'));
-  var amt=parseFloat(val('b-amt'))||0, bt=val('b-type');
-  var meets = bt==='hourly' ? amt>=60 : amt>=1000;
-  var border = bt==='hourly' ? (amt>=45&&amt<60) : (amt>=600&&amt<1000);
-  job+= meets?2:(border?1:0);
-  var pr=val('j-props'); job+= (pr==='0'||pr==='1')?2:(pr==='2'?1:0); job+= chk('j-long')?1:0; if(job>7)job=7;
-  var mat=0; mat+=(+val('m-match')); mat+=chk('m-proof')?1:0; mat+=chk('c-us')?1:0; if(mat>5)mat=5;
-  var total=cli+job+mat;
-  var decision = total>=14 ? ((total>=16 && mat>=4)?'APPLY WITH BOOST':'APPLY STANDARD') : 'SKIP — low score';
-  return {total:total,cli:cli,job:job,mat:mat,decision:decision};
-}
-function barRow(label,v,max){return '<div style="margin:6px 0"><div class="flex" style="justify-content:space-between"><span class="note">'+label+'</span><span class="note">'+v+'/'+max+'</span></div><div class="bar"><i style="width:'+(100*v/max)+'%"></i></div></div>';}
-function coreText(){ var s=val('job-text')||''; var cut=s.search(/activity on this job|about the client|client'?s recent history/i); if(cut>0) s=s.slice(0,cut); return s.toLowerCase(); }
-function pickTemplate(){
-  var s=coreText();
-  if(/\b(director|vp|head of|chief|cto)\b/.test(s)) return TEMPLATES[4];
-  if(/n8n|zapier|make\.com|make automation/.test(s)) return TEMPLATES[6];
-  if(/rag|vector|knowledge base|chatbot on|hallucinat/.test(s)) return TEMPLATES[0];
-  if(/agent|langgraph|crewai|scrap|automation|workflow/.test(s)) return TEMPLATES[2];
-  if(/saas|full.?stack|dashboard|stripe|next\.?js|frontend|backend/.test(s)) return TEMPLATES[1];
-  if(/mlops|sagemaker|kubernetes|deploy|pipeline|scale/.test(s)) return TEMPLATES[5];
-  if(/retainer|long.?term|ongoing|part.?time|join our team/.test(s)) return TEMPLATES[11];
-  return TEMPLATES[0];
-}
-async function runEval(){
-  if(!gate('evaluate')) return;
-  var el=document.getElementById('eval-out');
-  var jd=val('job-text');
-  if(!jd.trim()){ el.innerHTML='<div class="card note">Paste the full job post first, then press Evaluate.</div>'; return; }
-  el.innerHTML='<div class="card note">Scoring live...</div>';
-  var ask='Score this Upwork job now. Give the full 19-point breakdown (Client, Job, Match) with the proposal-count penalty and the final decision, following your scoring rules exactly. Do not write the proposal here, the proposal buttons handle that.\n\nJOB:\n'+jd;
-  try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
-      messages:[{role:'user',content:ask}]})});
-    if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Scoring failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
-    var data=await resp.json();
-    var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
-    if(!txt){ el.innerHTML='<div class="card note">The model returned no score. Try again.</div>'; return; }
-    el.innerHTML='<div class="card"><div class="eyebrow">Decision (scored live by Claude)</div><div class="md">'+mdToHtml(txt)+'</div></div>';
-    logAct('evaluate', firstLine(jd), 0, 'AI scored');
-  }catch(e){
-    el.innerHTML='<div class="card note">Scoring error: '+esc(String(e&&e.message?e.message:e))+'</div>';
+  var tmpl = buildTemplateProposal(lastEval.jd,s);
+  renderProposal(tmpl, s, false);
+  if(online()){
+    api("claude",{prompt:claudePrompt(lastEval.jd,s)}).then(function(r){
+      if(r&&r.ok&&r.text){ var parsed=null; try{parsed=JSON.parse(r.text);}catch(e){}
+        renderProposal(parsed||{proposal:r.text,intro:tmpl.intro}, s, true); }
+    });
   }
 }
-
-/* ============================ PROPOSAL + COVER LETTER (local, works with no key) ============================ */
-function firstLine(s){s=(s||'').trim();var l=s.split('\n')[0]||'New job';return l.slice(0,80);}
-function clientWords(job){ // pull a specific phrase from the post
-  var s=(job||'').replace(/\s+/g,' ').trim(); if(!s) return 'the problem in your post';
-  var m=s.match(/(need|looking for|want|require|build|integrate|automate|fix|develop|create)[^.]{8,90}/i);
-  return m? m[0].trim().replace(/^[a-z]/,function(x){return x.toLowerCase();}) : s.slice(0,80);
+function renderProposal(obj,s,live){
+  stats.prop++;updateStats();
+  var band='<span class="badge '+(s.total>=16?"b-boost":s.total===13?"b-border":"b-std")+'">'+(live?"Claude-refined":"Template draft")+' · '+esc(s.decision)+'</span>';
+  var connects = s.total>=16?"10–16 Connects, boost if 10+ proposals or long-term":"6 Connects, no boost";
+  var html=band+
+    '<h4 style="margin:14px 0 4px">PROPOSAL <span class="note">(paste into Upwork\'s Cover Letter box)</span></h4>'+
+    '<div class="out" id="propText">'+esc(obj.proposal)+'</div>'+
+    '<div class="row" style="margin-top:8px"><button class="btn sm" onclick="copyLog(\'propText\',\'PROPOSAL\')">Copy proposal</button>'+
+    '<span class="note">Recommended: '+connects+'.</span></div>'+
+    '<h4 style="margin:16px 0 4px">INTRO MESSAGE <span class="note">(your FIRST reply after the client responds — never paste in the application)</span></h4>'+
+    '<div class="out" id="introText">'+esc(obj.intro)+'</div>'+
+    '<div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="copyLog(\'introText\',\'INTRO\')">Copy intro</button></div>'+
+    '<p class="note">Reminder: only true, traceable metrics — swap the bracketed proof lines for a real project number before sending.</p>';
+  $("propOut").innerHTML=html;
 }
-/* ---- TASK 1: real stack + concrete approach per template type (no invented metrics/names) ---- */
-function stackFor(c){
-  var M={
-   T1:{stack:"Python, LangChain or LlamaIndex, a vector store (Pinecone, Chroma or FAISS) and an LLM API",
-       approach:"retrieval over your own content with grounding and an evaluation step, so the model answers from your data instead of guessing"},
-   T2:{stack:"FastAPI or Django on the backend, React or Next.js on the front end, PostgreSQL or Supabase, Stripe and Docker",
-       approach:"auth, database, payments and the AI logic wired together and deployed as one production app, not a fragile demo"},
-   T3:{stack:"LangGraph or CrewAI in Python, with tool calling, retries and guardrails",
-       approach:"an agent that runs the whole workflow end to end and handles the edge cases, with checks so it fails safely"},
-   T4:{stack:"Python, FastAPI, React and the major LLM APIs",
-       approach:"the smallest working slice first, wired to your real inputs so you can see it run early"},
-   T5:{stack:"a full backend, front end, AI layer and cloud deployment",
-       approach:"owning architecture, security and delivery, so you get one person accountable end to end"},
-   T6:{stack:"AWS, Docker, CI/CD and Kubernetes or SageMaker",
-       approach:"containerising the model and adding pipelines and monitoring, so it runs reliably under real load"},
-   T7:{stack:"n8n, Make or Zapier with webhooks, Google Sheets, Slack and the LLM APIs",
-       approach:"turning the manual steps into one pipeline that runs itself and notifies your team"},
-   T8:{stack:"a Claude or GPT assistant grounded on your content, with retrieval and clear fallbacks",
-       approach:"an assistant that answers from your business, on brand, instead of giving generic replies"},
-   T9:{stack:"FastAPI or Node with OAuth, retries and proper error handling",
-       approach:"two systems talking reliably, with auth and failure handling built in from the start"},
-   T10:{stack:"Python NLP and extraction pipelines over your documents",
-        approach:"turning the unstructured docs into clean structured output you can search and trust"},
-   T11:{stack:"a full stack plus the AI layer, built to extend",
-        approach:"a real, demo-able MVP fast, structured so you can grow it instead of rebuilding it"},
-   T12:{stack:"frontend, backend, AI and deployment handled by one engineer",
-        approach:"owning delivery as part of your team, so there is less coordination overhead for you"}
-  };
-  return M[c]||M.T4;
+function buildTemplateProposal(jd,s){
+  var hookWords=(jd.match(/(RAG|LangChain|LangGraph|FastAPI|React|automation|agent|voice|MLOps|pipeline|chatbot|LLM|v0|Vercel|consulting)/gi)||["AI"]).slice(0,3).join(", ");
+  var proposal=
+"Hi there,\n\nI build production "+hookWords+" systems, and your post lines up closely with work I have shipped. On a comparable build I [state one TRUE metric here, e.g. cut retrieval errors from X% to Y% / saved N hours/week] — I can bring that same approach here.\n\nA couple of quick proof points: [real mini-case 1 with a number], and [real mini-case 2 with a number]. I read your post and noted you need "+hookWords+"; that is exactly my core stack (Python, FastAPI, React, LangGraph, RAG).\n\nHow I'd start: (1) confirm scope and success metric with you, (2) stand up a working slice of the core feature, (3) iterate to production with tests.\n\nOne question: what does success look like for you in the first two weeks?\n\nHappy to jump on a quick call. — Saqib, AI Advocate";
+  var intro="Thanks for the reply! Quick context: I focus on "+hookWords+" and have shipped this exact type of system before. Before we talk numbers, what is the single outcome you most want this to deliver first? That tells me the fastest path to value for you.";
+  return {proposal:proposal,intro:intro};
 }
-function echoProblem(job){
-  var s=(job||"").replace(/\s+/g," ").trim();
-  var m=s.match(/(?:need|looking for|want|require|build|integrate|automate|fix|develop|create|help with)\s+([^.,;\n]{6,80})/i);
-  var ph = m ? m[1].trim() : (s.slice(0,60)||"the system described in your post");
-  ph = ph.replace(/[.\s]+$/,"");
-  // drop a dangling trailing fragment (e.g. a cut-off next sentence like "We a"):
-  // strip trailing function words / pronouns that no real problem phrase would end on
-  var STOP=/\s+(?:a|an|and|or|to|for|with|the|of|in|on|at|that|this|we|our|i|you|it|they|is|are|be|as|by)$/i;
-  while(STOP.test(ph)) ph=ph.replace(STOP,"");
-  // natural capitalisation + article: keep ALL-CAPS acronyms intact (AI, RAG, API, LLM...),
-  // lowercase a normal leading word, and add the right article for a bare acronym noun phrase.
-  var first=ph.split(/\s+/)[0]||"";
-  var ART={AI:"an",API:"an",LLM:"an",ML:"an",NLP:"an",MVP:"an",SDK:"an",ERP:"an",AWS:"an",
-           RAG:"a",SaaS:"a",UI:"a",UX:"a",CRM:"a",GPT:"a",SQL:"a"};
-  if(/^(?:a|an|the|some|our|your|my|this|that)\b/i.test(ph)){
-    ph = ph.charAt(0).toLowerCase()+ph.slice(1);          // already has a determiner
-  } else if(ART.hasOwnProperty(first)){
-    ph = ART[first]+" "+ph;                                 // bare acronym -> add article, keep case
-  } else if(/^[A-Z]{2,}$/.test(first)){
-    /* other all-caps acronym, no mapped article -> leave it as-is */
-  } else {
-    ph = ph.charAt(0).toLowerCase()+ph.slice(1);           // normal word -> lowercase first letter
-  }
-  return ph;
+function claudePrompt(jd,s){
+  return "You are AI Advocate's Upwork co-pilot. Write a winning proposal for this job. Rules: 120-180 words, no em dashes, natural spoken English, no 'Dear Hiring Manager', mirror 2-3 words from the post, ONE specific metric placeholder in [brackets] the freelancer will fill with a TRUE number, one sharp question, light CTA. Also write a 2-4 sentence INTRO MESSAGE (first reply after the client responds). Return strict JSON: {\"proposal\":\"...\",\"intro\":\"...\"}. Job score was "+s.summary+" ("+s.decision+"). JOB POST:\n"+jd;
 }
-/* TASK 1: problem-first, first person, real stack, no invented metrics/names, ends on ONE question.
-   120-160 words for the full proposal. Free template mode (works with no API key);
-   live Claude generation plugs in later via the proxy. No personal names, no agency mention. */
-async function genProposal(mode){
-  if(!gate("evaluate")) return;
-  var el=document.getElementById("prop-out");
-  var jd=val("job-text");
-  if(!jd){ el.innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
-  el.innerHTML='<div class="card note">Generating proposal...</div>';
-  var ask='Write a winning Upwork proposal and intro message for this job, following your PROPOSAL '
-    +'OUTPUT RULES exactly. Output ONLY the two labelled blocks (PROPOSAL and INTRO MESSAGE), '
-    +'no score, no preamble.\n\nJOB:\n'+jd;
-  if(mode==="speed") ask+=' Keep the proposal on the shorter side, about 120 words.';
-  try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
-      messages:[{role:'user',content:ask}]})});
-    if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Proposal generation failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
-    var data=await resp.json();
-    var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
-    if(!txt){ el.innerHTML='<div class="card note">The model returned no text. Try again.</div>'; return; }
-    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
-      +'<div class="md" data-copy>'+mdToHtml(txt)+'</div>'
-      +'<div class="src" style="margin-top:10px">Generated live by Claude from the job post and the agency brief. Review before sending.</div></div>';
-    logAct("proposal", firstLine(jd), 0, mode==="speed"?"speed draft":"proposal draft");
-  }catch(e){
-    el.innerHTML='<div class="card note">Proposal generation error: '+esc(String(e&&e.message?e.message:e))+'</div>';
-  }
-}
-function shortProof(t){return t.proof.split('.')[0].replace(/^Saqib[: ]*/,'').toLowerCase().replace(/^[a-z]/,function(x){return x.toUpperCase();});}
-function step1(t){return 'Confirm scope and success criteria, then set up the core ('+oneWord(t.t)+') with your real data/stack.';}
-function step2(t){return 'Build the working slice end to end, test it against your edge cases, and show you a demo early.';}
-function step3(t){return 'Harden, document, and hand over so your team owns it, no dependency on me.';}
-function question(job){var s=(job||'').toLowerCase();
-  if(/rag|data|documents|knowledge/.test(s)) return 'roughly how much data/how many documents should it search, and where does it live?';
-  if(/api|integrat|webhook/.test(s)) return 'which systems need to talk to each other, and do you already have API access/keys?';
-  if(/saas|app|dashboard|frontend/.test(s)) return 'is there an existing codebase/design, or are we starting fresh?';
-  if(/agent|automat|workflow|n8n/.test(s)) return 'what does the workflow look like today, step by step, before we automate it?';
-  return 'what does success look like for you in the first 2 weeks?';}
-function oneWord(s){return (s||'project').split(' ').slice(0,3).join(' ');}
-function cap(s){s=s||'';return s.charAt(0).toUpperCase()+s.slice(1);}
-function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function copyText(btn){var c=btn.closest('.card').querySelector('[data-copy]');navigator.clipboard.writeText(c.innerText);btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);}
-
-/* ============================ PIPELINE + AUTO-LOG ============================ */
-function gate(area){
-  if(canAct(ME)) return true;
-  var msg = ME.kind==='excused' ? (ME.name+' is excused from bidding for ≥1 month.') : (ME.name+', you are outside your '+(ME.slot?ME.slot.start+'–'+ME.slot.end+' PKT ':'')+'window — actions are locked.');
-  alert(msg); return false;
-}
-function logAct(action, job, score, decision){
-  mem.activity.push({ts:Date.now(), by:ME.id, byName:ME.name, action:action, job:job, score:score, decision:decision});
-  save('activity',mem.activity); renderReport(); renderCommand();
-  // auto-create / advance pipeline rows for shortlist
-}
-function shortlist(){
-  if(!gate('pipeline')) return;
-  var job=val('job-text')||'(paste a job in Evaluate first)';
-  var P=parseJob(job); var sc = (P.bans.length||(P.worldwide&&!P.usOnly)||P.belowBudget)?0:scoreManual().total;
-  mem.pipeline.push({id:Date.now(), job:firstLine(job), score:sc, stage:'Shortlisted', by:ME.name});
-  save('pipeline',mem.pipeline); logAct('shortlist',firstLine(job),sc,'shortlisted'); renderPipeline();
-}
-var STAGES=['Shortlisted','Awaiting approval','Approved','Applied'];
-function advance(id){
-  var row=mem.pipeline.find(function(x){return x.id===id;}); if(!row)return;
-  var i=STAGES.indexOf(row.stage);
-  // approval step: only owners/manager
-  if(row.stage==='Awaiting approval' && !(ME.kind==='owner'||ME.kind==='manager')){alert('Only Saqib, Waqas or Usman can approve.');return;}
-  if(!canAct(ME)){gate('pipeline');return;}
-  if(i<STAGES.length-1){row.stage=STAGES[i+1];}
-  save('pipeline',mem.pipeline);
-  logAct(row.stage==='Applied'?'applied':'advance',row.job,row.score,row.stage);
-  renderPipeline();
-}
-function renderPipeline(){
-  var b=document.getElementById('pipe'); if(!b)return; b.innerHTML='';
-  if(!mem.pipeline.length){b.innerHTML='<tr><td colspan="5" class="muted">No jobs yet. Evaluate a job, then Shortlist.</td></tr>';}
-  mem.pipeline.slice().reverse().forEach(function(row){
-    var locked = !canAct(ME);
-    var next = row.stage!=='Applied' ? '<button class="btn ghost" '+(locked?'disabled':'')+' onclick="advance('+row.id+')">→ '+STAGES[STAGES.indexOf(row.stage)+1]+'</button>' : '<span class="pill ok">Done</span>';
-    b.innerHTML+='<tr class="'+(locked?'row-lock':'')+'"><td>'+esc(row.job)+'</td><td>'+(row.score||'-')+'</td><td><span class="pill '+(row.stage==='Applied'?'ok':'warn')+'">'+row.stage+'</span></td><td class="muted">'+row.by+'</td><td>'+next+'</td></tr>';
+function copyLog(id,kind){
+  var txt=$(id).innerText;
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.resolve()).then(function(){
+    stats.copy++;updateStats();toast(kind+" copied — logged with your name and timestamp.");
+    logEvent({type:"COPY_"+kind,detail:kind+" copied to clipboard",score:lastEval&&lastEval.score?lastEval.score.total+"/19":"—"});
   });
 }
-// expose shortlist button via Evaluate decision card too
-window.shortlist=shortlist;
 
-/* ============================ DAILY REPORT ============================ */
-function todayKey(d){d=d||pktNow();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
-function renderReport(){
-  var rb=document.getElementById('rep-body'); if(!rb)return;
-  document.getElementById('rep-date').textContent=pktNow().toDateString()+' (PKT)';
-  var today=todayKey();
-  var per={};
-  TEAM.forEach(function(m){per[m.id]={name:m.name,evaluate:0,shortlist:0,applied:0,skip:0};});
-  mem.activity.forEach(function(a){
-    var d=new Date(a.ts); var u=d.getTime()+d.getTimezoneOffset()*60000; var p=new Date(u+5*3600000);
-    if(todayKey(p)!==today) return;
-    var row=per[a.by]; if(!row)return;
-    if(a.action==='evaluate'){row.evaluate++; if((a.decision||'').indexOf('SKIP')===0)row.skip++;}
-    if(a.action==='shortlist')row.shortlist++;
-    if(a.action==='applied')row.applied++;
+/* ---------- guardian ---------- */
+function askGuardian(){
+  var q=prompt("Ask the co-pilot anything about the system:");
+  if(!q)return;
+  var relevant=/(score|proposal|client|connect|upwork|jd|job|rate|fee|profile|queue|log|kaleem|team|boost|ban|budget|duration|time)/i.test(q);
+  var ans = relevant
+    ? "Good question. Based only on your v9.1 rules and the facts entered: use Evaluate to score the job, then Proposal. If a specific number isn't verifiable, I won't invent it."
+    : "That one is outside what I should answer on my own. I'm working under Mr. Jahanzaib's (Zeb's) instructions as my guardian for anything policy-level or baseless — please confirm this with him and I'll follow his call.";
+  toast("Co-pilot replied — see the log.");
+  logEvent({type:"QUESTION",detail:"Q: "+q+" | A: "+(relevant?"answered":"deferred to Jahanzaib")});
+  alert(ans);
+}
+
+/* ---------- pipeline ---------- */
+function renderPipe(){
+  if(!evalHistory.length){$("pipeOut").innerHTML='<p class="note">No jobs evaluated yet this session.</p>';return}
+  var rows=evalHistory.slice().sort(function(a,b){
+    var k=pipeSort.key,av=a[k],bv=b[k];
+    if(k==="total"){av=parseFloat(av)||-99;bv=parseFloat(bv)||-99;}
+    return (av<bv?-1:av>bv?1:0)*pipeSort.dir;
   });
-  rb.innerHTML='';
-  TEAM.filter(function(m){return m.kind!=='excused';}).forEach(function(m){var r=per[m.id];
-    rb.innerHTML+='<tr><td>'+r.name+'</td><td>'+r.evaluate+'</td><td>'+r.shortlist+'</td><td>'+r.applied+'</td><td>'+r.skip+'</td></tr>';});
-  var feed=document.getElementById('feed');
-  var todays=mem.activity.filter(function(a){var d=new Date(a.ts);var u=d.getTime()+d.getTimezoneOffset()*60000;return todayKey(new Date(u+5*3600000))===today;}).slice(-30).reverse();
-  feed.innerHTML = todays.length? todays.map(function(a){return '<div class="note">'+hhmm(new Date(a.ts))+' · <b>'+a.byName+'</b> '+a.action+' — '+esc(a.job||'')+(a.score?(' ('+a.score+'/19)'):'')+(a.decision?(' → '+a.decision):'')+'</div>';}).join('') : '<div class="muted note">No activity logged today yet.</div>';
+  var body=rows.map(function(e){
+    var badge=e.decision.indexOf("BOOST")>-1?"b-boost":e.decision.indexOf("APPLY")>-1?"b-std":e.decision.indexOf("BORDER")>-1?"b-border":"b-skip";
+    return "<tr><td>"+new Date(e.ts).toLocaleTimeString()+"</td><td><b>"+esc(String(e.total))+"</b></td>"+
+      "<td><span class='badge "+badge+"'>"+esc(e.decision)+"</span></td><td>"+esc(String(e.country))+"</td><td>"+esc(String(e.budget))+"</td><td>"+esc(e.summary)+"</td></tr>";
+  }).join("");
+  $("pipeOut").innerHTML='<table><thead><tr>'+
+    '<th onclick="sortPipe(\'ts\')">Time</th><th onclick="sortPipe(\'total\')">Score</th>'+
+    '<th onclick="sortPipe(\'decision\')">Decision</th><th onclick="sortPipe(\'country\')">Country</th>'+
+    '<th onclick="sortPipe(\'budget\')">Budget</th><th>Summary</th></tr></thead><tbody>'+body+'</tbody></table>';
 }
-function copyReport(){
-  var today=todayKey(); var lines=['AI Advocate — Daily Report '+pktNow().toDateString()];
-  document.querySelectorAll('#rep-body tr').forEach(function(tr){var t=tr.innerText.split('\t').join(' · ');lines.push(t);});
-  navigator.clipboard.writeText(lines.join('\n')); alert('Report copied — paste into WhatsApp/Slack.');
+function sortPipe(k){pipeSort.dir=(pipeSort.key===k)?-pipeSort.dir:-1;pipeSort.key=k;renderPipe();}
+
+/* ---------- analytics ---------- */
+function renderAnalytics(){
+  var mins=startTs?Math.max(1,Math.round((Date.now()-startTs)/60000)):0;
+  var jdsPerHr=mins?((stats.jd/(mins/60))||0):0;
+  var applied=stats.apply, skipped=stats.skip, tot=applied+skipped;
+  var ratio=tot?Math.round(applied/tot*100):0;
+  var cards=[
+    ["Time on profile", fmtDur(startTs?Date.now()-startTs:0)],
+    ["Minutes", String(mins)],
+    ["JDs / hour", jdsPerHr.toFixed(1)],
+    ["Apply rate", ratio+"%"],
+    ["Applied", String(applied)],
+    ["Skipped", String(skipped)],
+    ["Proposals", String(stats.prop)],
+    ["Copies", String(stats.copy)]
+  ];
+  $("kpiRow").innerHTML=cards.map(function(c){return '<div class="card stat"><b>'+esc(c[1])+'</b><span>'+esc(c[0])+'</span></div>'}).join("");
+  $("analyticsNote").textContent=(me==="Kaleem")?
+    "Kaleem: part-time target ~240 min. Focus on quality reads over speed — the apply rate matters more than volume.":
+    "Apply rate = jobs you were advised to apply to ÷ all evaluated. A healthy rate is often 20–40%; a very high rate can mean the filter is too loose.";
 }
 
-/* ============================ COMMAND ============================ */
-function renderCommand(){
-  var c={Shortlisted:0,'Awaiting approval':0,Approved:0,Applied:0};
-  mem.pipeline.forEach(function(r){if(c[r.stage]!==undefined)c[r.stage]++;});
-  set('s-short',c.Shortlisted); set('s-await',c['Awaiting approval']); set('s-appr',c.Approved);
-  var today=todayKey(); var applied=mem.activity.filter(function(a){var d=new Date(a.ts);var u=d.getTime()+d.getTimezoneOffset()*60000;return a.action==='applied'&&todayKey(new Date(u+5*3600000))===today;}).length;
-  set('s-applied',applied);
-  renderRoster();
-}
-function set(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
-
-/* ============================ TEMPLATES / PROFILES / SCORING / RULES ============================ */
-function renderTemplates(){
-  var l=document.getElementById('tmpl-list'); l.innerHTML='';
-  TEMPLATES.forEach(function(t){
-    l.innerHTML+='<div class="tmpl"><div class="flex" style="justify-content:space-between"><b>'+t.c+' · '+t.t+'</b><span class="pill">'+t.rate+'</span></div>'
-      +'<div class="note" style="margin-top:6px"><b>Use when:</b> '+t.when+'</div>'
-      +'<div class="note"><b>Connects:</b> '+t.con+' · <b>Boost:</b> '+t.boost+'</div>'
-      +'<div class="note" style="margin-top:6px"><b>Opener:</b> '+esc(t.open)+'</div>'
-      +'<div class="note"><b>Proof:</b> '+esc(t.proof)+'</div></div>';
+/* ---------- logs ---------- */
+function renderLogs(){
+  api("getLogs",{}).then(function(r){
+    if(r.gate)gate=r.gate;
+    var logs=r.logs||[];
+    if(!logs.length){$("logsOut").innerHTML='<p class="note">No activity yet. Evaluate a JD to see logs here and in the Google Sheet.</p>';return}
+    var rows=logs.map(function(l){return "<tr><td>"+new Date(l.ts).toLocaleString()+"</td><td>"+esc(l.user||"")+
+      "</td><td><b>"+esc(l.type||"")+"</b></td><td>"+esc(l.total||l.score||"")+"</td><td>"+esc(l.decision||"")+
+      "</td><td>"+esc((l.durationMin!=null&&l.durationMin!=="")?(l.durationMin+" min"):"")+"</td><td>"+esc(l.detail||"")+"</td></tr>"}).join("");
+    $("logsOut").innerHTML='<table><thead><tr><th>Time</th><th>User</th><th>Event</th><th>Score</th><th>Decision</th><th>Duration</th><th>Detail</th></tr></thead><tbody>'+rows+'</tbody></table>';
   });
 }
-function renderProfiles(){
-  var el=document.getElementById('profiles');var html='';
-  ['saqib','zeb','agency'].forEach(function(k){var p=PROFILES[k];
-    html+='<div class="card" style="margin-bottom:12px"><div class="eyebrow">'+(k==='saqib'?'Bidding profile':k==='zeb'?'Builder profile':'Agency')+'</div><h3 style="margin:6px 0">'+p.h+'</h3>'
-      +'<ul class="note" style="margin:6px 0 0;padding-left:18px;line-height:1.6">'+p.body.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>';
-  });
-  el.innerHTML=html;
-}
-function renderScoring(){
-  var el=document.getElementById('scoring');
-  function tbl(rows){return '<table>'+rows.map(function(r){return '<tr><td>'+r[0]+'</td><td class="muted" style="text-align:right">'+r[1]+'</td></tr>';}).join('')+'</table>';}
-  el.innerHTML='<div class="card"><div class="eyebrow">The 19-point score — why this works</div>'
-    +'<p class="note" style="margin-top:6px">Three outcomes. <b>16-19 with Match 4+</b> apply with boost, 14-15 apply standard, below 14 skip. Hard bans override to SKIP. It is tuned to the two things the data says actually drive replies: <b>fit</b> and <b>a verified, mid-tier client</b> — not chasing whales or perfect 5-star clients.</p></div>'
-    +'<div class="grid g3" style="margin-top:12px">'
-    +'<div class="card"><div class="eyebrow">Client · /7</div>'+tbl(SCORING.client)+'</div>'
-    +'<div class="card"><div class="eyebrow">Job · /7</div>'+tbl(SCORING.job)+'</div>'
-    +'<div class="card"><div class="eyebrow">Match · /5</div>'+tbl(SCORING.match)+'</div></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Evidence & sources</div>'
-    + SOURCES.map(function(s){return '<div class="src"><b>'+s[0]+'</b> — '+s[1]+'<br><a href="'+s[2]+'" target="_blank" rel="noopener">'+s[2]+'</a></div>';}).join('')
-    +'<p class="note" style="margin-top:8px">Two evidence-based tweaks baked in: (1) mid-tier $1k–$50k clients score highest (whales reply ~3.85% vs ~8% mid-tier, GigRadar); (2) every generated proposal leads with the client\u2019s own problem in sentence one (Upwork 2026; SnipeWork 500+ sample).</p></div>';
-}
-function renderRules(){
-  document.getElementById('rules').innerHTML=
-    '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 20+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 29 June)</div><p class="note" style="margin-top:6px">Allowed regions: <b>United States and Europe</b> (India and Bangladesh remain banned countries). Jobs paying <b>over $60/hr</b>, or one-time fixed <b>$1000+</b>. Bid rate set per job by Saqib/Usman, usually <b>$70–90/hr</b>.</p></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Fees (June 2026)</div><p class="note" style="margin-top:6px">Old 20/10/5% tiers retired May 2025. Freelancer fee variable 0–15%, shown before submit (~10% typical; AI specialists often 0–5%). Connects $0.15 each — standard 6 = $0.90, large up to 16 = $2.40. Freelancer Plus $19.99/mo. ID badge = 35 connects ($5.25). PKR payout via Direct to Local Bank $0.99 (personal accounts). Quote = desired net ÷ 0.90.</p></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US or Europe jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
-}
-
-/* ============================ UPWORK GUIDE (accordion, from UPWORK_GUIDE_CONTENT.md) ============================ */
-var GUIDE=[
- {L:'A',t:'Getting Started & Eligibility',url:'https://docs.google.com/document/d/15h7pU_WKewxWRPmpgAYDwPTPmjF1ayVFQ3BMNDgB6QY/edit?usp=sharing',
-  lead:'How Upwork works and who is allowed to join and bid.',
-  cards:[
-   {h:'What Upwork is',b:'A global marketplace connecting freelancers and clients. Freelancer flow: build a strong profile → find jobs → send tailored proposals → deliver → get paid securely. "Best Match" leans on profile + job-post data, so keep both accurate and keyword-rich.'},
-   {h:'Who can join',b:'Upwork serves 180+ countries but not everywhere. You must be 18+ (or the age of majority) and handle your own work-authorization rules.'},
-   {h:'Connects (bidding currency)',b:['Used for proposals, boosting and the Availability Badge. $0.15 each, sold in bundles; verified billing method required.','Per-proposal cost varies by job and can change while live — check the post.','Free: Basic 10/mo · Freelancer Plus 100/mo. Refunded if a client withdraws the post; not for jobs you don’t win.']},
-   {h:'Freelancer Plus ($19.99/mo)',b:'~100 Connects, full Uma access, proposal/job insights, alerts, and 0% fee on Direct Contracts.'}
-  ],
-  callout:'Restricted by US law (cannot register/use Upwork): Russia and Belarus (operations suspended May 2022), Iran, North Korea, Cuba and Cuban nationals, Crimea, the LPR and DPR regions, plus anyone on the US SDN list. The list changes. Previously suspended users cannot return — new accounts get closed.'},
- {L:'B',t:'Profile & Verification',url:'https://docs.google.com/document/d/1N0lfDIkHF3ZUGTgZL7drCUVR7bK9r2GuPqCFY7qZCss/edit?usp=sharing',
-  lead:'Completeness and verification drive visibility, trust and hire rate.',
-  cards:[
-   {h:'Build a 100% profile',b:'Cover work history, education & certifications, languages, availability, and a real portfolio. Bio: action verbs, keywords, one clear value proposition. For Saqib: lead with true AI/LLM/RAG/FastAPI metrics; state the MS in Data Science; never list a credential not on the live profile.'},
-   {h:'One account, many profiles',b:'One account per login/email, holding one freelancer + one agency + multiple client profiles, each with its own contracts and finances. Switch via the dropdown under your profile photo.'},
-   {h:'Identity verification',b:'The blue identity-verification badge signals trust. Verify with a government ID (sometimes ID + proof of address), a camera/video check, and your phone number. Some US-only jobs need location verification; KYC info may be requested. The badge costs Connects, not cash.'},
-   {h:'Availability Badge',b:'A blue "Available now" badge (bought with Connects) that earns more invites and shows in search; clients can filter by it. Weekly cost varies with demand and you set a max you’ll spend.'},
-   {h:'Account controls',b:'You manage dark/light mode, AI preferences, and how your name displays.'}
-  ],
-  callout:'A VPN is allowed only if used properly — not to fake your location.'},
- {L:'C',t:'Finding Work & Proposals',url:'https://docs.google.com/document/d/15azeAv-gHUoEX0OKBbjkX21jFlCdsRR8B8KA8X-wStg/edit?usp=sharing',
-  lead:'Search, bid, and how the auction and Job Success Score work.',
-  cards:[
-   {h:'Job search',b:'Matches on client category, skills, title, description. Advanced Search supports Boolean (AND / OR / NOT) plus "all words / any words / exact phrase." Job alerts and the job digest email surface matches; saved searches help. Ranking isn’t fully disclosed (so it can’t be gamed).'},
-   {h:'Sending proposals',b:'Bid against a specific post; the Connect cost is shown. Keep it tailored (maps to the T1–T8 templates + 120–180-word skeleton). Freelancer Plus adds bid-range and client-activity insights, and recorded video interviews via Uma.'},
-   {h:'Boosted Proposals (auction)',b:'Bid extra Connects to reach the top of the client’s list. Eligibility depends on match strength; always optional. You set a max bid; a bid table shows others’ ranges; boosted proposals are shown separately (top); ties resolve by a set rule; you can update or re-boost.'},
-   {h:'Direct offers & Direct Contracts',b:['Direct offer: a client offers a contract directly — negotiate, accept, or decline (different from an invitation to apply).','Direct Contracts: bring your own off-platform client onto Upwork; reduced fee, 0% for active Freelancer Plus. Moving a contract off Upwork costs a conversion fee.']},
-   {h:'Project Catalog',b:'Publish pre-scoped, fixed-price/timeline project packages (with images, video, PDF samples); clients buy directly without a proposal.'},
-   {h:'Job Success Score (JSS)',b:'90%+ = strong; 80s = solid with room to grow; ≤79% = challenges. Built from client feedback, contract-ending history, and long-term relationships. An agency’s JSS is the aggregate of its jobs.'}
-  ],
-  callout:'Some auctions are placebo auctions (used to calibrate) and Connects aren’t taken for a placebo boost.'},
- {L:'D',t:'Payments, Fees & Taxes',url:'https://docs.google.com/document/d/1KAuAaSkC7Taboeq19t6lXSmGzjK0bKVe4u-uyHfLXvs/edit?usp=sharing',
-  lead:'Verified July 2026 — the flat 10% fee is retired; the freelancer fee is now variable.',
-  cards:[
-   {h:'Fees (verified July 2026)',b:['Freelancer service fee: variable 0–15% per contract (NOT a flat 10% — that was retired 1 May 2025); locked at proposal. Blended ~11–13.5%; high-demand AI skills can land lower.','Client marketplace fee 3–10%; contract-initiation fee $0.99–$14.99 (client, per new contract).','Connects $0.15; standard proposal ~6 Connects; Freelancer Plus $19.99/mo.']},
-   {h:'Getting paid & withdrawals',b:'Enter tax info first, then add a withdrawal method. Options: Direct to US Bank (ACH, free), Direct to Local Bank (needs bank codes; Pakistan $0.99 to a personal account — PKR to business accounts is rejected), Payoneer and PayPal (timing/fees vary), US wire ~$30. A reserve balance can briefly hold funds; holiday payment delays happen.'},
-   {h:'Weekly billing (hourly)',b:'Period Mon 00:00 → Sun 23:59 UTC; client invoiced Monday, reviews Mon–Fri; earnings available the following Wednesday (~10 days). Log time with the Desktop App.'},
-   {h:'Taxes',b:'Tax info is required before withdrawal. US persons (Saqib) file Form W-9. Upwork handles various local taxes elsewhere (India GST + TDS, Australia/Singapore GST, Switzerland/Colombia/Vietnam VAT, etc.).'}
-  ],
-  callout:'Rate rule: gross = net ÷ (1 − quoted fee). Because the fee is variable, read the exact % on each proposal before quoting.'},
- {L:'E',t:'Protection & Disputes',url:'https://docs.google.com/document/d/1NxafJDuB2P0fHVOPFw10rs2oJBEPWhrdTFQ7hd9Yy0c/edit?usp=sharing',
-  lead:'What qualifies for payment protection, and what to do when a client goes silent.',
-  cards:[
-   {h:'Hourly Payment Protection — qualify',b:'Client has a verified billing method; track time with the Desktop App; work matches the contract; stay within the weekly limit. Manual time outside these rules is not protected.'},
-   {h:'Fixed-Price Protection — qualify',b:'Don’t start until the milestone is fully funded in project funds (escrow); only escrowed funds are covered; confirm the client’s payment method is verified.'},
-   {h:'Client goes silent',b:['Hourly: end anytime; properly-logged protected hours still pay on the normal cycle.','Fixed: complete + submit the milestone (Deliver work → active contracts), then wait 14 days for auto-release.']},
-   {h:'Disputes',b:['Fixed-price: if a client won’t release a funded milestone, file a dispute on an active or ended contract; Upwork provides a non-binding resolution / mediation step.','Hourly: a client can dispute your hours — respond with work-diary evidence.','Refunds (client-side): a client may request a refund within 180 days; the freelancer decides full/partial/none.']}
-  ],
-  callout:'Off-platform work voids protection: only escrowed (fixed) or Desktop-App-tracked (hourly) work is covered.'},
- {L:'F',t:'Contracts, Time & Feedback',url:'https://docs.google.com/document/d/1dzvJcPodhDWstx_PmwjTZM_lCl-Id71AMr5Q_acaJW4/edit?usp=sharing',
-  lead:'The Desktop App, managing contracts, and the end-of-contract review.',
-  cards:[
-   {h:'The Desktop App',b:'Logs hourly time via the time tracker (screenshots + activity), which builds the work diary — required for full Hourly Protection. Supports manual time (less protection). Common fixes: reinstall, re-login, clear cached uploads if time or contracts don’t appear.'},
-   {h:'Managing contracts',b:'Tracked vs manual time, activity tags, to-do lists, and the contract workroom. Upwork may pause a contract (billing/verification) until resolved. You can propose milestone changes or rate changes and end a contract from its menu.'},
-   {h:'Feedback',b:'End-of-contract review has a 14-day window: public review + private note (old private star rating removed). A review is required to end a contract; public reviews can be edited within the window. You can also give feedback to clients.'}
-  ],
-  callout:'A review is required to end a contract; the 14-day feedback window lets you edit public reviews before it closes.'},
- {L:'G',t:'Agencies on Upwork',url:'https://docs.google.com/document/d/1IHZaAOKXxoaCO-WRubg259z6u8D3Z1R3vbQ0ymfGW5U/edit?usp=sharing',
-  lead:'AI Advocate’s operating model — read closely.',
-  cards:[
-   {h:'How agencies work',b:'An agency is a team under one profile. Clients hire the agency (owner, a manager, or a member); payments go to the agency, which pays its own members by internal agreement.'},
-   {h:'Agency Plus plan ($19.99/mo)',b:'Gives the agency its own Connects (100/cycle) and the ability to bid as the agency. Agency Connects follow cycle-end rules (they don’t roll indefinitely). An agency can run alongside a personal Freelancer Plus.'},
-   {h:'Members',b:'Add/remove members; members are exclusive (work only under this agency) or non-exclusive (also work independently). Assign a specific member to a proposal, or submit without an assigned member per the agency’s settings.'},
-   {h:'Operating',b:'Manage the agency’s rate and visibility, its proposals and offers, and its finances. You can create, close, or leave an agency. Agency contracts function like individual contracts but roll up to the agency’s JSS.'}
-  ],
-  callout:'Reminder: all current bidding is on Saqib’s PERSONAL freelancer profile — the agency profile is not used for bidding right now.'},
- {L:'H',t:'Trust, Safety & Support',url:'https://docs.google.com/document/d/128yxSbSBWjQa9S6Qw1QhqZTKAkbRj9Kk4YjNnvVMv6w/edit?usp=sharing',
-  lead:'Spot scams, report abuse, secure the account, and where to get help.',
-  cards:[
-   {h:'Scam red flags',b:'Unrealistic pay or vague posts; pressure to talk off-platform before a contract; free-work "tests"; requests to pay/be paid outside Upwork. Keep all comms and payment on Upwork — off-platform activity voids protection and violates ToS.'},
-   {h:'Reporting',b:'Flag pre-contract contact sharing, off-platform payment, fake profiles, copyrighted logos, or threats. Reports are confidential; you can block/unblock users.'},
-   {h:'Secure your account',b:'Password (required), security question, mobile number, and an authenticator app (highest level — enable it). Manage in Account Settings → Password and security. Only enter credentials on the real Upwork site/app; verify email legitimacy first.'},
-   {h:'Account management',b:'Check account health in settings; you can reactivate a freelancer account, fix login issues, and appeal a suspension. Suspensions can be permanent.'},
-   {h:'Support & status',b:'Reach support from the Help Center (Get Support / log in). Upwork publishes a live system-status page (marketplace, messages, payments) — check it first before assuming an app-side bug.'}
-  ],
-  callout:'Debug order: Upwork Status → account health → ops-hub. Keep all comms and payment on Upwork — off-platform activity voids protection and violates ToS.'}
-];
-function toggleGuide(i){var el=document.getElementById('acc-'+i);if(el)el.classList.toggle('open');}
-function renderGuide(){
-  var el=document.getElementById('guide');if(!el)return;
-  el.innerHTML=GUIDE.map(function(g,i){
-    var cards=g.cards.map(function(c){
-      var body=Array.isArray(c.b)?('<ul class="note">'+c.b.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'):('<p class="note">'+esc(c.b)+'</p>');
-      return '<div class="acc-card"><h4>'+esc(c.h)+'</h4>'+body+'</div>';
-    }).join('');
-    return '<div class="acc" id="acc-'+i+'">'
-      +'<div class="acc-h" onclick="toggleGuide('+i+')">'
-        +'<span class="acc-badge">'+g.L+'</span>'
-        +'<span class="acc-title">'+esc(g.t)+'</span>'
-        +'<a class="acc-doc" href="'+g.url+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open full document ↗</a>'
-        +'<span class="acc-caret">▶</span>'
-      +'</div>'
-      +'<div class="acc-body">'
-        +'<p class="acc-lead">'+esc(g.lead)+'</p>'
-        +cards
-        +'<div class="acc-callout"><span>⚠️</span><div>'+esc(g.callout)+'</div></div>'
-      +'</div></div>';
-  }).join('');
-}
-
-/* ============================ ASK AI (demo + live) ============================ */
-var AGENCY_CONTEXT = buildContext();
-function buildContext(){
-  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). Rate: $55/hr Saqib, $45-55/hr agency. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). Match budget point = $55/hr or $200+ fixed. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work. PROPOSAL OUTPUT RULES: whenever you write a proposal for a job, output exactly two clearly labelled blocks, in this order.
-
-BLOCK 1 heading, written exactly as a bold heading: "### PROPOSAL (paste this into Upwork's Cover Letter box when you apply)". Then the full proposal, 120 to 180 words. For clarity to the bidder: Upwork's application field is confusingly named "Cover Letter", so THIS proposal block is exactly what you paste into that box. It is the main pitch and the first thing the client reads.
-
-BLOCK 2 heading, written exactly as a bold heading: "### INTRO MESSAGE (send this as your first reply AFTER the client responds, or as a boosted-proposal intro. Do NOT paste this into the application)". Then a short opener of 2 to 4 sentences.
-
-Both blocks must be complete and ready to paste, nothing left blank. NEVER output placeholders or bracketed blanks such as [their requirement], [metric], [name], or [detail]. If a specific number is unknown, write a true qualitative sentence instead. NEVER invent a metric, tool, employer, title, or result; use only facts true of Saqib and traceable to real work. NEVER use em dashes or en dashes; use commas and periods. Write in natural, humanized, spoken English, the way a confident senior engineer actually talks; contractions are fine; no corporate filler, no "I am the perfect fit", no "Dear Hiring Manager". Proposal shape: open with the client's exact problem in their own words; give one or two true proof points; show you read the post; give a 2 to 3 step plan; end with one specific question.`;
-}
-
-var chat=[];
-function mdToHtml(src){
-  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-  function inline(s){return esc(s)
-    .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
-    .replace(/`([^`]+)`/g,'<code>$1</code>');}
-  var lines=String(src||'').replace(/\r/g,'').split('\n'),out=[],i=0;
-  while(i<lines.length){
-    var ln=lines[i];
-    if(/\|/.test(ln)&&i+1<lines.length&&/^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(lines[i+1])){
-      var hd=ln.split('|').map(function(c){return c.trim();});
-      if(hd[0]==='')hd.shift(); if(hd[hd.length-1]==='')hd.pop();
-      i+=2; var rows=[];
-      while(i<lines.length&&/\|/.test(lines[i])){
-        var cs=lines[i].split('|').map(function(c){return c.trim();});
-        if(cs[0]==='')cs.shift(); if(cs[cs.length-1]==='')cs.pop();
-        rows.push(cs); i++;
-      }
-      out.push('<table class="md"><thead><tr>'+hd.map(function(h){return '<th>'+inline(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+inline(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>');
-      continue;
-    }
-    if(/^\s*---+\s*$/.test(ln)){out.push('<hr class="md">');i++;continue;}
-    var h=ln.match(/^(#{1,6})\s+(.*)$/);
-    if(h){var lv=Math.min(h[1].length+2,6);out.push('<h'+lv+' class="md">'+inline(h[2])+'</h'+lv+'>');i++;continue;}
-    if(/^\s*[-*]\s+/.test(ln)){var it=[];while(i<lines.length&&/^\s*[-*]\s+/.test(lines[i])){it.push('<li>'+inline(lines[i].replace(/^\s*[-*]\s+/,''))+'</li>');i++;}out.push('<ul class="md">'+it.join('')+'</ul>');continue;}
-    if(/^\s*\d+\.\s+/.test(ln)){var oi=[];while(i<lines.length&&/^\s*\d+\.\s+/.test(lines[i])){oi.push('<li>'+inline(lines[i].replace(/^\s*\d+\.\s+/,''))+'</li>');i++;}out.push('<ol class="md">'+oi.join('')+'</ol>');continue;}
-    if(/^\s*$/.test(ln)){i++;continue;}
-    var para=[ln];i++;
-    while(i<lines.length&&!/^\s*$/.test(lines[i])&&!/^#{1,6}\s/.test(lines[i])&&!/^\s*---+\s*$/.test(lines[i])&&!/\|/.test(lines[i])&&!/^\s*[-*]\s+/.test(lines[i])&&!/^\s*\d+\.\s+/.test(lines[i])){para.push(lines[i]);i++;}
-    out.push('<p class="md">'+para.map(inline).join('<br>')+'</p>');
-  }
-  return out.join('');
-}
-function pushMsg(role,text){chat.length&&role==='user'?null:null; var c=document.getElementById('chat');var d=document.createElement('div');d.className='msg '+(role==='user'?'user':role==='sys'?'sys':'ai');if(role==='ai'){ d.innerHTML=mdToHtml(text); } else { d.textContent=text; }c.appendChild(d);c.scrollTop=c.scrollHeight;}
-function demoAnswer(q){
-  var s=q.toLowerCase();
-  if(/ban|skip|avoid|black/.test(s)) return 'Hard bans (instant skip, 0 connects): Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed under $200, survey/test jobs, on-site 2+ days/week. Proposal count is a penalty, not a ban: under 20 none, 20-50 minus 1, 50+ minus 2.';
-  if(/score|19|point|evaluate/.test(s)) return '19-point score: Client/7 + Job/7 + Match/5. 16-19 with Match 4+ apply with boost; 14-15 apply standard; below 14 skip. Hard bans override to skip. Mid-tier verified clients ($1k–$50k) score highest.';
-  if(/fee|connect|cost|charge|payout|pkr/.test(s)) return 'Fees: variable 0–15% shown before submit (~10% typical). Connects $0.15 each (6 = $0.90). Plus $19.99/mo. ID badge 35 connects. PKR via Direct to Local Bank $0.99. Quote = net ÷ 0.90.';
-  if(/slot|window|time|hour|shift/.test(s)) return 'Bidder windows are picked daily (ad-hoc), single login on Saqib\u2019s personal profile. Defaults: Fiza 19–20, Subhan 20–21, Sadia 21–22, Hamza 22–23 PKT. Owners, Usman and Zeb act anytime.';
-  if(/excus|kaleem|sana|ayesha|adil/.test(s)) return 'Kaleem, Sana, Ayesha and Adil are excused from Upwork bidding for at least one month (Saqib, 29 June).';
-  if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
-  if(/threshold|apply|budget|rate|\$60|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India, Bangladesh, and Pakistan banned), over $60/hr or $1000+ fixed (Saqib, 29 June). Bid usually $70–90/hr, set per job by Saqib/Usman.';
-  if(/profile|agency|personal/.test(s)) return 'All bidding is on Saqib\u2019s PERSONAL freelancer profile, not the agency. Single login, one person at a time.';
-  return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, allowed regions United States and Europe (India, Bangladesh, and Pakistan banned), over $60/hr or $1000+ fixed; score 19 points (16-19 with Match 4+ boost, 14-15 standard, below 14 skip); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
-}
-async function askAI(){
-  var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
-  var live=false;
-  try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,messages:chat})});
-    if(resp.ok){var data=await resp.json();var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');if(txt){pushMsg('ai',txt);chat.push({role:'assistant',content:txt});live=true;}}
-  }catch(e){}
-  if(!live){var a=demoAnswer(q);pushMsg('ai',a);chat.push({role:'assistant',content:a});}
-}
-function renderAiMode(){
-  document.getElementById('ai-mode').innerHTML='<span>\u2726</span><div><b>Works now in Demo mode everywhere; fully live inside Claude or with a key.</b> Open this app as an artifact in Claude and the bot answers live for free. On a plain URL it answers from Demo mode until Saqib\u2019s Anthropic API key (separate from Claude Max) is added as a server env var. Models: <b>claude-sonnet-4-6</b> proposals, <b>claude-haiku-4-5</b> cheap scoring.</div>';
-}
-
-/* ============================ THEME + MANUAL STATE ============================ */
-var THEMES=['emerald','sapphire','violet','amber','daylight'];
-function setTheme(name){
-  var t=THEMES.indexOf(name)>=0?name:'emerald';
-  document.documentElement.setAttribute('data-theme',t);
-  try{localStorage.setItem('aia_theme',t);}catch(e){}
-  var sel=document.getElementById('theme-select'); if(sel) sel.value=t;
-}
-function initTheme(){
-  var saved='emerald'; try{saved=localStorage.getItem('aia_theme')||'emerald';}catch(e){}
-  setTheme(saved);
-}
-/* When a job description is pasted, the AI scores it, so grey out the manual signal boxes and proposal-count dropdown. */
-function syncManualState(){
-  var has=((typeof val==='function'?val('job-text'):'')||'').trim().length>0;
-  var card=document.getElementById('signal-card'); if(card) card.classList.toggle('manual-dim',has);
-  var jp=document.getElementById('j-props'); if(jp) jp.classList.toggle('manual-dim',has);
-}
-
-/* ============================ BOOT ============================ */
-function renderAll(){renderAccess();renderCommand();renderPipeline();renderReport();renderRoster();tickClock();}
-async function boot(){
-  initTheme();
-  initRole(); initNav(); renderTemplates(); renderProfiles(); renderScoring(); renderRules(); renderGuide(); renderAiMode();
-  mem.pipeline=await load('pipeline',[]); mem.activity=await load('activity',[]);
-  AGENCY_CONTEXT=buildContext();
-  renderAll(); syncManualState();
-  pushMsg('sys','Ask anything about bans, scoring, fees, slots, templates, the flow, or a specific job.');
-  setInterval(function(){tickClock();renderAccess();renderRoster();},20000);
-}
-// add a Shortlist button to the Evaluate decision card after eval
-var _runEval=runEval;
-runEval=async function(){await _runEval();var o=document.getElementById('eval-out');var card=o&&o.querySelector('.card:not(.note)');if(card&&!document.getElementById('sl-btn')){var b=document.createElement('button');b.id='sl-btn';b.className='btn gold';b.style.marginTop='10px';b.textContent='Shortlist this job';b.onclick=shortlist;card.appendChild(b);}};
-boot();
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+window.addEventListener("beforeunload",function(){if(me&&online()){navigator.sendBeacon&&navigator.sendBeacon(BACKEND_URL,JSON.stringify({action:"logout",name:me}))}});
 </script>
-</body></html>
+</body>
+</html>
