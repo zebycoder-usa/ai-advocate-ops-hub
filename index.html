@@ -1138,13 +1138,10 @@ function seatLogout(){
     seatShow('login');
   });
 }
-window.addEventListener('beforeunload',function(){
-  /* Best-effort release so a closed tab does not hold the seat. If the beacon
-     is lost, the 12-minute heartbeat timeout in Code.gs releases it anyway. */
-  if(seatMe && navigator.sendBeacon){
-    try{ navigator.sendBeacon(SEAT_BACKEND,JSON.stringify(seatLogoutPayload())); }catch(e){}
-  }
-});
+/* No beforeunload release on purpose. A refresh is not a logout: the beacon
+   would free the seat and hand it to the queue before session-restore could
+   reclaim it. A genuinely closed or crashed tab stops sending heartbeats, and
+   the 12-minute STALE_MS timeout in Code.gs releases the seat on its own. */
 
 /* ---- restore a session on page load ---- */
 function seatBoot(){
