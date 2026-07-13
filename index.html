@@ -78,8 +78,60 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
 .acc-card h4{margin:0 0 6px;font-size:13px;color:var(--text)}
 .acc-card .note{margin:0}.acc-card ul{margin:6px 0 0;padding-left:18px;line-height:1.6}
 .acc-callout{display:flex;gap:10px;align-items:flex-start;background:#0f231b;border:1px solid #1f5a45;border-radius:12px;padding:12px;font-size:13px;color:var(--muted);margin-top:12px}
+/* ---- seat gate: one person on Saqib's profile at a time ---- */
+.seat{position:fixed;inset:0;z-index:200;display:none;place-items:center;padding:20px;overflow:auto;
+  background:radial-gradient(1200px 600px at 80% -10%,#16302600,var(--bg)),var(--bg)}
+.seat.on{display:grid}
+.seat-box{width:100%;max-width:460px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.seat-box h2{margin:8px 0 6px;font-size:19px}
+.seat-hero{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--green),var(--gold));display:grid;place-items:center;font-weight:800;color:#06120d;font-size:18px}
+.seat-box .lbl{margin-top:14px}
+.seat-box .btn{width:100%;margin-top:14px}
+.seat-row{display:flex;gap:8px;margin-top:10px}
+.seat-row .btn{margin-top:0}
+.seat-msg{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;min-height:1em}
+.seat-live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;
+  box-shadow:0 0 0 0 rgba(67,211,158,.7);animation:seatpulse 1.8s infinite}
+@keyframes seatpulse{0%{box-shadow:0 0 0 0 rgba(67,211,158,.6)}70%{box-shadow:0 0 0 9px rgba(67,211,158,0)}100%{box-shadow:0 0 0 0 rgba(67,211,158,0)}}
+.seat-state{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:14px;font-size:13px;line-height:1.6}
+.seat-queue{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.7}
+.seat-queue li.me{color:var(--green);font-weight:700}
+.seat-offer{background:#0f231b;border:1px solid #1f5a45;border-radius:12px;padding:13px;margin-top:14px}
+.seat-offer p{margin:0 0 10px;font-weight:700;font-size:13px}
+.btn.danger{background:transparent;border:1px solid var(--red);color:var(--red)}
+#seat-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 </style></head>
 <body>
+
+<!-- SEAT GATE — login -->
+<section id="seat-login" class="seat">
+  <div class="seat-box">
+    <div class="seat-hero">A</div>
+    <h2>Who is on shift?</h2>
+    <p class="note">Only one person can be on Saqib's personal profile at a time. Pick your name to take the seat, or join the queue if someone already has it.</p>
+    <label class="lbl" for="seat-name">Your name</label>
+    <select id="seat-name" class="field"></select>
+    <button class="btn" id="seat-enter" onclick="seatLogin()">Enter the app</button>
+    <p class="seat-msg" id="seat-login-msg"></p>
+    <div class="seat-state" id="seat-login-state"><span class="seat-live"></span>Checking the profile…</div>
+  </div>
+</section>
+
+<!-- SEAT GATE — waiting room -->
+<section id="seat-wait" class="seat">
+  <div class="seat-box">
+    <div class="seat-hero">⏳</div>
+    <h2>The profile is in use</h2>
+    <div class="seat-state" id="seat-wait-state"></div>
+    <div id="seat-wait-offer"></div>
+    <p class="note" style="margin-top:12px">This refreshes every 15 seconds. When the seat frees up you move in automatically.</p>
+    <div class="seat-row">
+      <button class="btn ghost" onclick="seatRefresh()">Refresh now</button>
+      <button class="btn ghost" onclick="seatLogout()">Leave the queue</button>
+    </div>
+  </div>
+</section>
+
 <div class="wrap">
   <div class="top">
     <div class="brand"><div class="logo">A</div><div><b>AI Advocate · Live Ops Command</b><div class="s">Saqib's PERSONAL freelancer profile · US + Europe · single login</div></div></div>
@@ -89,6 +141,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       <select id="role-select" title="Who are you?"></select>
       <div class="clock" id="clock">…</div>
     </div>
+    <div id="seat-bar"></div>
   </div>
 
   <div id="access" class="banner" style="margin-top:12px"></div>
@@ -111,7 +164,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       </div>
       <div class="card">
         <div class="eyebrow" style="color:var(--red)">Hard ban — instant skip, 0 connects</div>
-        <p class="note" style="margin-top:8px">Industries: Banking/Finance/Trading/Crypto/Forex · Govt/Military/Defense/ITAR/GovCloud/FedRAMP/CMMC. Countries: India, Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200 · 20+ proposals · survey/test jobs · on-site 2+ days/week. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>
+        <p class="note" style="margin-top:8px">Industries: Banking/Finance/Trading/Crypto/Forex · Weapons/Military/Defense/ITAR. <b>Government and public-sector AI, data, automation and voice work is ALLOWED.</b> Countries: India, Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200 · 50+ proposals · survey/test jobs · on-site 2+ days/week. Proposals 20–50 are a scoring penalty, not a ban. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>
       </div>
     </div>
     <div class="card" style="margin-top:12px">
@@ -441,7 +494,9 @@ function parseJob(text){
   if(P.budgetType==='fixed' && P.amount!=null && P.amount<200) P.bans.push('Fixed-price under $200 ($'+P.amount+')');
   /* Proposal saturation is NOT a ban — it is scored as a penalty in runEval (see SAT_PENALTY). */
   if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
-  if(/\b(government|federal agency|military|defense|defence|itar|fedramp|cmmc|govcloud|gov cloud)\b/i.test(low)) P.bans.push('Banned industry (govt/defense)');
+  /* Weapons/military/defense stay banned. Government and public-sector AI, data, automation
+     and voice work is ALLOWED (v9) — FedRAMP/CMMC/GovCloud are civilian compliance regimes. */
+  if(/\b(weapons?|military|defense|defence|itar)\b/i.test(low)) P.bans.push('Banned industry (weapons/defense)');
   if(/\b(umbrage|stewart|cvs health|lynx)\b/i.test(low)) P.bans.push('Banned company');
   if(P.isBanCountry) P.bans.push('Client in India/Bangladesh (hard ban)');
   if(/(on-?site|in[- ]person)[^.]{0,40}(2|3|4|5)\s*days?/i.test(low)) P.bans.push('On-site 2+ days/week');
@@ -736,7 +791,8 @@ function renderScoring(){
 }
 function renderRules(){
   document.getElementById('rules').innerHTML=
-    '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 20+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p></div>'
+    '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Weapons, Military, Defense, ITAR. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 50+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>'
+    +'<p class="note" style="margin-top:8px"><b>Government and public-sector AI, data, automation and voice work is ALLOWED</b> — it is not a banned industry. Proposal saturation: under 20 no penalty, 20–50 subtract 1, 50+ skip. A busy job is a scoring penalty, never an automatic ban.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 29 June)</div><p class="note" style="margin-top:6px">Allowed regions: <b>United States and Europe</b> (India and Bangladesh remain banned countries). Jobs paying <b>over $60/hr</b>, or one-time fixed <b>$1000+</b>. Bid rate set per job by Saqib/Usman, usually <b>$70–90/hr</b>.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Fees (June 2026)</div><p class="note" style="margin-top:6px">Old 20/10/5% tiers retired May 2025. Freelancer fee variable 0–15%, shown before submit (~10% typical; AI specialists often 0–5%). Connects $0.15 each — standard 6 = $0.90, large up to 16 = $2.40. Freelancer Plus $19.99/mo. ID badge = 35 connects ($5.25). PKR payout via Direct to Local Bank $0.99 (personal accounts). Quote = desired net ÷ 0.90.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US or Europe jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
@@ -934,8 +990,199 @@ function syncManualState(){
   var jp=document.getElementById('j-props'); if(jp) jp.classList.toggle('manual-dim',has);
 }
 
+/* ============================ SEAT GATE ============================
+   One person at a time on Saqib's PERSONAL profile. The seat lives server-side
+   in the Apps Script Queue sheet (Code.gs); this is the client half.
+   NOTE: gate() elsewhere in this file is the time-WINDOW check (can this member
+   act right now). Everything here is the SEAT gate and is prefixed seat*. */
+var SEAT_BACKEND = "https://script.google.com/macros/s/AKfycbwsAdkj8XwW-x8DykVJ4mXzNp4qzFbJFx2kSm4uAor2Wi6AMm6BhuRW0P19xdIVoZFWWw/exec";
+var SEAT_ADMINS  = ['Saqib Shahzad','Jahanzaib (Zeb)'];  // must match ADMINS in Code.gs
+var seatMe=null, seatStart=null, seatQ={holder:null,holderSince:null,waiting:[],pendingOffer:null};
+var seatPoll=null, seatBeat=null, seatBooted=false;
+
+function seatApi(action,payload){
+  payload=payload||{}; payload.action=action; if(seatMe) payload.name=seatMe;
+  return fetch(SEAT_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(payload)}).then(function(r){return r.json();});
+}
+function seatShow(which){
+  document.getElementById('seat-login').classList.toggle('on',which==='login');
+  document.getElementById('seat-wait').classList.toggle('on',which==='wait');
+}
+function seatPos(){
+  for(var i=0;i<seatQ.waiting.length;i++){ if(seatQ.waiting[i].name===seatMe) return i+1; }
+  return 0;
+}
+function seatStateHtml(){
+  if(!seatQ.holder) return '<span class="seat-live"></span>The profile is <b>free</b>. Take it.';
+  var since = seatQ.holderSince ? ' since '+new Date(seatQ.holderSince).toLocaleTimeString() : '';
+  var h='<span class="seat-live"></span><b>'+esc(seatQ.holder)+'</b> has the profile'+since+'.';
+  if(seatQ.waiting.length){
+    h+='<ul class="seat-queue">'+seatQ.waiting.map(function(w,i){
+      return '<li class="'+(w.name===seatMe?'me':'')+'">#'+(i+1)+' '+esc(w.name)+(w.name===seatMe?' (you)':'')+'</li>';
+    }).join('')+'</ul>';
+  }
+  return h;
+}
+function seatRenderLogin(){
+  var el=document.getElementById('seat-login-state'); if(el) el.innerHTML=seatStateHtml();
+}
+function seatRenderWait(){
+  var el=document.getElementById('seat-wait-state'); if(el) el.innerHTML=seatStateHtml();
+  var pos=seatPos(), off=document.getElementById('seat-wait-offer');
+  if(!off) return;
+  if(seatQ.pendingOffer===seatMe){
+    off.innerHTML='<div class="seat-offer"><p>The seat is yours right now.</p>'
+      +'<div class="seat-row"><button class="btn" onclick="seatAct(\'accept\')">Take the seat</button>'
+      +'<button class="btn ghost" onclick="seatAct(\'decline\')">Pass for now</button></div></div>';
+  } else {
+    off.innerHTML = pos ? '<p class="note" style="margin-top:10px">You are <b>#'+pos+'</b> in the queue.</p>' : '';
+  }
+}
+function seatRenderBar(){
+  var bar=document.getElementById('seat-bar'); if(!bar) return;
+  if(!seatMe){ bar.innerHTML=''; return; }
+  var h='<span class="pill ok">'+esc(seatMe)+' has the profile</span>'
+    +'<button class="btn ghost" style="padding:6px 10px;font-size:12px" onclick="seatLogout()">Log out</button>';
+  if(SEAT_ADMINS.indexOf(seatMe)>=0 && seatQ.holder && seatQ.holder!==seatMe){
+    h+='<button class="btn danger" style="padding:6px 10px;font-size:12px" onclick="seatForceRelease()">Force-release '+esc(seatQ.holder)+'</button>';
+  }
+  bar.innerHTML=h;
+}
+
+/* ---- entering / leaving the app ---- */
+function seatEnter(){
+  seatShow(null);
+  clearInterval(seatPoll); seatPoll=null;
+  clearInterval(seatBeat);
+  seatBeat=setInterval(function(){ if(seatMe) seatApi('heartbeat',{}).catch(function(){}); },2*60*1000);
+  /* point the existing role selector at whoever took the seat */
+  var m=TEAM.find(function(t){return t.name===seatMe;});
+  if(m){ var sel=document.getElementById('role-select'); if(sel) sel.value=m.id; ME=m; try{localStorage.setItem('aia_me',m.id);}catch(e){} }
+  seatRenderBar();
+  if(!seatBooted){ seatBooted=true; boot(); } else { renderAll(); }
+}
+function seatWait(){
+  seatShow('wait'); seatRenderWait();
+  clearInterval(seatBeat); seatBeat=null;
+  clearInterval(seatPoll);
+  seatPoll=setInterval(seatRefresh,15000);
+}
+function seatApply(r){
+  if(r && r.gate) seatQ=r.gate;
+  if(seatQ.holder===seatMe) seatEnter(); else seatWait();
+}
+
+function seatLogin(){
+  var btn=document.getElementById('seat-enter'), msg=document.getElementById('seat-login-msg');
+  seatMe=document.getElementById('seat-name').value;
+  btn.disabled=true; msg.textContent='Signing in…';
+  seatApi('login',{}).then(function(r){
+    btn.disabled=false;
+    if(r && r.ok===false){ msg.textContent=r.error||'Sign-in failed.'; seatMe=null; return; }
+    msg.textContent='';
+    seatStart=Date.now();
+    try{ localStorage.setItem('aio_me',seatMe); localStorage.setItem('aio_ts',String(seatStart)); }catch(e){}
+    if(r.gate) seatQ=r.gate;
+    if(r.gateStatus==='HOLDER') seatEnter(); else seatWait();
+  }).catch(function(){
+    btn.disabled=false; msg.textContent='Backend unreachable. Check your connection and try again.'; seatMe=null;
+  });
+}
+function seatRefresh(){
+  if(!seatMe) return;
+  seatApi('getLogs',{}).then(function(r){
+    if(r && r.gate) seatQ=r.gate;
+    if(seatQ.holder===seatMe) seatEnter(); else seatRenderWait();
+  }).catch(function(){});
+}
+function seatAct(kind){
+  seatApi(kind==='accept'?'gateAccept':'gateDecline',{}).then(function(r){
+    if(r && r.gate) seatQ=r.gate;
+    if(kind==='accept' && seatQ.holder===seatMe) seatEnter(); else seatRenderWait();
+  }).catch(function(){});
+}
+function seatForceRelease(){
+  if(!seatQ.holder) return;
+  if(!confirm('Force-release '+seatQ.holder+' from the profile?\n\nOnly do this for a crashed or stuck session. They will lose the seat immediately.')) return;
+  seatApi('forceRelease',{}).then(function(r){
+    if(r && r.ok===false){ alert(r.error||'Force-release failed.'); return; }
+    if(r.gate) seatQ=r.gate;
+    seatRenderBar();
+    alert('Released '+(r.released||'the holder')+'. The seat is now offered to the next person in the queue.');
+  }).catch(function(){ alert('Force-release failed. Backend unreachable.'); });
+}
+function seatLogoutPayload(){
+  var mins = seatStart ? Math.round((Date.now()-seatStart)/60000) : 0;
+  var today=todayKey();
+  var mine=mem.activity.filter(function(a){
+    var d=new Date(a.ts); var u=d.getTime()+d.getTimezoneOffset()*60000;
+    return a.byName===seatMe && todayKey(new Date(u+5*3600000))===today;
+  });
+  return {action:'logout',name:seatMe,durationMin:mins,
+    jds:mine.filter(function(a){return a.action==='evaluate';}).length,
+    proposals:mine.filter(function(a){return a.action==='proposal';}).length,
+    copies:mine.filter(function(a){return a.action==='applied';}).length};
+}
+function seatLogout(){
+  if(!seatMe) return;
+  var body=seatLogoutPayload();
+  clearInterval(seatBeat); seatBeat=null;
+  clearInterval(seatPoll); seatPoll=null;
+  try{ localStorage.removeItem('aio_me'); localStorage.removeItem('aio_ts'); }catch(e){}
+  seatApi('logout',body).then(function(r){
+    if(r && r.gate) seatQ=r.gate;
+  }).catch(function(){}).then(function(){
+    seatMe=null; seatStart=null;
+    seatRenderBar(); seatRenderLogin();
+    seatShow('login');
+  });
+}
+window.addEventListener('beforeunload',function(){
+  /* Best-effort release so a closed tab does not hold the seat. If the beacon
+     is lost, the 12-minute heartbeat timeout in Code.gs releases it anyway. */
+  if(seatMe && navigator.sendBeacon){
+    try{ navigator.sendBeacon(SEAT_BACKEND,JSON.stringify(seatLogoutPayload())); }catch(e){}
+  }
+});
+
+/* ---- restore a session on page load ---- */
+function seatBoot(){
+  var sel=document.getElementById('seat-name');
+  TEAM.forEach(function(m){
+    var o=document.createElement('option'); o.value=m.name; o.textContent=m.name+' · '+m.role; sel.appendChild(o);
+  });
+  var saved=null, ts=null;
+  try{ saved=localStorage.getItem('aio_me'); ts=localStorage.getItem('aio_ts'); }catch(e){}
+  if(!saved){ seatShow('login'); seatRefreshLogin(); return; }
+
+  seatMe=saved; seatStart=ts?parseInt(ts,10):Date.now();
+  sel.value=saved;
+  seatApi('getLogs',{}).then(function(r){
+    if(r && r.gate) seatQ=r.gate;
+    if(seatQ.holder===seatMe) return seatEnter();
+    var waiting=seatQ.waiting.some(function(w){return w.name===seatMe;});
+    if(waiting || seatQ.pendingOffer===seatMe) return seatWait();
+    /* not holder, not queued — re-join */
+    return seatApi('login',{}).then(seatApply);
+  }).catch(function(){
+    /* backend down: do not silently let two people work. Send them to login. */
+    seatMe=null; seatShow('login');
+    document.getElementById('seat-login-msg').textContent='Could not reach the backend. Sign in again when you are back online.';
+  });
+}
+function seatRefreshLogin(){
+  seatApi('getLogs',{}).then(function(r){
+    if(r && r.gate) seatQ=r.gate;
+    seatRenderLogin();
+  }).catch(function(){
+    var el=document.getElementById('seat-login-state');
+    if(el) el.textContent='Backend unreachable — profile status unknown.';
+  });
+}
+
 /* ============================ BOOT ============================ */
-function renderAll(){renderAccess();renderCommand();renderPipeline();renderReport();renderRoster();tickClock();}
+function renderAll(){renderAccess();renderCommand();renderPipeline();renderReport();renderRoster();seatRenderBar();tickClock();}
 async function boot(){
   initTheme();
   initRole(); initNav(); renderTemplates(); renderProfiles(); renderScoring(); renderRules(); renderGuide(); renderAiMode();
@@ -948,6 +1195,8 @@ async function boot(){
 // add a Shortlist button to the Evaluate decision card after eval
 var _runEval=runEval;
 runEval=async function(){await _runEval();var o=document.getElementById('eval-out');var card=o&&o.querySelector('.card:not(.note)');if(card&&!document.getElementById('sl-btn')){var b=document.createElement('button');b.id='sl-btn';b.className='btn gold';b.style.marginTop='10px';b.textContent='Shortlist this job';b.onclick=shortlist;card.appendChild(b);}};
-boot();
+/* The seat gate boots first. boot() runs only once the user holds the profile. */
+initTheme();
+seatBoot();
 </script>
 </body></html>
