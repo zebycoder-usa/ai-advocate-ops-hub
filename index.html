@@ -37,7 +37,6 @@ textarea{width:100%;min-height:90px;resize:vertical}
 .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
 .pill.ok{color:var(--green);border-color:#1f5a45;background:#0f2a20}.pill.no{color:var(--red);border-color:#5a2020;background:#2a0f0f}.pill.warn{color:var(--amber);border-color:#5a4a1f;background:#2a230f}.pill.anytime{color:var(--gold);border-color:#5a4a1f;background:#221c0c}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-.row-lock{opacity:.5}
 .bar{height:8px;border-radius:6px;background:var(--sunken);overflow:hidden;border:1px solid var(--line)}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--green2),var(--green))}
 .scorebig{font-size:40px;font-weight:800;line-height:1}
 .note{font-size:12px;color:var(--muted)}
@@ -160,7 +159,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       <div class="card">
         <div class="eyebrow">Whose hour is it now</div>
         <div id="whose" style="margin-top:8px"></div>
-        <div class="note" style="margin-top:8px">Windows are <b>ad-hoc</b> — picked daily in the group because only one person can be on Saqib's profile at a time. Defaults below are the 29 June windows; edit per day.</div>
+        <div class="note" style="margin-top:8px">One person holds the seat at a time. Log out when done so the next team member can log in.</div>
       </div>
       <div class="card">
         <div class="eyebrow" style="color:var(--red)">Hard ban — instant skip, 0 connects</div>
@@ -169,7 +168,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     </div>
     <div class="card" style="margin-top:12px">
       <div class="eyebrow">Today's roster</div>
-      <table style="margin-top:8px"><thead><tr><th>Member</th><th>Role</th><th>Today's window (PKT)</th><th>Status now</th></tr></thead><tbody id="roster"></tbody></table>
+      <table style="margin-top:8px"><thead><tr><th>Member</th><th>Role</th><th>Access</th></tr></thead><tbody id="roster"></tbody></table>
     </div>
   </section>
 
@@ -218,7 +217,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
   <!-- PIPELINE -->
   <section class="view" data-view="pipeline">
     <div class="card"><div class="eyebrow">Pipeline</div>
-      <p class="note" style="margin-top:6px">Bidders can move rows only during their window. Owners (Saqib, Waqas) and Usman approve anytime. Every action auto-logs to the Daily Report — no manual sheet entry.</p>
+      <p class="note" style="margin-top:6px">Owners (Saqib, Waqas) and Usman approve anytime. Every action auto-logs to the Daily Report — no manual sheet entry.</p>
       <table style="margin-top:8px"><thead><tr><th>Job</th><th>Score</th><th>Stage</th><th>By</th><th>Action</th></tr></thead><tbody id="pipe"></tbody></table>
     </div>
   </section>
@@ -277,10 +276,10 @@ var TEAM = [
   {id:'waqas', name:'Waqas Riaz', role:'Owner P2', kind:'owner'},
   {id:'usman', name:'Usman Saeed', role:'Manager', kind:'manager'},
   {id:'zeb',   name:'Jahanzaib (Zeb)', role:'Builder', kind:'builder'},
-  {id:'fiza',  name:'Fiza', role:'Bidder', kind:'bidder', slot:{start:'19:00',end:'20:00'}},
-  {id:'subhan',name:'Subhan', role:'Bidder', kind:'bidder', slot:{start:'20:00',end:'21:00'}},
-  {id:'sadia', name:'Sadia', role:'Bidder', kind:'bidder', slot:{start:'21:00',end:'22:00'}},
-  {id:'hamza', name:'Hamza', role:'Bidder', kind:'bidder', slot:{start:'22:00',end:'23:00'}},
+  {id:'fiza',  name:'Fiza', role:'Bidder', kind:'bidder'},
+  {id:'subhan',name:'Subhan', role:'Bidder', kind:'bidder'},
+  {id:'sadia', name:'Sadia', role:'Bidder', kind:'bidder'},
+  {id:'hamza', name:'Hamza', role:'Bidder', kind:'bidder'},
   {id:'kaleem',name:'Kaleem', role:'Excused (≥1 month)', kind:'excused'},
   {id:'sana',  name:'Sana', role:'Design · excused from bidding', kind:'excused'},
   {id:'ayesha',name:'Ayesha', role:'UI · excused from bidding', kind:'excused'},
@@ -410,14 +409,7 @@ function tickClock(){
   var p=pktNow(),c=cstNow();
   document.getElementById('clock').innerHTML='PKT '+hhmm(p)+' · CST '+hhmm(c)+'<br><span class="muted">'+p.toDateString()+'</span>';
 }
-function inSlot(m){
-  if(!m||m.kind!=='bidder'||!m.slot) return m && m.kind!=='excused'; // owners/manager/builder = always true
-  var p=pktNow(); var cur=p.getHours()*60+p.getMinutes();
-  var s=m.slot.start.split(':'),e=m.slot.end.split(':');
-  var a=(+s[0])*60+(+s[1]), b=(+e[0])*60+(+e[1]);
-  return cur>=a && cur<b;
-}
-function canAct(m){ if(!m) return false; if(m.kind==='excused') return false; if(m.kind==='bidder') return inSlot(m); return true; }
+function canAct(m){ if(!m) return false; if(m.kind==='excused') return false; return true; }
 
 /* ============================ NAV ============================ */
 var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
@@ -433,29 +425,20 @@ function go(name,btn){
 /* ============================ ACCESS BANNER + ROSTER ============================ */
 function renderAccess(){
   var el=document.getElementById('access');
-  if(ME.kind==='excused'){el.innerHTML='<span>\u26d4</span><div><b>'+ME.name+' is excused from Upwork bidding for at least one month</b> (Saqib, 29 June). You can view everything, but shortlist/apply actions are locked.</div>';return;}
-  if(ME.kind==='bidder'){
-    var ok=inSlot(ME);
-    el.innerHTML='<span>'+(ok?'\u2705':'\u23f3')+'</span><div><b>'+ME.name+' · window '+ME.slot.start+'\u2013'+ME.slot.end+' PKT.</b> '+(ok?'You are IN your window — actions unlocked.':'Outside your window — actions are read-only.')+' Single login: VPN Houston, separate browser, no personal Upwork, log out then message the next person.</div>';
-    return;
-  }
-  el.innerHTML='<span>\u2728</span><div><b>'+ME.name+' \u2014 anytime access.</b> Owners (Saqib, Waqas), Usman (manager) and Zeb (builder) can act and approve at any time. No fixed slot.</div>';
+  if(ME.kind==='excused'){el.innerHTML='<span>\u26d4</span><div><b>'+ME.name+' is excused from Upwork bidding for at least one month.</b> You can view everything, but shortlist/apply actions are locked.</div>';return;}
+  el.innerHTML='<span>\u2705</span><div><b>'+ME.name+' \u2014 actions unlocked.</b> Single login: VPN Houston, separate browser, no personal Upwork. When done, click Log Out so the next person can take the seat.</div>';
 }
 function statusPill(m){
   if(m.kind==='excused') return '<span class="pill no">Excused</span>';
-  if(m.kind!=='bidder') return '<span class="pill anytime">Anytime</span>';
-  return inSlot(m)?'<span class="pill ok">In window</span>':'<span class="pill warn">Locked</span>';
+  return '<span class="pill ok">Active</span>';
 }
 function renderRoster(){
   var b=document.getElementById('roster');b.innerHTML='';
   TEAM.forEach(function(m){
-    var slot = m.kind==='bidder' ? (m.slot.start+'\u2013'+m.slot.end) : (m.kind==='excused'?'\u2014':'anytime');
-    b.innerHTML+='<tr'+(m.id===ME.id?' style="background:#0f231b"':'')+'><td>'+m.name+'</td><td class="muted">'+m.role+'</td><td>'+slot+'</td><td>'+statusPill(m)+'</td></tr>';
+    b.innerHTML+='<tr'+(m.id===ME.id?' style="background:#0f231b"':'')+'><td>'+m.name+'</td><td class="muted">'+m.role+'</td><td>'+statusPill(m)+'</td></tr>';
   });
-  // whose hour
   var w=document.getElementById('whose');
-  var active=TEAM.filter(function(m){return m.kind==='bidder'&&inSlot(m);});
-  w.innerHTML = active.length ? active.map(function(m){return '<span class="pill ok">'+m.name+' · '+m.slot.start+'\u2013'+m.slot.end+'</span>';}).join(' ') : '<span class="pill warn">No bidder window active right now</span>';
+  if(w) w.innerHTML='';
 }
 
 /* ============================ EVALUATOR (19-point) ============================ */
@@ -676,10 +659,10 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 function copyText(btn){var c=btn.closest('.card').querySelector('[data-copy]');navigator.clipboard.writeText(c.innerText);btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);}
 
 /* ============================ PIPELINE + AUTO-LOG ============================ */
+/* ============================ PIPELINE + AUTO-LOG ============================ */
 function gate(area){
-  if(canAct(ME)) return true;
-  var msg = ME.kind==='excused' ? (ME.name+' is excused from bidding for ≥1 month.') : (ME.name+', you are outside your '+(ME.slot?ME.slot.start+'–'+ME.slot.end+' PKT ':'')+'window — actions are locked.');
-  alert(msg); return false;
+  if(!canAct(ME)){alert(ME.name+' is excused from bidding for ≥1 month.');return false;}
+  return true;
 }
 function logAct(action, job, score, decision){
   mem.activity.push({ts:Date.now(), by:ME.id, byName:ME.name, action:action, job:job, score:score, decision:decision});
@@ -699,7 +682,6 @@ function advance(id){
   var i=STAGES.indexOf(row.stage);
   // approval step: only owners/manager
   if(row.stage==='Awaiting approval' && !(ME.kind==='owner'||ME.kind==='manager')){alert('Only Saqib, Waqas or Usman can approve.');return;}
-  if(!canAct(ME)){gate('pipeline');return;}
   if(i<STAGES.length-1){row.stage=STAGES[i+1];}
   save('pipeline',mem.pipeline);
   logAct(row.stage==='Applied'?'applied':'advance',row.job,row.score,row.stage);
@@ -709,10 +691,8 @@ function renderPipeline(){
   var b=document.getElementById('pipe'); if(!b)return; b.innerHTML='';
   if(!mem.pipeline.length){b.innerHTML='<tr><td colspan="5" class="muted">No jobs yet. Evaluate a job, then Shortlist.</td></tr>';}
   mem.pipeline.slice().reverse().forEach(function(row){
-    var locked = !canAct(ME);
-    var next = row.stage!=='Applied' ? '<button class="btn ghost" '+(locked?'disabled':'')+' onclick="advance('+row.id+')">→ '+STAGES[STAGES.indexOf(row.stage)+1]+'</button>' : '<span class="pill ok">Done</span>';
-    b.innerHTML+='<tr class="'+(locked?'row-lock':'')+'"><td>'+esc(row.job)+'</td><td>'+(row.score||'-')+'</td><td><span class="pill '+(row.stage==='Applied'?'ok':'warn')+'">'+row.stage+'</span></td><td class="muted">'+row.by+'</td><td>'+next+'</td></tr>';
-  });
+    var next = row.stage!=='Applied' ? '<button class="btn ghost" onclick="advance('+row.id+')">\u2192 '+STAGES[STAGES.indexOf(row.stage)+1]+'</button>' : '<span class="pill ok">Done</span>';
+    b.innerHTML+='<tr><td>'+esc(row.job)+'</td><td>'+(row.score||'-')+'</td><td><span class="pill '+(row.stage==='Applied'?'ok':'warn')+'">' +row.stage+'</span></td><td class="muted">'+row.by+'</td><td>'+next+'</td></tr>';
 }
 // expose shortlist button via Evaluate decision card too
 window.shortlist=shortlist;
@@ -950,7 +930,7 @@ function demoAnswer(q){
   if(/ban|skip|avoid|black/.test(s)) return 'Hard bans (instant skip, 0 connects): Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed under $200, survey/test jobs, on-site 2+ days/week. Proposal count is a penalty, not a ban: under 20 none, 20-50 minus 1, 50+ minus 2.';
   if(/score|19|point|evaluate/.test(s)) return '19-point score: Client/7 + Job/7 + Match/5. 16-19 with Match 4+ apply with boost; 14-15 apply standard; below 14 skip. Hard bans override to skip. Mid-tier verified clients ($1k–$50k) score highest.';
   if(/fee|connect|cost|charge|payout|pkr/.test(s)) return 'Fees: variable 0–15% shown before submit (~10% typical). Connects $0.15 each (6 = $0.90). Plus $19.99/mo. ID badge 35 connects. PKR via Direct to Local Bank $0.99. Quote = net ÷ 0.90.';
-  if(/slot|window|time|hour|shift/.test(s)) return 'Bidder windows are picked daily (ad-hoc), single login on Saqib\u2019s personal profile. Defaults: Fiza 19–20, Subhan 20–21, Sadia 21–22, Hamza 22–23 PKT. Owners, Usman and Zeb act anytime.';
+  if(/slot|window|time|hour|shift/.test(s)) return 'One seat at a time on Saqib\u2019s personal profile. Log out when done so the next person can log in. Owners (Saqib, Waqas), Usman, and Zeb can act anytime.';
   if(/excus|kaleem|sana|ayesha|adil/.test(s)) return 'Kaleem, Sana, Ayesha and Adil are excused from Upwork bidding for at least one month (Saqib, 29 June).';
   if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
   if(/threshold|apply|budget|rate|\$60|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India, Bangladesh, and Pakistan banned), over $60/hr or $1000+ fixed (Saqib, 29 June). Bid usually $70–90/hr, set per job by Saqib/Usman.';
@@ -993,8 +973,8 @@ function syncManualState(){
 /* ============================ SEAT GATE ============================
    One person at a time on Saqib's PERSONAL profile. The seat lives server-side
    in the Apps Script Queue sheet (Code.gs); this is the client half.
-   NOTE: gate() elsewhere in this file is the time-WINDOW check (can this member
-   act right now). Everything here is the SEAT gate and is prefixed seat*. */
+   NOTE: gate() in this file checks if the member is excused from bidding.
+   Everything here is the SEAT gate and is prefixed seat*. */
 var SEAT_BACKEND = "https://script.google.com/macros/s/AKfycbwsAdkj8XwW-x8DykVJ4mXzNp4qzFbJFx2kSm4uAor2Wi6AMm6BhuRW0P19xdIVoZFWWw/exec";
 var SEAT_ADMINS  = ['Saqib Shahzad','Jahanzaib (Zeb)'];  // must match ADMINS in Code.gs
 var seatMe=null, seatStart=null, seatQ={holder:null,holderSince:null,waiting:[],pendingOffer:null};
@@ -1186,7 +1166,7 @@ async function boot(){
   mem.pipeline=await load('pipeline',[]); mem.activity=await load('activity',[]);
   AGENCY_CONTEXT=buildContext();
   renderAll(); syncManualState();
-  pushMsg('sys','Ask anything about bans, scoring, fees, slots, templates, the flow, or a specific job.');
+  pushMsg('sys','Ask anything about bans, scoring, fees, templates, the flow, or a specific job.');
   setInterval(function(){tickClock();renderAccess();renderRoster();},20000);
 }
 // add a Shortlist button to the Evaluate decision card after eval
