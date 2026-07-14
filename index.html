@@ -997,6 +997,14 @@ var CL_RUBRIC=[
 
 function clWordCount(t){return (t||'').trim().split(/\s+/).filter(Boolean).length;}
 
+/* Read the text back out of the DOM. The old version inlined JSON.stringify()
+   into an onclick="" attribute, which broke on any quote in the AI output. */
+function copyRewritten(btn){
+  var p=document.getElementById('cl-rewritten'); if(!p)return;
+  navigator.clipboard.writeText(p.innerText);
+  btn.textContent='Copied'; setTimeout(function(){btn.textContent='Copy';},1500);
+}
+
 function renderCLScore(result){
   var out=document.getElementById('cl-score-out'); if(!out)return;
   var total=0; CL_RUBRIC.forEach(function(r){total+=result[r.id]||0;});
@@ -1020,13 +1028,13 @@ function renderCLScore(result){
     +'<table style="margin-top:12px">'+rows+'</table>'
     +(result.summary?'<div class="note" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+esc(result.summary)+'</div>':'')
     +'</div>'
-    +(result.rewritten?'<div class="card"><div class="eyebrow">Rewritten to 9.5+</div><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;margin:10px 0 0">'+esc(result.rewritten)+'</pre>'
-      +'<button class="btn ghost" style="margin-top:8px" onclick="navigator.clipboard.writeText('+JSON.stringify(result.rewritten)+');this.textContent=\'Copied\';setTimeout(()=>this.textContent=\'Copy\',1500)">Copy</button></div>':'');
+    +(result.rewritten?'<div class="card"><div class="eyebrow">Rewritten to 9.5+</div><pre id="cl-rewritten" style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;margin:10px 0 0">'+esc(result.rewritten)+'</pre>'
+      +'<button class="btn ghost" style="margin-top:8px" onclick="copyRewritten(this)">Copy</button></div>':'');
 }
 
-var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency. Principal: Saqib Shahzad, senior AI/ML/LLM engineer, $55/hr. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.5/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.5"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.';
+var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency. Principal: Saqib Shahzad, senior AI/ML/LLM engineer. His posted Upwork rate is $85.00/hr; bid floor is $85/hr and the standard band is $85-110/hr. He is Rising Talent with 100% Job Success, he is NOT Top Rated, never let a proposal claim otherwise. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.5/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.5"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.';
 
-var CL_REWRITE_SYSTEM='You are a world-class Upwork proposal writer for Saqib Shahzad, senior AI/ML/LLM engineer at AI Advocate Agency. You rewrite proposals to hit 9.5/10 on the scoring rubric.\n\nRULES you must follow exactly:\n- Open with the client\'s exact problem in their own words (not Saqib\'s credentials)\n- Include exactly 2 true proof points — only use facts present in the original proposal or derivable from Saqib\'s real profile (senior AI/ML engineer, FastAPI/React/GenAI/RAG/LLM agents). NEVER invent metrics.\n- Include a 2–3 step numbered plan specific to this brief\n- End with one sharp question relevant to this exact job\n- Natural, spoken English. No em dashes. No en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders.\n- Proposal length: 120–180 words exactly.\n\nReturn ONLY the rewritten proposal text. No preamble, no explanation, no score.';
+var CL_REWRITE_SYSTEM='You are a world-class Upwork proposal writer for Saqib Shahzad, senior AI/ML/LLM engineer at AI Advocate Agency. You rewrite proposals to hit 9.5/10 on the scoring rubric.\n\nRULES you must follow exactly:\n- Open with the client\'s exact problem in their own words (not Saqib\'s credentials)\n- Include exactly 2 true proof points — only use facts present in the original proposal or derivable from Saqib\'s real profile (senior AI/ML engineer, FastAPI/React/GenAI/RAG/LLM agents). NEVER invent metrics.\n- Saqib is Rising Talent with 100% Job Success. He is NOT Top Rated and NOT Top Rated Plus. Never claim a badge or credential he does not have. His rate is $85/hr, never state a lower rate.\n- Include a 2–3 step numbered plan specific to this brief\n- End with one sharp question relevant to this exact job\n- Natural, spoken English. No em dashes. No en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders.\n- Proposal length: 120–180 words exactly.\n\nReturn ONLY the rewritten proposal text. No preamble, no explanation, no score.';
 
 async function scoreCL(){
   var cl=document.getElementById('cl-text').value.trim();
@@ -1037,7 +1045,7 @@ async function scoreCL(){
   var wc=clWordCount(cl);
   var userMsg='COVER LETTER / PROPOSAL ('+wc+' words):\n'+cl+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
   try{
-    var raw=await callBackend({action:'claude',system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:800});
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:800});
     var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
     renderCLScore(json);
   }catch(e){
@@ -1053,10 +1061,10 @@ async function improveCL(){
   out.innerHTML='<div class="card"><div class="muted">Rewriting to 9.5+… this takes ~10 seconds.</div></div>';
   var userMsg='Rewrite this proposal to 9.5/10.\n\nORIGINAL PROPOSAL:\n'+cl+(jd?'\n\nJOB DESCRIPTION (for context):\n'+jd:'');
   try{
-    var rewritten=await callBackend({action:'claude',system:CL_REWRITE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:500});
+    var rewritten=await callBackend({system:CL_REWRITE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:500});
     // Now score the rewritten version
     var scoreMsg='COVER LETTER / PROPOSAL ('+clWordCount(rewritten)+' words):\n'+rewritten+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
-    var raw=await callBackend({action:'claude',system:CL_SCORE_SYSTEM,message:scoreMsg,model:'claude-sonnet-4-6',max_tokens:800});
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:scoreMsg,model:'claude-sonnet-4-6',max_tokens:800});
     var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
     json.rewritten=rewritten;
     renderCLScore(json);
@@ -1065,11 +1073,19 @@ async function improveCL(){
   }
 }
 
-async function callBackend(payload){
-  var resp=await fetch(SEAT_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+/* Uses the same /api/claude Vercel proxy as the rest of the app. The GAS
+   claude() action only reads data.prompt and ignores system/model/max_tokens,
+   so it cannot serve this feature. */
+async function callBackend(opts){
+  var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:opts.model||'claude-sonnet-4-6',max_tokens:opts.max_tokens||800,
+      system:opts.system,messages:[{role:'user',content:opts.message}]})});
+  if(!resp.ok){ var errt=await resp.text(); throw new Error('HTTP '+resp.status+': '+errt); }
   var data=await resp.json();
-  if(data.error) throw new Error(data.error);
-  return data.text||data.response||data.result||JSON.stringify(data);
+  if(data.error) throw new Error(data.error.message||data.error);
+  var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+  if(!txt) throw new Error('The model returned no text.');
+  return txt;
 }
 
 /* ============================ THEME + MANUAL STATE ============================ */
