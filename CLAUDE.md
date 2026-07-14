@@ -45,7 +45,7 @@ This repo builds the live app at ai-advocate-ops-hub.vercel.app (Vite + React, b
 ## Team roster (v11, July 2026)
 | Name | Role | Notes |
 |---|---|---|
-| Saqib Shahzad | Owner, senior AI/ML consultant | $55/hr freelancer, $45-55/hr agency. Upwork Top Rated. ADMIN |
+| Saqib Shahzad | Owner, senior AI/ML consultant | Posted profile rate $85/hr. Bid floor $85, band $85-110/hr. Upwork **Rising Talent**, 100% Job Success (NOT Top Rated). ADMIN |
 | Zeb (Jahanzaib) | Co-admin, ops lead | ADMIN — can force-release gate |
 | Waqas Riaz | Team member | Full access |
 | Usman Saeed | Team member | Full access |
@@ -88,7 +88,9 @@ When working across VS Code Claude, Claude Code web, or Claude.ai:
 - Proposal count: under 20 no penalty; 20 to 50 subtract 1 (busy); 50+ AUTO-SKIP. Upwork never shows a bucket above "50+".
 - Scoring (19-point): Client /7 (fixed-price /6, the "$25/hr avg paid" point is N/A) + Job /7 + Match /5. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 = APPLY STANDARD; below 14 or any hard ban = SKIP. There is no REVIEW band.
 - Fees: freelancer service fee is variable 0-15% per contract. The flat 10% and the tiered 20/10/5 are RETIRED. Client fee 3-10%. Connects $0.15 each; standard proposal about 6 Connects.
-- Rate: Saqib $55/hr; agency $45-55/hr.
+- Rate (updated 14 July 2026, personal profile only; agency rate is out of scope): Saqib's **posted Upwork profile rate is $85.00/hr**. **BID FLOOR $85/hr, never quote below the posted rate** (undercutting the posted anchor signals he is discountable, and $85 already sits below Upwork's $100/hr median for ML engineers). **Standard bid band $85-110/hr**, set per job by Saqib and Usman. By complexity: agentic AI / RAG / LLM $95-110; MLOps and AI MVP $90-110; full-stack SaaS $85-105; chatbot / NLP / retainer $85-100; automation / API integration $85-95. Revisit upward to $110-130 once Top Rated is earned (needs $1,000 earned + 90-day history).
+- Match budget point, four tiers on the rate the CLIENT offers: **$85+/hr** ideal, full point. **$70-84/hr** good, full point, but note we will bid above their budget. **$50-69/hr** award the point then **subtract 1** from the total and mark for review. **Under $50/hr** no budget point, **flag "rate well below target", review critically, but do NOT ban** — still score it and always state the final score. Fixed-price $200+ earns the point.
+- Badge: **Rising Talent, 100% Job Success. NOT Top Rated.** Never claim Top Rated or Top Rated Plus in any proposal or profile copy.
 
 ## Working style
 - One change at a time; confirm before the next step. State facts as facts and assumptions as assumptions.
