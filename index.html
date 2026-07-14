@@ -276,10 +276,12 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
         <textarea id="cl-text" style="min-height:180px;margin-top:8px" placeholder="Paste the full cover letter or proposal here. Include every word you plan to send."></textarea>
         <label class="lbl">Original job description (paste for better context — optional but recommended)</label>
         <textarea id="cl-jd" style="min-height:80px" placeholder="Paste the Upwork job post here so the AI can check relevance, echo, and specificity…"></textarea>
+        <label class="lbl">Job link (logged to sheet — optional)</label>
+        <input class="field" id="cl-job-link" placeholder="https://www.upwork.com/jobs/~…">
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" onclick="scoreCL()">Score it (AI · 10-point)</button>
           <button class="btn ghost" onclick="improveCL()">Rewrite to 9.5+</button>
-          <button class="btn ghost" onclick="document.getElementById('cl-text').value='';document.getElementById('cl-jd').value='';document.getElementById('cl-score-out').innerHTML=''">Clear</button>
+          <button class="btn ghost" onclick="document.getElementById('cl-text').value='';document.getElementById('cl-jd').value='';document.getElementById('cl-job-link').value='';document.getElementById('cl-score-out').innerHTML=''">Clear</button>
         </div>
       </div>
       <div class="card">
@@ -1040,6 +1042,7 @@ async function scoreCL(){
     var raw=await callBackend({action:'claude',system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:800});
     var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
     renderCLScore(json);
+    logCLEvalToSheet(json, cl, jd);
   }catch(e){
     out.innerHTML='<div class="card"><div class="muted">Score failed: '+esc(String(e))+'</div></div>';
   }
@@ -1060,6 +1063,7 @@ async function improveCL(){
     var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
     json.rewritten=rewritten;
     renderCLScore(json);
+    logCLEvalToSheet(json, rewritten, jd);
   }catch(e){
     out.innerHTML='<div class="card"><div class="muted">Rewrite failed: '+esc(String(e))+'</div></div>';
   }
@@ -1070,6 +1074,54 @@ async function callBackend(payload){
   var data=await resp.json();
   if(data.error) throw new Error(data.error);
   return data.text||data.response||data.result||JSON.stringify(data);
+}
+
+function logCLEvalToSheet(scoreJson, clText, jdText){
+  try{
+    var assignee=ME?ME.name:'';
+    var jdFirst=(jdText||'').trim().split('\n')[0].slice(0,120);
+    var hiringRateSel=document.getElementById('c-hire');
+    var hiringRate=hiringRateSel?hiringRateSel.options[hiringRateSel.selectedIndex].text:'';
+    var spendSel=document.getElementById('c-spend');
+    var totalSpend=spendSel?spendSel.options[spendSel.selectedIndex].text:'';
+    var propsSel=document.getElementById('j-props');
+    var proposals=propsSel?propsSel.options[propsSel.selectedIndex].text:'';
+    var btypeSel=document.getElementById('b-type');
+    var fixedHourly=btypeSel?btypeSel.value:'';
+    var bAmt=val('b-amt')||'';
+    var payVerified=(document.getElementById('c-verified')&&document.getElementById('c-verified').checked)?'Yes':'No';
+    var flagged=(document.getElementById('j-ban')&&document.getElementById('j-ban').checked)?'Yes':'';
+    var total=0; CL_RUBRIC.forEach(function(r){total+=scoreJson[r.id]||0;});
+    var verdict=total>=9.5?'SEND IT':total>=8.5?'ALMOST - REWRITE':'NEEDS REWRITE';
+    callBackend({
+      action:'logCLEval',
+      name:assignee,
+      row:{
+        assignee:assignee,
+        jobTitle:jdFirst,
+        jobLink:val('cl-job-link')||'',
+        hiringRate:hiringRate,
+        clientRatings:'',
+        payVerified:payVerified,
+        totalSpend:totalSpend,
+        proposals:proposals,
+        interviewing:'',
+        invitesSent:'',
+        unansweredInvites:'',
+        flag:flagged,
+        applied:'',
+        fixedHourly:fixedHourly,
+        highBid:bAmt,
+        avgBid:'',
+        lowBid:'',
+        connects:'6',
+        bid:'$55/hr',
+        reason:total.toFixed(1)+'/10 '+verdict,
+        jobPosted:'',
+        openJobs:''
+      }
+    }).catch(function(){});
+  }catch(err){ /* silent — logging must never break scoring */ }
 }
 
 /* ============================ THEME + MANUAL STATE ============================ */

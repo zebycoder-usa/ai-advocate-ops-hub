@@ -19,7 +19,8 @@
 var TABS = {
   ActivityLog: ["Timestamp","User","Type","Decision","Client","Job","Match","Total /19","Country","Budget","Duration (min)","Detail","Summary"],
   Sessions:    ["Session ID","User","Login Time","Logout Time","Duration (min)","Duration (h:m)","JDs","Proposals","Copies","Status"],
-  Queue:       ["Holder","HolderSince","Waiting","PendingOffer","UpdatedAt","HolderHeartbeat"]
+  Queue:       ["Holder","HolderSince","Waiting","PendingOffer","UpdatedAt","HolderHeartbeat"],
+  CLEval:      ["Assignee","Date","Time PKT","Job Title","Job Link","Hiring Rate","Client Ratings","Payment Method Verified?","Total Spend","Proposals","Interviewing","Invites sent","Unanswered Invites","Flag","Applied?","Fixed/Hourly","High Bid","Avg. Bid","Low bid","No. of Connects","Bid","Reason","Job posted","Open jobs"]
 };
 
 /* Must match SEAT_ADMINS in index.html, and the names in its TEAM list. */
@@ -157,16 +158,19 @@ var SYSTEM_PROMPT = [
   "{\"proposal\":\"...\",\"cover\":\"...\"}"
 ].join("\n");
 
-function callClaude_(prompt){
+function callClaude_(prompt, systemOverride, messageOverride, modelOverride, maxTokensOverride){
   var key=PropertiesService.getScriptProperties().getProperty("CLAUDE_API_KEY");
   if(!key) return {ok:false,error:"CLAUDE_API_KEY not set. Apps Script -> Project Settings -> Script Properties.",text:null};
-  var model=PropertiesService.getScriptProperties().getProperty("CLAUDE_MODEL")||"claude-sonnet-4-6";
+  var model=modelOverride||PropertiesService.getScriptProperties().getProperty("CLAUDE_MODEL")||"claude-sonnet-4-6";
+  var sysPrompt=systemOverride||SYSTEM_PROMPT;
+  var userContent=messageOverride||prompt||"";
+  var maxTok=maxTokensOverride||1200;
   try{
     var res=UrlFetchApp.fetch("https://api.anthropic.com/v1/messages",{
       method:"post",contentType:"application/json",muteHttpExceptions:true,
       headers:{"x-api-key":key,"anthropic-version":"2023-06-01"},
-      payload:JSON.stringify({model:model,max_tokens:1200,system:SYSTEM_PROMPT,
-        messages:[{role:"user",content:prompt}]})
+      payload:JSON.stringify({model:model,max_tokens:maxTok,system:sysPrompt,
+        messages:[{role:"user",content:userContent}]})
     });
     var j=JSON.parse(res.getContentText());
     if(j.error) return {ok:false,error:j.error.message||JSON.stringify(j.error),text:null};
@@ -206,7 +210,24 @@ function handle_(data){
     return {ok:true};
   }
   if(action==="getLogs") return {ok:true,logs:logsOut_(),gate:readQueue_()};
-  if(action==="claude")  return callClaude_(data.prompt||"");
+  if(action==="claude")  return callClaude_(data.prompt||"", data.system, data.message, data.model, data.max_tokens);
+  if(action==="logCLEval"){
+    var d=data.row||{};
+    var ts=new Date();
+    var tz="Asia/Karachi";
+    sheet_("CLEval").appendRow([
+      d.assignee||name||"",
+      Utilities.formatDate(ts,tz,"yyyy-MM-dd"),
+      Utilities.formatDate(ts,tz,"HH:mm:ss"),
+      d.jobTitle||"", d.jobLink||"",
+      d.hiringRate||"", d.clientRatings||"", d.payVerified||"",
+      d.totalSpend||"", d.proposals||"", d.interviewing||"", d.invitesSent||"", d.unansweredInvites||"",
+      d.flag||"", d.applied||"", d.fixedHourly||"",
+      d.highBid||"", d.avgBid||"", d.lowBid||"",
+      d.connects||"6", d.bid||"$55/hr", d.reason||"", d.jobPosted||"", d.openJobs||""
+    ]);
+    return {ok:true};
+  }
   if(!GATE_ACTIONS[action]) return {ok:true,note:"no-op"};
 
   var lock=LockService.getScriptLock();
