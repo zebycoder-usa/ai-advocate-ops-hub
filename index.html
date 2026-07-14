@@ -291,9 +291,9 @@ var PROFILES = {
     h:"Saqib S. — bidding profile (PERSONAL freelancer)",
     body:[
       "Title: Senior Full Stack Engineer | SaaS, GenAI, LLMs & FastAPI Expert",
-      "Location: Sugar Land, TX, USA · Rising Talent · 5.0 (2 reviews) · ID verified",
-      "Profile rate shown: $35/hr (older copy showed $55). BID rate is set per job by Saqib/Usman, usually $70–90/hr.",
-      "Jobs: 3 total (2 completed 5.0 + 1 in progress) · 20 hours · >30 hrs/week available",
+      "Location: Sugar Land, TX, USA · Rising Talent · 100% Job Success · 5.0 (2 reviews) · ID verified",
+      "Profile rate shown: $85.00/hr. BID FLOOR is $85/hr, never bid below the posted rate. Standard band $85-110/hr, set per job by Saqib/Usman.",
+      "Jobs: 4 total (3 completed + 1 in progress) · 20 hours · >30 hrs/week available",
       "Education: University of Houston — MS Data Science (2018–2020); Cornell — BASc Computer Science (2013–2017)",
       "Skills: FastAPI · React · Python · TypeScript · Node.js · PostgreSQL · MongoDB · RESTful API · Docker · ML · NLP",
       "Stack: LangChain · LlamaIndex · LangGraph · CrewAI · Flowise · Pinecone/Chroma/FAISS/Weaviate · AWS · CI/CD",
@@ -324,40 +324,40 @@ var PROFILES = {
 };
 
 var TEMPLATES = [
-  {c:'T1',t:'LLM / RAG / GenAI build',when:'Job mentions RAG, chatbot on data, knowledge base, hallucination, vector DB',rate:'$70-90/hr',con:'6',boost:'Only if high-value + few proposals',
+  {c:'T1',t:'LLM / RAG / GenAI build',when:'Job mentions RAG, chatbot on data, knowledge base, hallucination, vector DB',rate:'$95-110/hr',con:'6',boost:'Only if high-value + few proposals',
    open:'You need [their goal] without the model making things up, that is a retrieval + grounding problem, not a prompt problem.',
    proof:'Saqib built a RAG SaaS and a multi-agent SaaS (both 5.0). Pinecone/Chroma/FAISS + LangChain/LlamaIndex.'},
-  {c:'T2',t:'Full-stack SaaS / FastAPI + React',when:'SaaS MVP, dashboard, API + frontend, Stripe, auth',rate:'$70-90/hr',con:'6',boost:'No (unless premium)',
+  {c:'T2',t:'Full-stack SaaS / FastAPI + React',when:'SaaS MVP, dashboard, API + frontend, Stripe, auth',rate:'$85-105/hr',con:'6',boost:'No (unless premium)',
    open:'You want a production SaaS, not a wrapper, auth, DB, payments and the AI logic wired together and deployed.',
    proof:'Saqib ships full stack: FastAPI/Django + React/Next + PostgreSQL/Supabase + Stripe + AWS/Docker, 99.9% uptime.'},
-  {c:'T3',t:'Agentic AI / multi-agent / automation',when:'LangGraph, CrewAI, autonomous agents, scraping, workflow automation',rate:'$70-90/hr',con:'6',boost:'No',
+  {c:'T3',t:'Agentic AI / multi-agent / automation',when:'LangGraph, CrewAI, autonomous agents, scraping, workflow automation',rate:'$95-110/hr',con:'6',boost:'No',
    open:'You want an agent that actually completes the workflow end to end, with guardrails, not a demo that breaks on edge cases.',
    proof:'Saqib built LangGraph/CrewAI multi-agent systems that browse, scrape and execute; delivered a multi-agent SaaS (5.0).'},
-  {c:'T4',t:'Fast speed-bid (under 10 proposals)',when:'Fresh post, <10 proposals, speed beats polish',rate:'set by job',con:'6',boost:'Never',
+  {c:'T4',t:'Fast speed-bid (under 10 proposals)',when:'Fresh post, <10 proposals, speed beats polish',rate:'set by job, min $85/hr',con:'6',boost:'Never',
    open:'[Restate their exact problem in one line].',
    proof:'One-line proof + one question. Submit in minutes while the post is new.'},
-  {c:'T5',t:'Director / VP / Head of AI (decision-maker)',when:'Title-level client, strategic hire',rate:'$80-90/hr',con:'6-8',boost:'Always boost',
+  {c:'T5',t:'Director / VP / Head of AI (decision-maker)',when:'Title-level client, strategic hire',rate:'$95-110/hr',con:'6-8',boost:'Always boost',
    open:'You are hiring for [outcome] at the org level, you need someone who owns architecture and delivery, not a task-taker.',
    proof:'Saqib owns the whole stack end to end; speaks architecture, security and deployment, not just code.'},
-  {c:'T6',t:'MLOps / SageMaker / Kubernetes',when:'Deployment, scaling, pipelines, infra for ML',rate:'$80-90/hr',con:'6',boost:'If premium',
+  {c:'T6',t:'MLOps / SageMaker / Kubernetes',when:'Deployment, scaling, pipelines, infra for ML',rate:'$90-110/hr',con:'6',boost:'If premium',
    open:'Your model works, now it has to run reliably at scale. That is an MLOps and infra problem.',
    proof:'Saqib: AWS, Docker, CI/CD, scalable deployments with 99.9%+ uptime.'},
-  {c:'T7',t:'Workflow automation (n8n / Make / Zapier)',when:'Connect tools, automate ops, webhooks, Sheets/Slack',rate:'$60-80/hr',con:'6',boost:'No',
+  {c:'T7',t:'Workflow automation (n8n / Make / Zapier)',when:'Connect tools, automate ops, webhooks, Sheets/Slack',rate:'$85-95/hr',con:'6',boost:'No',
    open:'You are doing [repetitive task] by hand, that is a multi-step automation that can run itself and notify your team.',
    proof:'Multi-node pipelines integrating APIs, Google Sheets, OpenAI/Claude, webhooks and Slack.'},
-  {c:'T8',t:'AI chatbot / assistant for a business',when:'Website assistant, support bot, internal assistant',rate:'$60-85/hr',con:'6',boost:'No',
+  {c:'T8',t:'AI chatbot / assistant for a business',when:'Website assistant, support bot, internal assistant',rate:'$85-100/hr',con:'6',boost:'No',
    open:'You want a chatbot that answers from YOUR business, accurate, on-brand, and not generic.',
    proof:'Custom GPT-4o/Claude assistants grounded on client data; Saqib catalog has a $350 chatbot offering.'},
-  {c:'T9',t:'API integration / backend fix',when:'Connect 2 systems, REST/OAuth, debug backend',rate:'$60-80/hr',con:'6',boost:'No',
+  {c:'T9',t:'API integration / backend fix',when:'Connect 2 systems, REST/OAuth, debug backend',rate:'$85-95/hr',con:'6',boost:'No',
    open:'You need [system A] and [system B] talking reliably with proper auth and error handling.',
    proof:'Secure high-performance REST APIs, OAuth, multi-service backends (FastAPI/Node).'},
-  {c:'T10',t:'Data / NLP / document extraction',when:'Parse PDFs, extract structured data, classify, analyse',rate:'$60-85/hr',con:'6',boost:'No',
+  {c:'T10',t:'Data / NLP / document extraction',when:'Parse PDFs, extract structured data, classify, analyse',rate:'$85-100/hr',con:'6',boost:'No',
    open:'You have unstructured [docs/data] and need clean structured output you can trust and search.',
    proof:'NLP + extraction pipelines; AI resume-ranking & parsing system in portfolio.'},
-  {c:'T11',t:'AI MVP for a startup / founder',when:'Founder, "build my AI product", investor demo',rate:'$70-90/hr',con:'6-8',boost:'If competitive',
+  {c:'T11',t:'AI MVP for a startup / founder',when:'Founder, "build my AI product", investor demo',rate:'$90-110/hr',con:'6-8',boost:'If competitive',
    open:'You are validating [product], you need a real, demo-able MVP fast, built to extend, not throwaway.',
    proof:'Delivered MVPs from concept to shippable; full stack + AI in one engineer.'},
-  {c:'T12',t:'Long-term / retainer / staff-aug',when:'Ongoing, part-time, "join our team", monthly',rate:'$70-85/hr',con:'6',boost:'No',
+  {c:'T12',t:'Long-term / retainer / staff-aug',when:'Ongoing, part-time, "join our team", monthly',rate:'$85-100/hr',con:'6',boost:'No',
    open:'You want a reliable engineer embedded with your team long-term, owning delivery, not just tickets.',
    proof:'Saqib is one engineer who covers frontend, backend, AI and deployment, less coordination overhead for you.'}
 ];
@@ -693,6 +693,7 @@ function renderPipeline(){
   mem.pipeline.slice().reverse().forEach(function(row){
     var next = row.stage!=='Applied' ? '<button class="btn ghost" onclick="advance('+row.id+')">\u2192 '+STAGES[STAGES.indexOf(row.stage)+1]+'</button>' : '<span class="pill ok">Done</span>';
     b.innerHTML+='<tr><td>'+esc(row.job)+'</td><td>'+(row.score||'-')+'</td><td><span class="pill '+(row.stage==='Applied'?'ok':'warn')+'">' +row.stage+'</span></td><td class="muted">'+row.by+'</td><td>'+next+'</td></tr>';
+  });
 }
 // expose shortlist button via Evaluate decision card too
 window.shortlist=shortlist;
@@ -773,7 +774,7 @@ function renderRules(){
   document.getElementById('rules').innerHTML=
     '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Weapons, Military, Defense, ITAR. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 50+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>'
     +'<p class="note" style="margin-top:8px"><b>Government and public-sector AI, data, automation and voice work is ALLOWED</b> — it is not a banned industry. Proposal saturation: under 20 no penalty, 20–50 subtract 1, 50+ skip. A busy job is a scoring penalty, never an automatic ban.</p></div>'
-    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 29 June)</div><p class="note" style="margin-top:6px">Allowed regions: <b>United States and Europe</b> (India and Bangladesh remain banned countries). Jobs paying <b>over $60/hr</b>, or one-time fixed <b>$1000+</b>. Bid rate set per job by Saqib/Usman, usually <b>$70–90/hr</b>.</p></div>'
+    +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 14 July)</div><p class="note" style="margin-top:6px">Allowed regions: <b>United States and Europe</b> (India and Bangladesh remain banned countries). Budget tiers: <b>$85+/hr ideal</b> (full budget point) · <b>$70-84/hr</b> good, we bid above their budget · <b>$50-69/hr</b> review, minus 1 · <b>under $50/hr</b> flagged as well below target, review critically, not an auto-ban. One-time fixed <b>$1000+</b>. <b>BID FLOOR $85/hr</b>, never below the posted profile rate. Standard band <b>$85-110/hr</b>, set per job by Saqib/Usman.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Fees (June 2026)</div><p class="note" style="margin-top:6px">Old 20/10/5% tiers retired May 2025. Freelancer fee variable 0–15%, shown before submit (~10% typical; AI specialists often 0–5%). Connects $0.15 each — standard 6 = $0.90, large up to 16 = $2.40. Freelancer Plus $19.99/mo. ID badge = 35 connects ($5.25). PKR payout via Direct to Local Bank $0.99 (personal accounts). Quote = desired net ÷ 0.90.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US or Europe jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
 }
@@ -882,7 +883,7 @@ function renderGuide(){
 /* ============================ ASK AI (demo + live) ============================ */
 var AGENCY_CONTEXT = buildContext();
 function buildContext(){
-  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). Rate: $55/hr Saqib, $45-55/hr agency. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). Match budget point = $55/hr or $200+ fixed. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work. PROPOSAL OUTPUT RULES: whenever you write a proposal for a job, output exactly two clearly labelled blocks, in this order.
+  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). RATE: Saqib's posted Upwork profile rate is $85.00/hr. BID FLOOR is $85/hr; NEVER quote below the posted profile rate, it undercuts the anchor and signals he is discountable. Standard bid band is $85-110/hr, set per job by Saqib and Usman. Price by complexity: agentic AI, RAG and LLM builds at $95-110/hr; MLOps and AI MVPs at $90-110/hr; full-stack SaaS at $85-105/hr; chatbots, NLP extraction and retainers at $85-100/hr; automation and API integration at $85-95/hr. BADGE: Saqib is Rising Talent with 100% Job Success. He is NOT Top Rated and NOT Top Rated Plus; never claim either. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). MATCH BUDGET POINT, four tiers on the rate the CLIENT offers: $85/hr or more is ideal, award the full budget point; $70-84/hr is good, award the full budget point but note in the analysis that we will bid above their stated budget; $50-69/hr, award the point then SUBTRACT 1 from the total and mark it for review; under $50/hr, award no budget point, FLAG it as "rate well below target" and review it critically, but this is NOT a ban, still score it and always state the final score. Fixed-price $200+ earns the budget point. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work. PROPOSAL OUTPUT RULES: whenever you write a proposal for a job, output exactly two clearly labelled blocks, in this order.
 
 BLOCK 1 heading, written exactly as a bold heading: "### PROPOSAL (paste this into Upwork's Cover Letter box when you apply)". Then the full proposal, 120 to 180 words. For clarity to the bidder: Upwork's application field is confusingly named "Cover Letter", so THIS proposal block is exactly what you paste into that box. It is the main pitch and the first thing the client reads.
 
@@ -933,7 +934,7 @@ function demoAnswer(q){
   if(/slot|window|time|hour|shift/.test(s)) return 'One seat at a time on Saqib\u2019s personal profile. Log out when done so the next person can log in. Owners (Saqib, Waqas), Usman, and Zeb can act anytime.';
   if(/excus|kaleem|sana|ayesha|adil/.test(s)) return 'Kaleem, Sana, Ayesha and Adil are excused from Upwork bidding for at least one month (Saqib, 29 June).';
   if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
-  if(/threshold|apply|budget|rate|\$60|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India, Bangladesh, and Pakistan banned), over $60/hr or $1000+ fixed (Saqib, 29 June). Bid usually $70–90/hr, set per job by Saqib/Usman.';
+  if(/threshold|apply|budget|rate|\$60|\$85|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India, Bangladesh, and Pakistan banned). Budget tiers: $85+/hr is ideal, $70-84/hr is good, $50-69/hr costs 1 score point, under $50/hr is flagged as well below target and reviewed critically but not auto-banned. Or $1000+ fixed. BID FLOOR is $85/hr, never bid below the posted profile rate. Standard band $85-110/hr, set per job by Saqib/Usman.';
   if(/profile|agency|personal/.test(s)) return 'All bidding is on Saqib\u2019s PERSONAL freelancer profile, not the agency. Single login, one person at a time.';
   return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, allowed regions United States and Europe (India, Bangladesh, and Pakistan banned), over $60/hr or $1000+ fixed; score 19 points (16-19 with Match 4+ boost, 14-15 standard, below 14 skip); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
 }
