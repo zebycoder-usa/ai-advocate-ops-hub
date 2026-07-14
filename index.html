@@ -267,6 +267,39 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       <div class="flex" style="margin-top:10px"><input class="field" id="ai-in" placeholder="Ask about bans, scoring, fees, templates, the flow, or a job…" style="flex:1" onkeydown="if(event.key==='Enter')askAI()"><button class="btn" onclick="askAI()">Ask</button></div>
     </div>
   </section>
+
+  <!-- CL SCORE -->
+  <section class="view" data-view="clscore">
+    <div class="grid g2" style="margin-bottom:12px">
+      <div class="card">
+        <div class="eyebrow">1 · Paste your cover letter / proposal</div>
+        <textarea id="cl-text" style="min-height:180px;margin-top:8px" placeholder="Paste the full cover letter or proposal here. Include every word you plan to send."></textarea>
+        <label class="lbl">Original job description (paste for better context — optional but recommended)</label>
+        <textarea id="cl-jd" style="min-height:80px" placeholder="Paste the Upwork job post here so the AI can check relevance, echo, and specificity…"></textarea>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="scoreCL()">Score it (AI · 10-point)</button>
+          <button class="btn ghost" onclick="improveCL()">Rewrite to 9.5+</button>
+          <button class="btn ghost" onclick="document.getElementById('cl-text').value='';document.getElementById('cl-jd').value='';document.getElementById('cl-score-out').innerHTML=''">Clear</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="eyebrow">Scoring rubric — 10 points</div>
+        <table style="margin-top:8px;font-size:12px">
+          <thead><tr><th>#</th><th>Dimension</th><th>Max</th><th>What earns full marks</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><b>Opening hook</b></td><td>2.0</td><td>First sentence names the client's exact problem in their own words — not Saqib's credentials</td></tr>
+            <tr><td>2</td><td><b>Proof points</b></td><td>2.0</td><td>1–2 specific, verifiable, true results from real past work — no invented metrics</td></tr>
+            <tr><td>3</td><td><b>Concrete plan</b></td><td>2.0</td><td>2–3 numbered steps that are specific and actionable for this exact job</td></tr>
+            <tr><td>4</td><td><b>Closing question</b></td><td>1.5</td><td>One sharp, relevant question that shows deep reading of the brief</td></tr>
+            <tr><td>5</td><td><b>Style and tone</b></td><td>1.5</td><td>Natural spoken English, no em/en dashes, no "Dear Hiring Manager", no "I am the perfect fit", no bracket placeholders</td></tr>
+            <tr><td>6</td><td><b>Length and format</b></td><td>1.0</td><td>Proposal 120–180 words; cover letter 2–4 sentences. Right length = right discipline</td></tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:10px">Target: <b>9.5 / 10 minimum</b> before sending. Below 9.5 means rewrite, not send.</div>
+      </div>
+    </div>
+    <div id="cl-score-out"></div>
+  </section>
 </div>
 
 <script>
@@ -412,7 +445,7 @@ function tickClock(){
 function canAct(m){ if(!m) return false; if(m.kind==='excused') return false; return true; }
 
 /* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
 function initNav(){
   var nav=document.getElementById('nav');
   VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
@@ -950,6 +983,109 @@ async function askAI(){
 }
 function renderAiMode(){
   document.getElementById('ai-mode').innerHTML='<span>\u2726</span><div><b>Works now in Demo mode everywhere; fully live inside Claude or with a key.</b> Open this app as an artifact in Claude and the bot answers live for free. On a plain URL it answers from Demo mode until Saqib\u2019s Anthropic API key (separate from Claude Max) is added as a server env var. Models: <b>claude-sonnet-4-6</b> proposals, <b>claude-haiku-4-5</b> cheap scoring.</div>';
+}
+
+/* ============================ CL / PROPOSAL SCORER ============================ */
+var CL_RUBRIC=[
+  {id:'hook',  label:'Opening hook',      max:2.0, tip:'First sentence mirrors the client\'s exact problem in their own words — not a credential opener.'},
+  {id:'proof', label:'Proof points',      max:2.0, tip:'1–2 specific, verifiable, true results from real past work. No invented numbers or vague claims.'},
+  {id:'plan',  label:'Concrete plan',     max:2.0, tip:'2–3 numbered steps that are specific and actionable for this exact brief.'},
+  {id:'close', label:'Closing question',  max:1.5, tip:'One sharp, relevant question that shows you read the brief deeply.'},
+  {id:'style', label:'Style and tone',    max:1.5, tip:'Natural spoken English. No em/en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders.'},
+  {id:'len',   label:'Length and format', max:1.0, tip:'Proposal 120–180 words. Cover letter 2–4 sentences. Tight = disciplined.'}
+];
+
+function clWordCount(t){return (t||'').trim().split(/\s+/).filter(Boolean).length;}
+
+/* Read the text back out of the DOM. The old version inlined JSON.stringify()
+   into an onclick="" attribute, which broke on any quote in the AI output. */
+function copyRewritten(btn){
+  var p=document.getElementById('cl-rewritten'); if(!p)return;
+  navigator.clipboard.writeText(p.innerText);
+  btn.textContent='Copied'; setTimeout(function(){btn.textContent='Copy';},1500);
+}
+
+function renderCLScore(result){
+  var out=document.getElementById('cl-score-out'); if(!out)return;
+  var total=0; CL_RUBRIC.forEach(function(r){total+=result[r.id]||0;});
+  var pct=Math.round((total/10)*100);
+  var verdict=total>=9.5?'<span class="pill ok">SEND IT</span>':total>=8.5?'<span class="pill warn">ALMOST — REWRITE</span>':'<span class="pill no">NEEDS REWRITE</span>';
+  var rows='';
+  CL_RUBRIC.forEach(function(r){
+    var s=result[r.id]||0; var fill=Math.round((s/r.max)*100);
+    var col=s>=r.max*0.9?'var(--green)':s>=r.max*0.6?'var(--amber)':'var(--red)';
+    rows+='<tr><td><b>'+r.label+'</b><br><span class="muted" style="font-size:11px">'+r.tip+'</span></td>'
+      +'<td style="text-align:right;white-space:nowrap"><span style="color:'+col+';font-weight:800">'+s.toFixed(1)+'</span> / '+r.max.toFixed(1)+'</td>'
+      +'<td style="width:120px"><div class="bar"><i style="width:'+fill+'%;background:'+col+'"></i></div></td></tr>';
+    if(result[r.id+'_note']) rows+='<tr><td colspan="3" style="padding-top:2px;padding-bottom:8px;font-size:12px;color:var(--amber)">↳ '+esc(result[r.id+'_note'])+'</td></tr>';
+  });
+  out.innerHTML='<div class="card" style="margin-bottom:12px">'
+    +'<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
+    +'<div><div class="eyebrow">Cover Letter / Proposal Score</div>'
+    +'<div class="scorebig" style="color:'+(total>=9.5?'var(--green)':total>=8.5?'var(--amber)':'var(--red)')+'">'+total.toFixed(1)+' <span style="font-size:18px;font-weight:400;color:var(--muted)">/ 10</span></div></div>'
+    +'<div style="flex:1"><div class="bar" style="height:14px"><i style="width:'+pct+'%;background:'+(total>=9.5?'var(--green)':total>=8.5?'var(--amber)':'var(--red)')+'"></i></div>'
+    +'<div class="note" style="margin-top:4px">'+pct+'% · '+verdict+'</div></div></div>'
+    +'<table style="margin-top:12px">'+rows+'</table>'
+    +(result.summary?'<div class="note" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+esc(result.summary)+'</div>':'')
+    +'</div>'
+    +(result.rewritten?'<div class="card"><div class="eyebrow">Rewritten to 9.5+</div><pre id="cl-rewritten" style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;margin:10px 0 0">'+esc(result.rewritten)+'</pre>'
+      +'<button class="btn ghost" style="margin-top:8px" onclick="copyRewritten(this)">Copy</button></div>':'');
+}
+
+var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency. Principal: Saqib Shahzad, senior AI/ML/LLM engineer. His posted Upwork rate is $85.00/hr; bid floor is $85/hr and the standard band is $85-110/hr. He is Rising Talent with 100% Job Success, he is NOT Top Rated, never let a proposal claim otherwise. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.5/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.5"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.';
+
+var CL_REWRITE_SYSTEM='You are a world-class Upwork proposal writer for Saqib Shahzad, senior AI/ML/LLM engineer at AI Advocate Agency. You rewrite proposals to hit 9.5/10 on the scoring rubric.\n\nRULES you must follow exactly:\n- Open with the client\'s exact problem in their own words (not Saqib\'s credentials)\n- Include exactly 2 true proof points — only use facts present in the original proposal or derivable from Saqib\'s real profile (senior AI/ML engineer, FastAPI/React/GenAI/RAG/LLM agents). NEVER invent metrics.\n- Saqib is Rising Talent with 100% Job Success. He is NOT Top Rated and NOT Top Rated Plus. Never claim a badge or credential he does not have. His rate is $85/hr, never state a lower rate.\n- Include a 2–3 step numbered plan specific to this brief\n- End with one sharp question relevant to this exact job\n- Natural, spoken English. No em dashes. No en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders.\n- Proposal length: 120–180 words exactly.\n\nReturn ONLY the rewritten proposal text. No preamble, no explanation, no score.';
+
+async function scoreCL(){
+  var cl=document.getElementById('cl-text').value.trim();
+  var jd=document.getElementById('cl-jd').value.trim();
+  if(!cl){alert('Paste your cover letter or proposal first.');return;}
+  var out=document.getElementById('cl-score-out');
+  out.innerHTML='<div class="card"><div class="muted">Scoring with AI…</div></div>';
+  var wc=clWordCount(cl);
+  var userMsg='COVER LETTER / PROPOSAL ('+wc+' words):\n'+cl+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
+  try{
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:800});
+    var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
+    renderCLScore(json);
+  }catch(e){
+    out.innerHTML='<div class="card"><div class="muted">Score failed: '+esc(String(e))+'</div></div>';
+  }
+}
+
+async function improveCL(){
+  var cl=document.getElementById('cl-text').value.trim();
+  var jd=document.getElementById('cl-jd').value.trim();
+  if(!cl){alert('Paste your cover letter or proposal first, then click Score to see the breakdown before rewriting.');return;}
+  var out=document.getElementById('cl-score-out');
+  out.innerHTML='<div class="card"><div class="muted">Rewriting to 9.5+… this takes ~10 seconds.</div></div>';
+  var userMsg='Rewrite this proposal to 9.5/10.\n\nORIGINAL PROPOSAL:\n'+cl+(jd?'\n\nJOB DESCRIPTION (for context):\n'+jd:'');
+  try{
+    var rewritten=await callBackend({system:CL_REWRITE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:500});
+    // Now score the rewritten version
+    var scoreMsg='COVER LETTER / PROPOSAL ('+clWordCount(rewritten)+' words):\n'+rewritten+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:scoreMsg,model:'claude-sonnet-4-6',max_tokens:800});
+    var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
+    json.rewritten=rewritten;
+    renderCLScore(json);
+  }catch(e){
+    out.innerHTML='<div class="card"><div class="muted">Rewrite failed: '+esc(String(e))+'</div></div>';
+  }
+}
+
+/* Uses the same /api/claude Vercel proxy as the rest of the app. The GAS
+   claude() action only reads data.prompt and ignores system/model/max_tokens,
+   so it cannot serve this feature. */
+async function callBackend(opts){
+  var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:opts.model||'claude-sonnet-4-6',max_tokens:opts.max_tokens||800,
+      system:opts.system,messages:[{role:'user',content:opts.message}]})});
+  if(!resp.ok){ var errt=await resp.text(); throw new Error('HTTP '+resp.status+': '+errt); }
+  var data=await resp.json();
+  if(data.error) throw new Error(data.error.message||data.error);
+  var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+  if(!txt) throw new Error('The model returned no text.');
+  return txt;
 }
 
 /* ============================ THEME + MANUAL STATE ============================ */
