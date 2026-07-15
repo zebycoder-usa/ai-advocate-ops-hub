@@ -224,7 +224,7 @@ function handle_(data){
       d.totalSpend||"", d.proposals||"", d.interviewing||"", d.invitesSent||"", d.unansweredInvites||"",
       d.flag||"", d.applied||"", d.fixedHourly||"",
       d.highBid||"", d.avgBid||"", d.lowBid||"",
-      d.connects||"6", d.bid||"$55/hr", d.reason||"", d.jobPosted||"", d.openJobs||""
+      d.connects||"6", d.bid||"$85/hr", d.reason||"", d.jobPosted||"", d.openJobs||""
     ]);
     return {ok:true};
   }

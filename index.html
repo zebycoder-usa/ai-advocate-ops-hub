@@ -307,18 +307,17 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
 <script>
 /* ============================ DATA ============================ */
 var TEAM = [
-  {id:'saqib', name:'Saqib Shahzad', role:'Owner P1', kind:'owner'},
-  {id:'waqas', name:'Waqas Riaz', role:'Owner P2', kind:'owner'},
-  {id:'usman', name:'Usman Saeed', role:'Manager', kind:'manager'},
-  {id:'zeb',   name:'Jahanzaib (Zeb)', role:'Builder', kind:'builder'},
-  {id:'fiza',  name:'Fiza', role:'Bidder', kind:'bidder'},
-  {id:'subhan',name:'Subhan', role:'Bidder', kind:'bidder'},
-  {id:'sadia', name:'Sadia', role:'Bidder', kind:'bidder'},
-  {id:'hamza', name:'Hamza', role:'Bidder', kind:'bidder'},
-  {id:'kaleem',name:'Kaleem', role:'Excused (≥1 month)', kind:'excused'},
-  {id:'sana',  name:'Sana', role:'Design · excused from bidding', kind:'excused'},
-  {id:'ayesha',name:'Ayesha', role:'UI · excused from bidding', kind:'excused'},
-  {id:'adil',  name:'Adil', role:'Excused (≥1 month)', kind:'excused'}
+  {id:'saqib', name:'Saqib Shahzad',   role:'Owner',    kind:'owner'},
+  {id:'zeb',   name:'Jahanzaib (Zeb)', role:'Co-Admin', kind:'admin'},
+  {id:'waqas', name:'Waqas Riaz',      role:'Bidder',   kind:'bidder'},
+  {id:'usman', name:'Usman Saeed',     role:'Bidder',   kind:'bidder'},
+  {id:'fiza',  name:'Fiza',            role:'Bidder',   kind:'bidder'},
+  {id:'subhan',name:'Subhan',          role:'Bidder',   kind:'bidder'},
+  {id:'sadia', name:'Sadia',           role:'Bidder',   kind:'bidder'},
+  {id:'hamza', name:'Hamza',           role:'Bidder',   kind:'bidder'},
+  {id:'kaleem',name:'Kaleem',          role:'Learner',  kind:'bidder'},
+  {id:'sana',  name:'Sana',            role:'Bidder',   kind:'bidder'},
+  {id:'ayesha',name:'Ayesha',          role:'Bidder',   kind:'bidder'},
 ];
 
 var PROFILES = {
@@ -444,7 +443,7 @@ function tickClock(){
   var p=pktNow(),c=cstNow();
   document.getElementById('clock').innerHTML='PKT '+hhmm(p)+' · CST '+hhmm(c)+'<br><span class="muted">'+p.toDateString()+'</span>';
 }
-function canAct(m){ if(!m) return false; if(m.kind==='excused') return false; return true; }
+function canAct(m){ return !!m; }
 
 /* ============================ NAV ============================ */
 var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
@@ -460,11 +459,9 @@ function go(name,btn){
 /* ============================ ACCESS BANNER + ROSTER ============================ */
 function renderAccess(){
   var el=document.getElementById('access');
-  if(ME.kind==='excused'){el.innerHTML='<span>\u26d4</span><div><b>'+ME.name+' is excused from Upwork bidding for at least one month.</b> You can view everything, but shortlist/apply actions are locked.</div>';return;}
   el.innerHTML='<span>\u2705</span><div><b>'+ME.name+' \u2014 actions unlocked.</b> Single login: VPN Houston, separate browser, no personal Upwork. When done, click Log Out so the next person can take the seat.</div>';
 }
 function statusPill(m){
-  if(m.kind==='excused') return '<span class="pill no">Excused</span>';
   return '<span class="pill ok">Active</span>';
 }
 function renderRoster(){
@@ -696,8 +693,7 @@ function copyText(btn){var c=btn.closest('.card').querySelector('[data-copy]');n
 /* ============================ PIPELINE + AUTO-LOG ============================ */
 /* ============================ PIPELINE + AUTO-LOG ============================ */
 function gate(area){
-  if(!canAct(ME)){alert(ME.name+' is excused from bidding for ≥1 month.');return false;}
-  return true;
+  return canAct(ME);
 }
 function logAct(action, job, score, decision){
   mem.activity.push({ts:Date.now(), by:ME.id, byName:ME.name, action:action, job:job, score:score, decision:decision});
@@ -750,7 +746,7 @@ function renderReport(){
     if(a.action==='applied')row.applied++;
   });
   rb.innerHTML='';
-  TEAM.filter(function(m){return m.kind!=='excused';}).forEach(function(m){var r=per[m.id];
+  TEAM.forEach(function(m){var r=per[m.id];
     rb.innerHTML+='<tr><td>'+r.name+'</td><td>'+r.evaluate+'</td><td>'+r.shortlist+'</td><td>'+r.applied+'</td><td>'+r.skip+'</td></tr>';});
   var feed=document.getElementById('feed');
   var todays=mem.activity.filter(function(a){var d=new Date(a.ts);var u=d.getTime()+d.getTimezoneOffset()*60000;return todayKey(new Date(u+5*3600000))===today;}).slice(-30).reverse();
@@ -967,7 +963,7 @@ function demoAnswer(q){
   if(/score|19|point|evaluate/.test(s)) return '19-point score: Client/7 + Job/7 + Match/5. 16-19 with Match 4+ apply with boost; 14-15 apply standard; below 14 skip. Hard bans override to skip. Mid-tier verified clients ($1k–$50k) score highest.';
   if(/fee|connect|cost|charge|payout|pkr/.test(s)) return 'Fees: variable 0–15% shown before submit (~10% typical). Connects $0.15 each (6 = $0.90). Plus $19.99/mo. ID badge 35 connects. PKR via Direct to Local Bank $0.99. Quote = net ÷ 0.90.';
   if(/slot|window|time|hour|shift/.test(s)) return 'One seat at a time on Saqib\u2019s personal profile. Log out when done so the next person can log in. Owners (Saqib, Waqas), Usman, and Zeb can act anytime.';
-  if(/excus|kaleem|sana|ayesha|adil/.test(s)) return 'Kaleem, Sana, Ayesha and Adil are excused from Upwork bidding for at least one month (Saqib, 29 June).';
+  if(/kaleem/.test(s)) return 'Kaleem is a learner on the team with full app access. Give extra step-by-step guidance when helping them.';
   if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
   if(/threshold|apply|budget|rate|\$60|\$85|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India, Bangladesh, and Pakistan banned). Budget tiers: $85+/hr is ideal, $70-84/hr is good, $50-69/hr costs 1 score point, under $50/hr is flagged as well below target and reviewed critically but not auto-banned. Or $1000+ fixed. BID FLOOR is $85/hr, never bid below the posted profile rate. Standard band $85-110/hr, set per job by Saqib/Usman.';
   if(/profile|agency|personal/.test(s)) return 'All bidding is on Saqib\u2019s PERSONAL freelancer profile, not the agency. Single login, one person at a time.';
