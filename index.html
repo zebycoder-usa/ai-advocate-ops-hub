@@ -513,12 +513,13 @@ function parseJob(text){
      and voice work is ALLOWED (v9) — FedRAMP/CMMC/GovCloud are civilian compliance regimes. */
   if(/\b(weapons?|military|defense|defence|itar)\b/i.test(low)) P.bans.push('Banned industry (weapons/defense)');
   if(/\b(umbrage|stewart|cvs health|lynx)\b/i.test(low)) P.bans.push('Banned company');
-  if(P.isBanCountry) P.bans.push('Client in India/Bangladesh (hard ban)');
+  if(P.isBanCountry) P.bans.push('Client in India/Bangladesh/Pakistan (hard ban)');
   if(/(on-?site|in[- ]person)[^.]{0,40}(2|3|4|5)\s*days?/i.test(low)) P.bans.push('On-site 2+ days/week');
   if(/\bsurvey\b|\btest (?:job|task)\b|\bquestionnaire\b/i.test(low)) P.flags.push('Possible survey/test job - verify');
   if(P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)<0) P.flags.push('Outside allowed regions ('+P.region+') — review, not auto-skip');
-  var belowBudget = P.budgetType==='fixed' ? (P.amount!=null && P.amount<1000) : P.budgetType==='hourly' ? (P.amount!=null && P.amount<60) : false;
-  if(belowBudget) P.flags.push('Below threshold ('+(P.budgetType==='fixed'?'fixed <$1000':'<$60/hr')+')');
+  /* Rate floor $40/hr for agency (full-service). Flag below $40/hr for review — not a ban. */
+  var belowBudget = P.budgetType==='fixed' ? false : P.budgetType==='hourly' ? (P.amount!=null && P.amount<40) : false;
+  if(belowBudget) P.flags.push('Below $40/hr rate floor — review before bidding');
   P.belowBudget=belowBudget;
   return P;
 }
@@ -540,14 +541,24 @@ function scoreManual(){
   var cliMax=fixed?6:7; if(cli>cliMax)cli=cliMax;
   var job=0; job+= (+val('j-scope'));
   var amt=parseFloat(val('b-amt'))||0, bt=val('b-type');
-  var meets = bt==='hourly' ? amt>=60 : amt>=1000;
-  var border = bt==='hourly' ? (amt>=45&&amt<60) : (amt>=600&&amt<1000);
+  /* Rate floor $40/hr (full-service agency; personal floor was $85 but agency bids from $40) */
+  var meets = bt==='hourly' ? amt>=40 : amt>=200;
+  var border = bt==='hourly' ? (amt>=30&&amt<40) : false;
   job+= meets?2:(border?1:0);
-  var pr=val('j-props'); job+= (pr==='0'||pr==='1')?2:(pr==='2'?1:0); job+= chk('j-long')?1:0; if(job>7)job=7;
+  var pr=val('j-props');
+  /* Saturation: 50+ = -2 penalty on total; 20-50 = 0; under 20 = 0 */
+  var SAT_PENALTY = (pr==='3') ? -2 : 0;
+  job+= (pr==='0'||pr==='1')?2:(pr==='2'?1:0); job+= chk('j-long')?1:0; if(job>7)job=7;
   var mat=0; mat+=(+val('m-match')); mat+=chk('m-proof')?1:0; mat+=chk('c-us')?1:0; if(mat>5)mat=5;
-  var total=cli+job+mat;
-  var decision = total>=14 ? ((total>=16 && mat>=4)?'APPLY WITH BOOST':'APPLY STANDARD') : 'SKIP — low score';
-  return {total:total,cli:cli,job:job,mat:mat,decision:decision};
+  var total=cli+job+mat+SAT_PENALTY;
+  /* Recovery-review decision bands */
+  var decision;
+  if(total>=16 && mat>=4) decision='APPLY WITH BOOST';
+  else if(total>=14)      decision='APPLY STANDARD';
+  else if(total>=12)      decision='RECOVERY REVIEW — re-score; justify to 14 if legitimate';
+  else if(total>=10)      decision='MARGINAL — recover 1-2 pts if legitimate, else skip';
+  else                    decision='SKIP — score too low';
+  return {total:total,cli:cli,job:job,mat:mat,sat:SAT_PENALTY,decision:decision};
 }
 function barRow(label,v,max){return '<div style="margin:6px 0"><div class="flex" style="justify-content:space-between"><span class="note">'+label+'</span><span class="note">'+v+'/'+max+'</span></div><div class="bar"><i style="width:'+(100*v/max)+'%"></i></div></div>';}
 function coreText(){ var s=val('job-text')||''; var cut=s.search(/activity on this job|about the client|client'?s recent history/i); if(cut>0) s=s.slice(0,cut); return s.toLowerCase(); }
@@ -804,7 +815,7 @@ function renderScoring(){
 function renderRules(){
   document.getElementById('rules').innerHTML=
     '<div class="card"><div class="eyebrow" style="color:var(--red)">Hard bans</div><p class="note" style="margin-top:6px">Industries: Banking, Finance, Trading, Crypto, Forex, Weapons, Military, Defense, ITAR. Countries: India & Bangladesh (all clients). Companies: Umbrage, Stewart, CVS Health, Lynx. Conditions: fixed &lt;$200, 50+ proposals, survey/test jobs, on-site 2+ days/week. → instant skip, 0 connects. Allowed regions: United States and Europe; India and Bangladesh remain banned.</p>'
-    +'<p class="note" style="margin-top:8px"><b>Government and public-sector AI, data, automation and voice work is ALLOWED</b> — it is not a banned industry. Proposal saturation: under 20 no penalty, 20–50 subtract 1, 50+ skip. A busy job is a scoring penalty, never an automatic ban.</p></div>'
+    +'<p class="note" style="margin-top:8px"><b>Government and public-sector AI, data, automation and voice work is ALLOWED</b> — it is not a banned industry. Proposal saturation: under 20 = 0 penalty, 20-50 = 0 penalty, 50+ = -2 on total score. Saturation is never an automatic ban.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Apply threshold (Saqib, 14 July)</div><p class="note" style="margin-top:6px">Allowed regions: <b>United States and Europe</b> (India and Bangladesh remain banned countries). Budget tiers: <b>$85+/hr ideal</b> (full budget point) · <b>$70-84/hr</b> good, we bid above their budget · <b>$50-69/hr</b> review, minus 1 · <b>under $50/hr</b> flagged as well below target, review critically, not an auto-ban. One-time fixed <b>$1000+</b>. <b>BID FLOOR $85/hr</b>, never below the posted profile rate. Standard band <b>$85-110/hr</b>, set per job by Saqib/Usman.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Fees (June 2026)</div><p class="note" style="margin-top:6px">Old 20/10/5% tiers retired May 2025. Freelancer fee variable 0–15%, shown before submit (~10% typical; AI specialists often 0–5%). Connects $0.15 each — standard 6 = $0.90, large up to 16 = $2.40. Freelancer Plus $19.99/mo. ID badge = 35 connects ($5.25). PKR payout via Direct to Local Bank $0.99 (personal accounts). Quote = desired net ÷ 0.90.</p></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Flow</div><p class="note" style="margin-top:6px">Bidder takes their 1-hour window on Saqib\u2019s personal profile (single login) → shortlist US or Europe jobs meeting the threshold, score 19 points → post job link + 2–3 bullet WHY to the group → Usman/Saqib review and put real connects behind it → proposal sent. Owners/Usman act anytime. Reply to clients within 2h. Logs are auto-generated here — no manual sheet entry for repetitive items.</p></div>';
@@ -914,13 +925,7 @@ function renderGuide(){
 /* ============================ ASK AI (demo + live) ============================ */
 var AGENCY_CONTEXT = buildContext();
 function buildContext(){
-  return `You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency (ai-advocate-ops-hub.vercel.app). Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer. Agency: AI ADVOCATE HOLDING LLC. Co-owners (equal): Saqib Shahzad + Waqas Riaz. Manager: Usman Saeed. Team: Sadia (proposals), Subhan (profile/SEO), Hamza + Fiza (research), Sana (design), Ayesha (UI), Zeb (builder). RATE: Saqib's posted Upwork profile rate is $85.00/hr. BID FLOOR is $85/hr; NEVER quote below the posted profile rate, it undercuts the anchor and signals he is discountable. Standard bid band is $85-110/hr, set per job by Saqib and Usman. Price by complexity: agentic AI, RAG and LLM builds at $95-110/hr; MLOps and AI MVPs at $90-110/hr; full-stack SaaS at $85-105/hr; chatbots, NLP extraction and retainers at $85-100/hr; automation and API integration at $85-95/hr. BADGE: Saqib is Rising Talent with 100% Job Success. He is NOT Top Rated and NOT Top Rated Plus; never claim either. The live Upwork profile overrides all credentials; never state a credential not on it. HARD BANS (check before scoring, spend 0 Connects): banking ops / trading / forex / crypto / weapons / defense; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED - score it normally. FEES (verified Jul 2026): freelancer service fee is VARIABLE 0-15% per contract, shown and locked at proposal time (the old tiered 20/10/5 was retired May 2025). Client marketplace fee 3-10%. Connects $0.15 each; a standard proposal is about 6 Connects. SCORING (19-point): Client /7 + Job /7 + Match /5 = Total /19. On fixed-price jobs, Client is scored /6 (the "$25/hr average paid" point is N/A). MATCH BUDGET POINT, four tiers on the rate the CLIENT offers: $85/hr or more is ideal, award the full budget point; $70-84/hr is good, award the full budget point but note in the analysis that we will bid above their stated budget; $50-69/hr, award the point then SUBTRACT 1 from the total and mark it for review; under $50/hr, award no budget point, FLAG it as "rate well below target" and review it critically, but this is NOT a ban, still score it and always state the final score. Fixed-price $200+ earns the budget point. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 with Client 5+/Job 5+/Match 3+ = APPLY STANDARD (6 Connects, no boost); below 14 or any hard ban = SKIP. Proposal count is a score penalty, not a ban: under 20 no penalty, 20-50 minus 1 (busy), 50+ minus 2 (heavily saturated). Let the 19-point score decide; never auto-skip on proposal count alone. GUARDRAIL: Quote these exact numbers. Never invent budget, rate, fee, or proposal-count figures. If a number is not in this brief, say you do not have it rather than guessing. Never fabricate metrics or credentials in a proposal - every claimed metric must trace to real work. PROPOSAL OUTPUT RULES: whenever you write a proposal for a job, output exactly two clearly labelled blocks, in this order.
-
-BLOCK 1 heading, written exactly as a bold heading: "### PROPOSAL (paste this into Upwork's Cover Letter box when you apply)". Then the full proposal, 120 to 180 words. For clarity to the bidder: Upwork's application field is confusingly named "Cover Letter", so THIS proposal block is exactly what you paste into that box. It is the main pitch and the first thing the client reads.
-
-BLOCK 2 heading, written exactly as a bold heading: "### INTRO MESSAGE (send this as your first reply AFTER the client responds, or as a boosted-proposal intro. Do NOT paste this into the application)". Then a short opener of 2 to 4 sentences.
-
-Both blocks must be complete and ready to paste, nothing left blank. NEVER output placeholders or bracketed blanks such as [their requirement], [metric], [name], or [detail]. If a specific number is unknown, write a true qualitative sentence instead. NEVER invent a metric, tool, employer, title, or result; use only facts true of Saqib and traceable to real work. NEVER use em dashes or en dashes; use commas and periods. Write in natural, humanized, spoken English, the way a confident senior engineer actually talks; contractions are fine; no corporate filler, no "I am the perfect fit", no "Dear Hiring Manager". Proposal shape: open with the client's exact problem in their own words; give one or two true proof points; show you read the post; give a 2 to 3 step plan; end with one specific question.`;
+  return "You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency, a FULL-SERVICE tech firm. We advertise and deliver ALL of: front-end development, back-end development, full-stack, AI/ML, LLM, RAG, agentic AI, computer vision, NLP, data science, MLOps, QA, UX design, UI, CI/CD, DevOps. We have specialists for every one of these roles. Computer vision counts as data science. Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer, Rising Talent with 100% Job Success (NOT Top Rated). Agency: AI ADVOCATE HOLDING LLC. Rate floor $40/hr and above. APPLY TO THE MAXIMUM number of jobs across all these skills; skip as little as possible. HARD BANS (0 connects, check before scoring): banking ops/trading/forex/crypto, weapons/defense; confirmed India/Bangladesh/Pakistan clients (unknown region is NOT a ban); Umbrage/Stewart/CVS Health/Lynx; fixed-price under $200; survey/test jobs; pure no-code-only or purely non-technical work (VA, admin, copywriting). Government AI/voice/automation work is ALLOWED. PROPOSAL COUNT = SCORE PENALTY not a ban: under 20 = 0, 20-50 = 0, 50+ = -2; let the /19 decide. SCORING (19-point): Client/7 (fixed-price /6) + Job/7 + Match/5. Match never fails just because the domain differs from AI/ML, because we do full-service. DECISION (recovery-review): 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 = APPLY STANDARD; 12 to under 14 = honestly re-score and justify to 14 if legitimate, do not default to skip; 10 to under 12 = recover 1-2 points only if legitimate else skip; under 10 = skip. Recovery = honest re-scoring, never inflation. HONESTY GATE: never state a credential or metric not backed by the live Upwork profile or live website; only cite genuinely delivered work; never claim Top Rated; no fabrication. Generate bespoke proposals live (no fixed templates): a full PROPOSAL (goes in Upwork Cover Letter box) plus a short INTRO MESSAGE. Proposal 120 to 180 words. No placeholders, no em dashes, natural spoken English.";
 }
 
 var chat=[];
@@ -959,15 +964,15 @@ function mdToHtml(src){
 function pushMsg(role,text){chat.length&&role==='user'?null:null; var c=document.getElementById('chat');var d=document.createElement('div');d.className='msg '+(role==='user'?'user':role==='sys'?'sys':'ai');if(role==='ai'){ d.innerHTML=mdToHtml(text); } else { d.textContent=text; }c.appendChild(d);c.scrollTop=c.scrollHeight;}
 function demoAnswer(q){
   var s=q.toLowerCase();
-  if(/ban|skip|avoid|black/.test(s)) return 'Hard bans (instant skip, 0 connects): Banking, Finance, Trading, Crypto, Forex, Government, Military, Defense, ITAR, GovCloud, FedRAMP, CMMC; clients in India, Bangladesh, or Pakistan; companies Umbrage, Stewart, CVS Health, Lynx; fixed under $200, survey/test jobs, on-site 2+ days/week. Proposal count is a penalty, not a ban: under 20 none, 20-50 minus 1, 50+ minus 2.';
+  if(/ban|skip|avoid|black/.test(s)) return 'Hard bans (instant skip, 0 connects): banking/trading/forex/crypto, weapons/defense; confirmed clients in India, Bangladesh, or Pakistan (unknown region is NOT a ban); companies Umbrage, Stewart, CVS Health, Lynx; fixed under $200; survey/test jobs; pure non-technical work (VA, admin, copywriting). Government AI/voice/automation is ALLOWED. Proposal saturation: under 20 = 0, 20-50 = 0, 50+ = -2 on total. Saturation is a score penalty, never a ban.';
   if(/score|19|point|evaluate/.test(s)) return '19-point score: Client/7 + Job/7 + Match/5. 16-19 with Match 4+ apply with boost; 14-15 apply standard; below 14 skip. Hard bans override to skip. Mid-tier verified clients ($1k–$50k) score highest.';
   if(/fee|connect|cost|charge|payout|pkr/.test(s)) return 'Fees: variable 0–15% shown before submit (~10% typical). Connects $0.15 each (6 = $0.90). Plus $19.99/mo. ID badge 35 connects. PKR via Direct to Local Bank $0.99. Quote = net ÷ 0.90.';
   if(/slot|window|time|hour|shift/.test(s)) return 'One seat at a time on Saqib\u2019s personal profile. Log out when done so the next person can log in. Owners (Saqib, Waqas), Usman, and Zeb can act anytime.';
   if(/kaleem/.test(s)) return 'Kaleem is a learner on the team with full app access. Give extra step-by-step guidance when helping them.';
   if(/template|t1|t2|t3|proposal|cover/.test(s)) return 'Use the Evaluate & Propose tab: paste the job, score it, then generate a problem-first proposal + cover letter from the matching template (T1–T12). Personalize the opener with the client\u2019s own words.';
-  if(/threshold|apply|budget|rate|\$60|\$85|\$1000/.test(s)) return 'Apply threshold: allowed regions United States and Europe (India, Bangladesh, and Pakistan banned). Budget tiers: $85+/hr is ideal, $70-84/hr is good, $50-69/hr costs 1 score point, under $50/hr is flagged as well below target and reviewed critically but not auto-banned. Or $1000+ fixed. BID FLOOR is $85/hr, never bid below the posted profile rate. Standard band $85-110/hr, set per job by Saqib/Usman.';
+  if(/threshold|apply|budget|rate|\$40|\$85|\$200/.test(s)) return 'Rate floor: $40/hr (full-service agency). Below $40/hr is flagged for review, not auto-banned. Fixed-price: $200+ earns the budget point. Decision bands: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 = APPLY STANDARD; 12-13 = RECOVERY REVIEW (re-score honestly); 10-11 = MARGINAL (recover 1-2 pts if legitimate); under 10 = SKIP. Match never auto-fails just because the domain is not AI/ML, we are full-service.';
   if(/profile|agency|personal/.test(s)) return 'All bidding is on Saqib\u2019s PERSONAL freelancer profile, not the agency. Single login, one person at a time.';
-  return 'Operating summary: bid on Saqib\u2019s personal freelancer profile, allowed regions United States and Europe (India, Bangladesh, and Pakistan banned), over $60/hr or $1000+ fixed; score 19 points (16-19 with Match 4+ boost, 14-15 standard, below 14 skip); respect hard bans; Usman/Saqib approve connects. Ask about bans, scoring, fees, slots, templates, or the flow.';
+  return 'Operating summary: full-service agency (AI, ML, full-stack, DevOps, UX and more). Rate floor $40/hr. Score every eligible job on 19 points; apply to the maximum. Decision bands: 16-19 boost, 14-15 standard, 12-13 recovery review, 10-11 marginal, under 10 skip. Saturation 50+ = -2, not a ban. Hard bans: banking/crypto/defense, confirmed India/Bangladesh/Pakistan, banned companies, fixed under $200, pure non-technical work. Government AI is allowed. Ask about bans, scoring, fees, proposals, or the flow.';
 }
 async function askAI(){
   var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
