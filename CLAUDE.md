@@ -45,7 +45,7 @@ This repo builds the live app at ai-advocate-ops-hub.vercel.app (Vite + React, b
 ## Team roster (v11, July 2026)
 | Name | Role | Notes |
 |---|---|---|
-| Saqib Shahzad | Owner, senior AI/ML consultant | Posted profile rate $85/hr. Bid floor $85, band $85-110/hr. Upwork **Rising Talent**, 100% Job Success (NOT Top Rated). ADMIN |
+| Saqib Shahzad | Owner, senior AI/ML consultant | Agency rate floor **$40/hr and above, set per job** (v9.3). Upwork **Rising Talent**, 100% Job Success (NOT Top Rated). ADMIN |
 | Zeb (Jahanzaib) | Co-admin, ops lead | ADMIN — can force-release gate |
 | Waqas Riaz | Team member | Full access |
 | Usman Saeed | Team member | Full access |
@@ -77,19 +77,22 @@ When working across VS Code Claude, Claude Code web, or Claude.ai:
 - NEVER deploy to `main` without the owner's exact phrase: APPROVED - DEPLOY.
 
 ## Proposal and cover-letter output (whenever generating them)
+- Proof points come ONLY from the **AGENCY_PROOF_BANK** constant in `index.html` (real results published on the agency's live Upwork profile) or from facts in the user's own letter. Pick the ONE bank entry matching the job's domain, never list all. NEVER invent a number not in the bank or the user's text. Platform badges (Job Success Score, Rising Talent, star ratings) are NOT proof.
+- One consistent voice: "we" (the agency team) throughout — never mix "Saqib" and "we". NEVER mention the agency's Upwork job count, tenure, account age, or newness; lead with portfolio results and team expertise only.
 - Always output a full PROPOSAL and a full COVER LETTER, both complete and ready to paste.
 - NEVER use em dashes or en dashes. Use commas and periods.
 - NEVER leave placeholders or bracketed blanks. If a number is unknown, write a true qualitative sentence instead.
 - Natural, humanized, spoken English. No "Dear Hiring Manager", no "I am the perfect fit".
 - Shape: open with the client's exact problem in their words; one or two true proof points; a 2 to 3 step plan; end with one specific question. Proposal 120 to 180 words; cover letter 2 to 4 sentences.
 
-## Current operating numbers (v9, July 2026) - use exactly
+## Current operating numbers (v9.3, July 2026) - use exactly
 - Hard bans (skip before scoring, 0 Connects): banking, trading, forex, crypto, weapons, defense; clients confirmed in India, Bangladesh, or Pakistan (unknown region is NOT a ban); Umbrage, Stewart, CVS Health, Lynx; fixed-price under $200; survey/test jobs. Government and public-sector AI, data, automation, and voice work is ALLOWED.
-- Proposal count: under 20 no penalty; 20 to 50 subtract 1 (busy); 50+ AUTO-SKIP. Upwork never shows a bucket above "50+".
-- Scoring (19-point): Client /7 (fixed-price /6, the "$25/hr avg paid" point is N/A) + Job /7 + Match /5. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 = APPLY STANDARD; below 14 or any hard ban = SKIP. There is no REVIEW band.
+- Proposal count (v9.3): a score penalty, never a ban. Under 20 = 0; 20 to 50 = 0; 50+ = subtract 2. Let the /19 decide. Upwork never shows a bucket above "50+".
+- Scoring (19-point, v9.3 recovery-review): Client /7 (fixed-price /6, the "$25/hr avg paid" point is N/A) + Job /7 + Match /5. Match never fails just because the domain differs from AI/ML — we are full-service. Decision: 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 = APPLY STANDARD; 12 to under 14 = recovery review (honestly re-score, justify to 14 if legitimate); 10 to under 12 = marginal (recover 1-2 points only if legitimate, else skip); under 10 or any hard ban = SKIP. Recovery = honest re-scoring, never inflation.
+- New-client fairness (v9.3): a client new to Upwork is never a red flag by itself. Do not deduct for $0 spent, 0 hires, or no reviews on a new account — score those as N/A (neutral) and award what the client does qualify for (payment verified, allowed region). Integrity check: a very new account with large spend/many hires/many 5-star reviews = flag "verify client authenticity: inconsistent history" and do not award those points at face value.
 - Fees: freelancer service fee is variable 0-15% per contract. The flat 10% and the tiered 20/10/5 are RETIRED. Client fee 3-10%. Connects $0.15 each; standard proposal about 6 Connects.
-- Rate (updated 14 July 2026, personal profile only; agency rate is out of scope): Saqib's **posted Upwork profile rate is $85.00/hr**. **BID FLOOR $85/hr, never quote below the posted rate** (undercutting the posted anchor signals he is discountable, and $85 already sits below Upwork's $100/hr median for ML engineers). **Standard bid band $85-110/hr**, set per job by Saqib and Usman. By complexity: agentic AI / RAG / LLM $95-110; MLOps and AI MVP $90-110; full-stack SaaS $85-105; chatbot / NLP / retainer $85-100; automation / API integration $85-95. Revisit upward to $110-130 once Top Rated is earned (needs $1,000 earned + 90-day history).
-- Match budget point, four tiers on the rate the CLIENT offers: **$85+/hr** ideal, full point. **$70-84/hr** good, full point, but note we will bid above their budget. **$50-69/hr** award the point then **subtract 1** from the total and mark for review. **Under $50/hr** no budget point, **flag "rate well below target", review critically, but do NOT ban** — still score it and always state the final score. Fixed-price $200+ earns the point.
+- Rate (updated 17 July 2026, v9.3, agency full-service): **rate floor is $40/hr and above, set per job**. The old $85 personal bid floor is **RETIRED — do not revert it**. The agency is full-service (front-end, back-end, full-stack, AI/ML, LLM/RAG/agentic AI, computer vision, NLP, data science, MLOps, QA, UX/UI, CI/CD, DevOps, mobile) and applies to the maximum number of jobs across all these skills.
+- Budget point (v9.3, matches the app): hourly **$40+/hr** earns the point; **$30-39/hr** borderline, 1 point, review; **below $30/hr** flag "below rate floor — review before bidding", review critically, but do NOT ban — still score it and always state the final score. Fixed-price $200+ earns the point.
 - Badge: **Rising Talent, 100% Job Success. NOT Top Rated.** Never claim Top Rated or Top Rated Plus in any proposal or profile copy.
 
 ## Working style
