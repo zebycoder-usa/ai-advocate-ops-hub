@@ -1094,6 +1094,27 @@ async function callBackend(opts){
   return txt;
 }
 
+function logCLEvalToSheet(scoreJson, clText, jdText){
+  try{
+    var assignee=ME?ME.name:'';
+    var jdFirst=(jdText||'').trim().split('\n')[0].slice(0,120);
+    var total=0; CL_RUBRIC.forEach(function(r){total+=scoreJson[r.id]||0;});
+    var verdict=total>=9.5?'SEND IT':total>=8.5?'ALMOST - REWRITE':'NEEDS REWRITE';
+    fetch(SEAT_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'logCLEval',name:assignee,row:{
+        assignee:assignee,
+        jobTitle:jdFirst,
+        jobLink:(document.getElementById('cl-job-link')||{}).value||'',
+        hiringRate:'', clientRatings:'', payVerified:'',
+        totalSpend:'', proposals:'', interviewing:'', invitesSent:'', unansweredInvites:'',
+        flag:'', applied:'', fixedHourly:'',
+        highBid:'', avgBid:'', lowBid:'',
+        connects:'6', bid:'$40+/hr', reason:total.toFixed(1)+'/10 '+verdict,
+        jobPosted:'', openJobs:''
+      }})}).catch(function(){});
+  }catch(err){ /* silent — logging must never break the score flow */ }
+}
+
 /* ============================ THEME + MANUAL STATE ============================ */
 var THEMES=['emerald','sapphire','violet','amber','daylight'];
 function setTheme(name){
