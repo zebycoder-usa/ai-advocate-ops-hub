@@ -1040,6 +1040,13 @@ var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Ag
 
 var CL_REWRITE_SYSTEM='You are a world-class Upwork proposal writer for Saqib Shahzad, senior AI/ML/LLM engineer at AI Advocate Agency. You rewrite proposals to hit 9.5/10 on the scoring rubric.\n\nRULES you must follow exactly:\n- Open with the client\'s exact problem in their own words (not Saqib\'s credentials)\n- Include exactly 2 true proof points — only use facts present in the original proposal or derivable from Saqib\'s real profile (senior AI/ML engineer, FastAPI/React/GenAI/RAG/LLM agents). NEVER invent metrics.\n- Saqib is Rising Talent with 100% Job Success. He is NOT Top Rated and NOT Top Rated Plus. Never claim a badge or credential he does not have. Agency rate floor is $40/hr; the bid is set per job, never state a specific rate unless the job post or user provides it.\n- Include a 2–3 step numbered plan specific to this brief\n- End with one sharp question relevant to this exact job\n- Natural, spoken English. No em dashes. No en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders.\n- Proposal length: 120–180 words exactly.\n\nReturn ONLY the rewritten proposal text. No preamble, no explanation, no score.';
 
+function parseScoreJson(raw){
+  var s=(raw||'').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+  var start=s.indexOf('{'), end=s.lastIndexOf('}');
+  if(start!==-1&&end>start) s=s.slice(start,end+1);
+  try{ return JSON.parse(s); }catch(e){ return {_raw:s,hook:0,proof:0,plan:0,close:0,style:0,len:0,summary:'Could not parse AI response. Raw: '+s.slice(0,300)}; }
+}
+
 async function scoreCL(){
   var cl=document.getElementById('cl-text').value.trim();
   var jd=document.getElementById('cl-jd').value.trim();
@@ -1049,8 +1056,8 @@ async function scoreCL(){
   var wc=clWordCount(cl);
   var userMsg='COVER LETTER / PROPOSAL ('+wc+' words):\n'+cl+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
   try{
-    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:800});
-    var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:1600});
+    var json=parseScoreJson(raw);
     renderCLScore(json);
     logCLEvalToSheet(json, cl, jd);
   }catch(e){
@@ -1066,11 +1073,11 @@ async function improveCL(){
   out.innerHTML='<div class="card"><div class="muted">Rewriting to 9.5+… this takes ~10 seconds.</div></div>';
   var userMsg='Rewrite this proposal to 9.5/10.\n\nORIGINAL PROPOSAL:\n'+cl+(jd?'\n\nJOB DESCRIPTION (for context):\n'+jd:'');
   try{
-    var rewritten=await callBackend({system:CL_REWRITE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:500});
+    var rewritten=await callBackend({system:CL_REWRITE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:900});
     // Now score the rewritten version
     var scoreMsg='COVER LETTER / PROPOSAL ('+clWordCount(rewritten)+' words):\n'+rewritten+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
-    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:scoreMsg,model:'claude-sonnet-4-6',max_tokens:800});
-    var json=JSON.parse((raw||'').replace(/```[a-z]*\n?/g,'').replace(/```/g,'').trim());
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:scoreMsg,model:'claude-sonnet-4-6',max_tokens:1600});
+    var json=parseScoreJson(raw);
     json.rewritten=rewritten;
     renderCLScore(json);
     logCLEvalToSheet(json, rewritten, jd);
