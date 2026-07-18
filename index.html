@@ -542,11 +542,25 @@ function autofill(P){
   setVal('j-ban', P.bans.length>0);
 }
 function scoreManual(){
-  var cli=0; cli+= chk('c-verified')?2:0; cli+= (+val('c-hire'));
-  var sp=val('c-spend'); cli+= (sp==='2'?2:(sp==='1'||sp==='1b'?1:0));
   var fixed=val('b-type')==='fixed';
-  if(!fixed) cli+=1; /* "$25/hr average paid" point is N/A on fixed-price (v9.1) */
-  var cliMax=fixed?6:7; if(cli>cliMax)cli=cliMax;
+  /* R13 new-client fairness: for a client that is genuinely NEW to Upwork, the
+     unknowable history signals (total spend, hire count, and the "$25/hr avg
+     paid" point) are N/A — removed from BOTH earned and the achievable max, the
+     same way the $25/hr-avg point is already N/A on fixed-price. Fairness fires
+     ONLY for tenure==='new'; 'unknown' and 'established' are unchanged. */
+  var isNew = val('c-tenure')==='new';
+  /* client components */
+  var verifiedPts = chk('c-verified')?2:0;
+  var hirePts = (+val('c-hire'));
+  var sp=val('c-spend'); var spendPts = (sp==='2'?2:(sp==='1'||sp==='1b'?1:0));
+  var avg25Pts = fixed?0:1;              /* "$25/hr average paid" point */
+  /* which client dims are N/A for THIS job */
+  var naHire  = isNew;
+  var naSpend = isNew;
+  var naAvg25 = fixed || isNew;          /* N/A on fixed (existing) OR for a new client */
+  var cli = verifiedPts + (naHire?0:hirePts) + (naSpend?0:spendPts) + (naAvg25?0:avg25Pts);
+  var cliMax = 2 + (naHire?0:2) + (naSpend?0:2) + (naAvg25?0:1);
+  if(cli>cliMax)cli=cliMax;
   var job=0; job+= (+val('j-scope'));
   var amt=parseFloat(val('b-amt'))||0, bt=val('b-type');
   /* Rate floor $40/hr (full-service agency; personal floor was $85 but agency bids from $40) */
@@ -559,14 +573,31 @@ function scoreManual(){
   job+= (pr==='0'||pr==='1')?2:(pr==='2'?1:0); job+= chk('j-long')?1:0; if(job>7)job=7;
   var mat=0; mat+=(+val('m-match')); mat+=chk('m-proof')?1:0; mat+=chk('c-us')?1:0; if(mat>5)mat=5;
   var total=cli+job+mat+SAT_PENALTY;
-  /* Recovery-review decision bands */
+  var achievableMax = cliMax + 7 + 5;    /* knowable-points ceiling for THIS job */
+  /* Integrity: a brand-new account showing large spend/hires is internally
+     inconsistent — flag it and do not award those (already N/A'd) history points. */
+  var integrity = isNew && (spendPts>0 || hirePts>0);
+  /* Decision bands. NON-new clients use today's ABSOLUTE bands unchanged (this
+     keeps every existing pinned result, incl. fixed-price, byte-identical). NEW
+     clients are judged PROPORTIONALLY against their achievable max, so N/A dims
+     never count against them. When achievableMax===19 the two are identical. */
   var decision;
-  if(total>=16 && mat>=4) decision='APPLY WITH BOOST';
-  else if(total>=14)      decision='APPLY STANDARD';
-  else if(total>=12)      decision='RECOVERY REVIEW — re-score; justify to 14 if legitimate';
-  else if(total>=10)      decision='MARGINAL — recover 1-2 pts if legitimate, else skip';
-  else                    decision='SKIP — score too low';
-  return {total:total,cli:cli,job:job,mat:mat,sat:SAT_PENALTY,decision:decision};
+  if(!isNew){
+    if(total>=16 && mat>=4) decision='APPLY WITH BOOST';
+    else if(total>=14)      decision='APPLY STANDARD';
+    else if(total>=12)      decision='RECOVERY REVIEW — re-score; justify to 14 if legitimate';
+    else if(total>=10)      decision='MARGINAL — recover 1-2 pts if legitimate, else skip';
+    else                    decision='SKIP — score too low';
+  } else {
+    var f = achievableMax/19;
+    if(total>=16*f && mat>=4) decision='APPLY WITH BOOST';
+    else if(total>=14*f)      decision='APPLY STANDARD';
+    else if(total>=12*f)      decision='RECOVERY REVIEW — re-score; justify to 14 if legitimate';
+    else if(total>=10*f)      decision='MARGINAL — recover 1-2 pts if legitimate, else skip';
+    else                      decision='SKIP — score too low';
+  }
+  return {total:total,cli:cli,job:job,mat:mat,sat:SAT_PENALTY,decision:decision,
+    cliMax:cliMax,achievableMax:achievableMax,isNew:isNew,integrity:integrity};
 }
 function barRow(label,v,max){return '<div style="margin:6px 0"><div class="flex" style="justify-content:space-between"><span class="note">'+label+'</span><span class="note">'+v+'/'+max+'</span></div><div class="bar"><i style="width:'+(100*v/max)+'%"></i></div></div>';}
 function coreText(){ var s=val('job-text')||''; var cut=s.search(/activity on this job|about the client|client'?s recent history/i); if(cut>0) s=s.slice(0,cut); return s.toLowerCase(); }
@@ -589,25 +620,28 @@ function evalDecision(){
   var jd=val('job-text')||'';
   var P=parseJob(jd);
   var s=scoreManual();
-  var flags=P.flags||[];
+  var flags=(P.flags||[]).slice();
+  if(s.integrity) flags.push('verify client authenticity: inconsistent history');
+  var base={cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, total:s.total,
+    cliMax:s.cliMax, max:(s.isNew?s.achievableMax:19), isNew:s.isNew, flags:flags};
   if(P.bans && P.bans.length){
-    return {banned:true, bans:P.bans.slice(), flags:flags,
-      total:s.total, cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, decision:'SKIP — HARD BAN'};
+    base.banned=true; base.bans=P.bans.slice(); base.decision='SKIP — HARD BAN';
+    return base;
   }
-  return {banned:false, bans:[], flags:flags,
-    total:s.total, cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, decision:s.decision};
+  base.banned=false; base.bans=[]; base.decision=s.decision;
+  return base;
 }
 function renderDecisionCard(d){
-  var fixed=val('b-type')==='fixed';
-  var cliMax=fixed?6:7;
-  var col=d.banned?'var(--red)':(d.total>=14?'var(--green)':d.total>=10?'var(--amber)':'var(--red)');
-  var pill=d.banned?'<span class="pill no">SKIP — HARD BAN</span>'
-    :'<span class="pill '+(d.total>=14?'ok':d.total>=10?'warn':'no')+'">'+esc(d.decision)+'</span>';
+  var band=d.banned?'no':/BOOST|APPLY/.test(d.decision)?'ok':/RECOVERY|MARGINAL/.test(d.decision)?'warn':'no';
+  var col=band==='ok'?'var(--green)':band==='warn'?'var(--amber)':'var(--red)';
+  var pill='<span class="pill '+band+'">'+esc(d.banned?'SKIP — HARD BAN':d.decision)+'</span>';
+  var denom=d.max||19;
   var h='<div class="card"><div class="eyebrow">Decision (scored in-app, deterministic — not the model)</div>'
     +'<div class="flex" style="justify-content:space-between;align-items:center;margin-top:6px">'
-    +'<div class="scorebig" style="color:'+col+'">'+d.total+' <span style="font-size:16px;font-weight:400;color:var(--muted)">/ 19</span></div>'+pill+'</div>'
-    +barRow('Client',d.cli,cliMax)+barRow('Job',d.job,7)+barRow('Match',d.mat,5);
+    +'<div class="scorebig" style="color:'+col+'">'+d.total+' <span style="font-size:16px;font-weight:400;color:var(--muted)">/ '+denom+'</span></div>'+pill+'</div>'
+    +barRow('Client',d.cli,d.cliMax||7)+barRow('Job',d.job,7)+barRow('Match',d.mat,5);
   if(d.sat) h+='<p class="note" style="margin-top:6px;color:var(--amber)">Saturation penalty: '+d.sat+' (50+ proposals)</p>';
+  if(d.isNew) h+='<p class="note" style="margin-top:6px">New-client fairness: unknowable history is N/A, so this job is judged on '+denom+' knowable points (not out of 19).</p>';
   if(d.banned) h+='<div class="card" style="margin-top:10px;border-color:var(--red)"><div class="eyebrow" style="color:var(--red)">Hard bans</div><ul class="note" style="margin-top:6px">'+d.bans.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul></div>';
   if(d.flags && d.flags.length) h+='<div class="note" style="margin-top:8px;color:var(--amber)">Flags: '+d.flags.map(esc).join('; ')+'</div>';
   h+='<div class="src" style="margin-top:10px">Scored in-app from the signal boxes and hard-ban rules. The model writes proposal prose only, never the score.</div></div>';

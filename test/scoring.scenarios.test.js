@@ -122,13 +122,12 @@ describe('Phase 3 scenarios — penalties & flags (never a ban)', () => {
     expect(P.bans).toEqual([]); // below-rate and newness never ban
   });
 
-  it('KNOWN GAP (R13): deterministic scoreManual does NOT apply new-client fairness', () => {
-    // Documented v9.3 rule: $0-spent on a NEW account should be N/A (neutral),
-    // not 0. scoreManual has no tenure input and scores $0 spend as 0 points.
-    // Fairness currently lives only in the model prompt (runEval). Pinning the
-    // deterministic behavior; the refactor must port fairness into code.
+  it('fairness is tenure-gated: an UNKNOWN-tenure client is not treated as new (R13)', () => {
+    // BASE sets no c-tenure -> default 'unknown'. R13 fairness fires ONLY for
+    // tenure==='new', so 'unknown'/'established' keep today's absolute scoring:
+    // $0 spend still scores 0 here (no fairness credit for a non-new client).
     const r = scoreWith(app, { ...BASE, 'c-spend': '0' });
-    expect(r.cli).toBe(5); // verified2 + hire2 + spend0 + hourly1 = 5 (no fairness credit)
+    expect(r.cli).toBe(5); // verified2 + hire2 + spend0 + hourly1 = 5 (unchanged)
   });
 
   it('region outside allowed set -> FLAG, not skip', () => {
