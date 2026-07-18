@@ -81,3 +81,31 @@ describe('CLEval clevalRowFrom() decision mapping', () => {
     expect(row.reason).toContain('Banned industry');
   });
 });
+
+describe('CLEval postCLEval() is staging-safe (never writes to the live backend)', () => {
+  const R = { jobTitle: 'X', proposalStatus: 'Un Opened' };
+
+  it('unset endpoint -> no network write at all', () => {
+    app.window.CLEVAL_BACKEND = '';
+    const before = app.fetchCalls.length;
+    app.window.postCLEval(R, 'ev_test');
+    expect(app.fetchCalls.length).toBe(before); // no-op
+  });
+
+  it('REFUSES to write when CLEVAL_BACKEND equals the live SEAT_BACKEND', () => {
+    app.window.CLEVAL_BACKEND = app.window.SEAT_BACKEND; // misconfiguration
+    const before = app.fetchCalls.length;
+    app.window.postCLEval(R, 'ev_test');
+    expect(app.fetchCalls.length).toBe(before); // hard-refused, no write to live
+  });
+
+  it('writes only to a DISTINCT staging endpoint', () => {
+    const STAGING = 'https://script.google.com/macros/s/STAGING_CLONE/exec';
+    app.window.CLEVAL_BACKEND = STAGING;
+    const before = app.fetchCalls.length;
+    app.window.postCLEval(R, 'ev_test');
+    expect(app.fetchCalls.length).toBe(before + 1);
+    expect(String(app.fetchCalls[app.fetchCalls.length - 1])).toBe(STAGING);
+    app.window.CLEVAL_BACKEND = ''; // restore no-op default for other tests
+  });
+});

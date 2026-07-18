@@ -1247,7 +1247,10 @@ function clevalId(parts){
    no-op (local/dev/tests never write). Failures are swallowed so logging can never
    break the decision flow. The server owns Assignee/Date/Time/Status. */
 function postCLEval(rowObj, evId){
-  if(!CLEVAL_BACKEND) return;
+  /* Staging-only. No endpoint configured -> no-op. Hard refuse to write CLEval to
+     the LIVE gate backend even if misconfigured, so a preview can never touch the
+     live Ops DB / CLEval. */
+  if(!CLEVAL_BACKEND || CLEVAL_BACKEND===SEAT_BACKEND) return;
   try{
     fetch(CLEVAL_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'logCLEval', secret:CLEVAL_SECRET, evaluationId:evId,
