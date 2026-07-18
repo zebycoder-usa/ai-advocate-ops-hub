@@ -501,7 +501,13 @@ function parseJob(text){
   P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(t);
   /* ---- TASK 2: region detection. US + Europe allowed; India/Bangladesh hard ban ---- */
   P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|england|scotland|wales|ireland|germany|german|france|french|spain|spanish|italy|italian|netherlands|dutch|belgium|sweden|swedish|norway|denmark|danish|finland|finnish|poland|polish|portugal|portuguese|austria|austrian|switzerland|swiss|czech|greece|greek|romania|hungary|berlin|munich|london|paris|madrid|amsterdam|stockholm|dublin|zurich|lisbon|warsaw)\b/i.test(t);
-  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune)\b/i.test(t) && !/\bindiana\b/i.test(low);
+  /* R14: Pakistan is a required hard-ban country. Includes the country word,
+     the demonym (pakistani), and major cities. All matched with \b whole-word
+     boundaries; none of the added tokens is a whole-word substring of an
+     allowed US/Europe location, so no extra guard beyond the 'indiana' one is
+     needed (e.g. 'islamabad' cannot match 'Islamic'; 'multan' cannot match
+     'multi'). */
+  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune|pakistan|pakistani|karachi|lahore|islamabad|rawalpindi|faisalabad|multan|peshawar|quetta)\b/i.test(t) && !/\bindiana\b/i.test(low);
   P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : ((P.usOnly||/\bunited states\b/i.test(t))?'US':'Other'));
   P.verified=/payment (?:method )?verified|verified payment/i.test(t);
   var sp=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);

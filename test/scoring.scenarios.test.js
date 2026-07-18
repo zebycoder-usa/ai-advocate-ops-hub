@@ -67,12 +67,37 @@ describe('Phase 3 scenarios — hard BANS (parseJob)', () => {
     expect(P.bans).toContain('Client in India/Bangladesh/Pakistan (hard ban)');
   });
 
-  it('KNOWN GAP (R14): a Pakistan-only client is NOT auto-detected today', () => {
-    // The ban message names Pakistan but the isBanCountry regex omits it.
-    // Pinning current (incorrect) behavior; fix lands in the refactor phase.
-    const P = app.parseJob('Client located in Karachi, Pakistan. Hourly $70/hr.');
+  it('confirmed Pakistan client -> hard BAN (R14 fixed)', () => {
+    const P = app.parseJob('Client located in Islamabad, Pakistan. Hourly $70/hr.');
+    expect(P.isBanCountry).toBe(true);
+    expect(P.bans).toContain('Client in India/Bangladesh/Pakistan (hard ban)');
+  });
+
+  it('Karachi client -> hard BAN', () => {
+    const P = app.parseJob('Remote team based in Karachi. Hourly $70/hr.');
+    expect(P.isBanCountry).toBe(true);
+    expect(P.bans).toContain('Client in India/Bangladesh/Pakistan (hard ban)');
+  });
+
+  it('Lahore client -> hard BAN', () => {
+    const P = app.parseJob('Startup in Lahore looking for React devs. $80/hr.');
+    expect(P.isBanCountry).toBe(true);
+    expect(P.bans).toContain('Client in India/Bangladesh/Pakistan (hard ban)');
+  });
+
+  it('an allowed location is NOT falsely banned by the new tokens', () => {
+    const P = app.parseJob('Client in Amsterdam, Netherlands. Hourly $75/hr.');
     expect(P.isBanCountry).toBe(false);
-    expect(P.bans).not.toContain('Client in India/Bangladesh/Pakistan (hard ban)');
+    expect(P.bans).toEqual([]);
+  });
+
+  it('\\b guards: "Islamic" does not match islamabad; "Pakistani" does ban', () => {
+    // 'islamabad' must not match the substring 'Islam' -> not a ban country.
+    const a = app.parseJob('We build tools for an Islamic art museum in Paris.');
+    expect(a.isBanCountry).toBe(false);
+    // 'pakistani' (demonym) is an added token -> ban.
+    const b = app.parseJob('Client is a Pakistani-owned startup. Hourly $80/hr.');
+    expect(b.isBanCountry).toBe(true);
   });
 
   it('fixed-price under $200 -> hard BAN', () => {
