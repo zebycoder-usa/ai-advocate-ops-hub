@@ -250,6 +250,12 @@ function idemSet_(evId,status,rowNumber){
 /* Serialized reserve+append+commit. A retry with the same evaluationId returns
    the existing row instead of duplicating (survives a mid-write crash). */
 function handleLogCLEval_(data, name){
+  /* Shared-secret gate. Reads Script Property LOG_SECRET and accepts ONLY an
+     exact match. Fail-closed: if LOG_SECRET is unset, or the request's secret is
+     missing/wrong, reject with {ok:false,error:'unauthorized'} and write nothing.
+     Only postCLEval() calls this, and it sends secret:CLEVAL_SECRET. */
+  var want=PropertiesService.getScriptProperties().getProperty('LOG_SECRET');
+  if(!want || !data || data.secret!==want) return {ok:false,error:'unauthorized'};
   var evId = data.evaluationId || (data.row && data.row.evaluationId) || "";
   var lock=LockService.getScriptLock();
   try{ lock.waitLock(LOCK_MS); } catch(e){ return {ok:false,error:"CLEval busy, try again in a moment."}; }
