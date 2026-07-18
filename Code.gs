@@ -20,7 +20,8 @@ var TABS = {
   ActivityLog: ["Timestamp","User","Type","Decision","Client","Job","Match","Total /19","Country","Budget","Duration (min)","Detail","Summary"],
   Sessions:    ["Session ID","User","Login Time","Logout Time","Duration (min)","Duration (h:m)","JDs","Proposals","Copies","Status"],
   Queue:       ["Holder","HolderSince","Waiting","PendingOffer","UpdatedAt","HolderHeartbeat"],
-  CLEval:      ["Assignee","Date","Time PKT","Job Title","Job Link","Hiring Rate","Client Ratings","Payment Method Verified?","Total Spend","Proposals","Interviewing","Invites sent","Unanswered Invites","Flag","Applied?","Fixed/Hourly","High Bid","Avg. Bid","Low bid","No. of Connects","Bid","Reason","Job posted","Open jobs"]
+  CLEval:      ["Assignee","Date","Time PKT","Job Title","Job Link","Hiring Rate","Client Ratings","Payment Method Verified?","Total Spend","Proposals","Interviewing","Invites sent","Unanswered Invites","Flag","Applied?","Fixed/ Hourly","High Bid","Avg. Bid","Low bid","No. of Connects","Bid","Reason/Remarks","Job posted","Open jobs","Ptoposal Status"],
+  _Idempotency:["evaluationId","status","rowNumber","updatedAt"]
 };
 
 /* Must match SEAT_ADMINS in index.html, and the names in its TEAM list. */
@@ -35,7 +36,7 @@ function sheet_(name){
   if(!s){ s = ss_().insertSheet(name); s.appendRow(TABS[name]||["Timestamp","Data"]); s.setFrozenRows(1); }
   return s;
 }
-function setup(){ Object.keys(TABS).forEach(function(n){ sheet_(n); }); readQueue_(); return "setup ok"; }
+function setup(){ Object.keys(TABS).forEach(function(n){ sheet_(n); }); var id=ss_().getSheetByName("_Idempotency"); if(id) id.hideSheet(); readQueue_(); return "setup ok"; }
 function hm_(min){ min=Math.round(min||0); var h=Math.floor(min/60),m=min%60; return h+"h "+m+"m"; }
 
 /* ---- queue I/O ---- */
@@ -194,6 +195,98 @@ function logsOut_(){
 }
 function json_(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}
 
+/* ============================ CLEval (25-col, idempotent, injection-safe) ====
+   Writes all 25 columns in TABS.CLEval order. Assignee, Date (M/d/yyyy),
+   Time PKT (HH:mm Asia/Karachi) and the default "Ptoposal Status" are set here
+   server-side, never trusted from the browser. */
+var CLEVAL_ALLOWED_TABS = {"CLEval":1, "CLEval_StagingTest":1}; /* destination fixed; only these are writable */
+function resolveCLEvalSheet_(name){
+  return sheet_((name && CLEVAL_ALLOWED_TABS[name]) ? name : "CLEval");
+}
+/* Neutralize a leading formula trigger so a pasted title/reason cannot execute. */
+function neutralizeCell_(v){
+  if(v==null) return "";
+  if(typeof v==="string" && /^[=+\-@]/.test(v)) return "'"+v;
+  return v;
+}
+function isUpworkHttps_(u){
+  return typeof u==="string" && /^https:\/\/([a-z0-9-]+\.)*upwork\.com\//i.test(u);
+}
+/* Build the 25 cells in header order. Server-owned fields override the browser. */
+function clevalServerRow_(d, actor){
+  d = d || {};
+  var tz="Asia/Karachi", ts=new Date();
+  var link = isUpworkHttps_(d.jobLink) ? d.jobLink : "";  /* rich-text link applied after append */
+  var cells = [
+    actor || d.assignee || "",                       /* 1  Assignee (server-owned) */
+    Utilities.formatDate(ts,tz,"M/d/yyyy"),          /* 2  Date (server-owned) */
+    Utilities.formatDate(ts,tz,"HH:mm"),             /* 3  Time PKT (server-owned) */
+    d.jobTitle||"",                                  /* 4  Job Title */
+    link,                                            /* 5  Job Link (validated) */
+    d.hiringRate||"", d.clientRatings||"", d.payVerified||"",           /* 6-8 */
+    d.totalSpend||"", d.proposals||"", d.interviewing||"",              /* 9-11 */
+    d.invitesSent||"", d.unansweredInvites||"",                         /* 12-13 */
+    d.flag||"", d.applied||"", d.fixedHourly||"",                       /* 14-16 */
+    d.highBid||"", d.avgBid||"", d.lowBid||"",                          /* 17-19 */
+    d.connects||"", d.bid||"", d.reason||"",                            /* 20-22 */
+    d.jobPosted||"", d.openJobs||"",                                    /* 23-24 */
+    "Un Opened"                                      /* 25 Ptoposal Status (server-owned default) */
+  ];
+  return cells.map(neutralizeCell_);
+}
+/* ---- idempotency ledger (hidden _Idempotency tab) ---- */
+function idemFind_(evId){
+  var s=sheet_("_Idempotency"), last=s.getLastRow();
+  if(last<2) return null;
+  var vals=s.getRange(2,1,last-1,3).getValues();
+  for(var i=vals.length-1;i>=0;i--){ if(String(vals[i][0])===String(evId)) return {row:i+2,status:vals[i][1],rowNumber:vals[i][2]}; }
+  return null;
+}
+function idemSet_(evId,status,rowNumber){
+  var s=sheet_("_Idempotency"), found=idemFind_(evId);
+  if(found) s.getRange(found.row,2,1,3).setValues([[status, rowNumber||found.rowNumber||"", new Date()]]);
+  else s.appendRow([evId,status,rowNumber||"", new Date()]);
+}
+/* Serialized reserve+append+commit. A retry with the same evaluationId returns
+   the existing row instead of duplicating (survives a mid-write crash). */
+function handleLogCLEval_(data, name){
+  var evId = data.evaluationId || (data.row && data.row.evaluationId) || "";
+  var lock=LockService.getScriptLock();
+  try{ lock.waitLock(LOCK_MS); } catch(e){ return {ok:false,error:"CLEval busy, try again in a moment."}; }
+  try{
+    if(evId){
+      var ex=idemFind_(evId);
+      if(ex && String(ex.status)==="COMMITTED" && ex.rowNumber) return {ok:true,row:ex.rowNumber,deduped:true};
+      if(ex && ex.rowNumber){ idemSet_(evId,"COMMITTED",ex.rowNumber); return {ok:true,row:ex.rowNumber,deduped:true}; }
+      idemSet_(evId,"PENDING","");
+    }
+    var sheet=resolveCLEvalSheet_(data.sheet);
+    var row=clevalServerRow_(data.row||{}, name);
+    sheet.appendRow(row);
+    var rowNumber=sheet.getLastRow();
+    var link=(data.row||{}).jobLink;
+    if(isUpworkHttps_(link)){
+      var rt=SpreadsheetApp.newRichTextValue().setText(link).setLinkUrl(link).build();
+      sheet.getRange(rowNumber,5).setRichTextValue(rt);   /* NEVER a =HYPERLINK() string */
+    }
+    if(evId) idemSet_(evId,"COMMITTED",rowNumber);
+    return {ok:true,row:rowNumber,deduped:false};
+  } finally { lock.releaseLock(); }
+}
+/* On-demand 24->25 header repair. Idempotent: no-op once headers already match.
+   Run on the STAGING clone first; existing rows keep their first 24 values and
+   get a blank 25th column. */
+function repairCLEvalHeaders(){
+  var s=sheet_("CLEval"), want=TABS.CLEval;
+  var width=Math.max(s.getLastColumn(), want.length);
+  var have=width>=1 ? s.getRange(1,1,1,width).getValues()[0] : [];
+  var same = want.every(function(h,i){ return String(have[i]||"")===h; });
+  if(same) return "CLEval headers already 25-col; no change.";
+  s.getRange(1,1,1,want.length).setValues([want]);
+  s.setFrozenRows(1);
+  return "CLEval headers repaired to 25 columns.";
+}
+
 /* ---- routing ---- */
 /* Gate mutations run under a script lock. Without it, two people hitting "Enter"
    at the same moment both read holder=null and both become holder. */
@@ -211,23 +304,7 @@ function handle_(data){
   }
   if(action==="getLogs") return {ok:true,logs:logsOut_(),gate:readQueue_()};
   if(action==="claude")  return callClaude_(data.prompt||"", data.system, data.message, data.model, data.max_tokens);
-  if(action==="logCLEval"){
-    var d=data.row||{};
-    var ts=new Date();
-    var tz="Asia/Karachi";
-    sheet_("CLEval").appendRow([
-      d.assignee||name||"",
-      Utilities.formatDate(ts,tz,"yyyy-MM-dd"),
-      Utilities.formatDate(ts,tz,"HH:mm:ss"),
-      d.jobTitle||"", d.jobLink||"",
-      d.hiringRate||"", d.clientRatings||"", d.payVerified||"",
-      d.totalSpend||"", d.proposals||"", d.interviewing||"", d.invitesSent||"", d.unansweredInvites||"",
-      d.flag||"", d.applied||"", d.fixedHourly||"",
-      d.highBid||"", d.avgBid||"", d.lowBid||"",
-      d.connects||"6", d.bid||"$85/hr", d.reason||"", d.jobPosted||"", d.openJobs||""
-    ]);
-    return {ok:true};
-  }
+  if(action==="logCLEval") return handleLogCLEval_(data, name);
   if(!GATE_ACTIONS[action]) return {ok:true,note:"no-op"};
 
   var lock=LockService.getScriptLock();
@@ -269,10 +346,13 @@ function doPost(e){
   var data={}; try{data=JSON.parse(e.postData.contents);}catch(err){data={};}
   return json_(handle_(data));
 }
-/* GET is read-only. Gate mutations must go through POST so a stray link cannot
-   release someone's seat. */
+/* GET is read-only. Gate mutations AND all writes / model calls must go through
+   POST so a stray link or prefetch cannot release a seat, write a CLEval row, or
+   spend Claude tokens (R4). Only genuinely read-only actions may run on GET. */
+var POST_ONLY = {login:1, logout:1, heartbeat:1, gateAccept:1, gateDecline:1, forceRelease:1,
+                 log:1, claude:1, logCLEval:1};
 function doGet(e){
   var p=(e&&e.parameter)||{};
-  if(GATE_ACTIONS[p.action]) return json_({ok:false,error:"This action requires POST."});
+  if(POST_ONLY[p.action]) return json_({ok:false,error:"This action requires POST."});
   return json_(handle_(p));
 }

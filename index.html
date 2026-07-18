@@ -656,6 +656,16 @@ function runEval(){
   var d=evalDecision();                     /* deterministic authoritative verdict */
   el.innerHTML=renderDecisionCard(d);
   logAct('evaluate', firstLine(jd), d.total, d.banned?'HARD BAN':d.decision);
+  /* CLEval: log EVERY decision. APPLY -> Green/Yes + real connects+bid;
+     SKIP -> Red/No + connects blank + Bid '-'. No-op unless a staging endpoint
+     is configured, so tests and local runs never write. */
+  var apply=!d.banned && /^APPLY/.test(d.decision);
+  var amt=val('b-amt'), hourly=val('b-type')!=='fixed';
+  var ctx={ jobTitle:firstLine(jd), jobLink:(document.getElementById('cl-job-link')||{}).value||'',
+    fixedHourly: hourly?'Hourly':'Fixed', connects:'6',
+    bid: amt?('$'+amt+(hourly?'/hr':'')):'$40+/hr' };
+  postCLEval(clevalRowFrom(d, ctx),
+    clevalId([ (ME?ME.name:''), ctx.jobLink, ctx.jobTitle, todayKey(), (apply?'APPLY':'SKIP') ]));
 }
 
 /* ============================ PROPOSAL + COVER LETTER (local, works with no key) ============================ */
@@ -1181,24 +1191,79 @@ async function callBackend(opts){
   return txt;
 }
 
+/* ===== CLEval 25-column row builder (single source of column order on the
+   client; MUST match TABS.CLEval order in Code.gs). The server rebuilds the row
+   authoritatively and overrides the server-owned fields (Assignee, Date, Time
+   PKT, Ptoposal Status), so those are left blank here. ===== */
+var CLEVAL_COLUMNS=[
+  ['Assignee','assignee'],['Date','date'],['Time PKT','timePkt'],
+  ['Job Title','jobTitle'],['Job Link','jobLink'],['Hiring Rate','hiringRate'],
+  ['Client Ratings','clientRatings'],['Payment Method Verified?','payVerified'],
+  ['Total Spend','totalSpend'],['Proposals','proposals'],['Interviewing','interviewing'],
+  ['Invites sent','invitesSent'],['Unanswered Invites','unansweredInvites'],
+  ['Flag','flag'],['Applied?','applied'],['Fixed/ Hourly','fixedHourly'],
+  ['High Bid','highBid'],['Avg. Bid','avgBid'],['Low bid','lowBid'],
+  ['No. of Connects','connects'],['Bid','bid'],['Reason/Remarks','reason'],
+  ['Job posted','jobPosted'],['Open jobs','openJobs'],['Ptoposal Status','proposalStatus']
+];
+function buildCLEvalRow(d){
+  d=d||{};
+  return CLEVAL_COLUMNS.map(function(c){
+    var k=c[1];
+    if(k==='proposalStatus') return (d.proposalStatus!=null&&d.proposalStatus!=='')?String(d.proposalStatus):'Un Opened';
+    return d[k]!=null?String(d[k]):'';
+  });
+}
+/* Map a deterministic evaluation decision to a CLEval row object.
+   APPLY -> Flag Green, Applied Yes, real connects + our bid.
+   SKIP  -> Flag Red, Applied No, connects blank, Bid '-'. */
+function clevalRowFrom(decision, ctx){
+  decision=decision||{}; ctx=ctx||{};
+  var apply = !decision.banned && /^APPLY/.test(decision.decision||'');
+  return {
+    assignee:'', date:'', timePkt:'',                 /* server-owned */
+    jobTitle:ctx.jobTitle||'', jobLink:ctx.jobLink||'',
+    hiringRate:'', clientRatings:'', payVerified:'',
+    totalSpend:'', proposals:'', interviewing:'', invitesSent:'', unansweredInvites:'',
+    flag: apply?'Green':'Red',
+    applied: apply?'Yes':'No',
+    fixedHourly: ctx.fixedHourly||'',
+    highBid:'', avgBid:'', lowBid:'',                 /* Upwork-only, unknown to app */
+    connects: apply?(ctx.connects||''):'',
+    bid: apply?(ctx.bid||''):'-',
+    reason: decision.banned?((decision.bans||[]).join('; ')):(apply?'Applied':(decision.decision||'')),
+    jobPosted:'', openJobs:'',                        /* Upwork-only, unknown to app */
+    proposalStatus:'Un Opened'
+  };
+}
+/* Deterministic idempotency key so retries/reloads and the score+rewrite pair
+   converge to one row instead of duplicating. */
+function clevalId(parts){
+  var s=(parts||[]).join('|').toLowerCase(), h=0;
+  for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; }
+  return 'ev_'+h.toString(36);
+}
+/* POST a decision to the STAGING CLEval endpoint. No endpoint configured -> silent
+   no-op (local/dev/tests never write). Failures are swallowed so logging can never
+   break the decision flow. The server owns Assignee/Date/Time/Status. */
+function postCLEval(rowObj, evId){
+  if(!CLEVAL_BACKEND) return;
+  try{
+    fetch(CLEVAL_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'logCLEval', secret:CLEVAL_SECRET, evaluationId:evId,
+        name:(ME?ME.name:''), row:rowObj, cells:buildCLEvalRow(rowObj)})}).catch(function(){});
+  }catch(e){ /* never break the flow */ }
+}
+/* CL Score tab: one keyed row per letter (score and rewrite share the id). */
 function logCLEvalToSheet(scoreJson, clText, jdText){
   try{
-    var assignee=ME?ME.name:'';
     var jdFirst=(jdText||'').trim().split('\n')[0].slice(0,120);
     var total=0; CL_RUBRIC.forEach(function(r){total+=scoreJson[r.id]||0;});
     var verdict=total>=9.0?'PASS - READY TO SEND':total>=8.0?'ALMOST - REWRITE':'NEEDS REWRITE';
-    fetch(SEAT_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'logCLEval',name:assignee,row:{
-        assignee:assignee,
-        jobTitle:jdFirst,
-        jobLink:(document.getElementById('cl-job-link')||{}).value||'',
-        hiringRate:'', clientRatings:'', payVerified:'',
-        totalSpend:'', proposals:'', interviewing:'', invitesSent:'', unansweredInvites:'',
-        flag:'', applied:'', fixedHourly:'',
-        highBid:'', avgBid:'', lowBid:'',
-        connects:'6', bid:'$40+/hr', reason:total.toFixed(1)+'/10 '+verdict,
-        jobPosted:'', openJobs:''
-      }})}).catch(function(){});
+    var jobLink=(document.getElementById('cl-job-link')||{}).value||'';
+    var row={jobTitle:jdFirst, jobLink:jobLink, reason:total.toFixed(1)+'/10 '+verdict, proposalStatus:'Un Opened'};
+    var evId=clevalId([ (ME?ME.name:''), jobLink, jdFirst, todayKey(), 'CLSCORE' ]);
+    postCLEval(row, evId);
   }catch(err){ /* silent — logging must never break the score flow */ }
 }
 
@@ -1228,6 +1293,13 @@ function syncManualState(){
    Everything here is the SEAT gate and is prefixed seat*. */
 var SEAT_BACKEND = "https://script.google.com/macros/s/AKfycbwsAdkj8XwW-x8DykVJ4mXzNp4qzFbJFx2kSm4uAor2Wi6AMm6BhuRW0P19xdIVoZFWWw/exec";
 var SEAT_ADMINS  = ['Saqib Shahzad','Jahanzaib (Zeb)'];  // must match ADMINS in Code.gs
+/* CLEval logging targets a STAGING Apps Script endpoint. The URL and secret come
+   from runtime config injected by the staging deploy (window.__CLEVAL__), read
+   the same way SEAT_BACKEND is a var here — NEVER hardcode a secret. When unset
+   (e.g. local/dev/tests) logging is a silent no-op, so nothing is written. */
+var CLEVAL_CFG     = (typeof window!=='undefined' && window.__CLEVAL__) || {};
+var CLEVAL_BACKEND = CLEVAL_CFG.url    || '';
+var CLEVAL_SECRET  = CLEVAL_CFG.secret || '';
 var seatMe=null, seatStart=null, seatQ={holder:null,holderSince:null,waiting:[],pendingOffer:null};
 var seatPoll=null, seatBeat=null, seatBooted=false;
 
