@@ -2,6 +2,15 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Advocate · Live Ops Command</title>
+<!-- LOCAL DEV ONLY: load a gitignored CLEval staging config (window.__CLEVAL__).
+     Runs only on localhost, so it is a no-op in the committed build / production
+     (the file does not exist there and is never even requested). Loaded here in
+     <head>, before the main script, so window.__CLEVAL__ is set first. -->
+<script>
+(function(){var h=location.hostname;
+  if(h==='localhost'||h==='127.0.0.1'||h==='[::1]'){document.write('<script src="/cleval.local.js"><\/script>');}
+})();
+</script>
 <style>
 :root{--bg:#0c1410;--bg2:#11201a;--card:#13241d;--line:#24433a;--green:#43d39e;--green2:#2fae84;--gold:#c9a24b;--text:#e8f3ee;--muted:#8fb3a6;--red:#ff7a7a;--amber:#ffcf6b;--bubble:#13352a;--sunken:#0f231b}
 /* Selectable themes: override the six semantic roles (bg / card / line / accent / text / muted) plus --bubble (user chat bubble) and --sunken (inset/track). Emerald is the default. */

@@ -5,3 +5,6 @@ dist/
 .env.*
 .vscode/
 *.log
+# Local-dev-only CLEval staging config (never commit; may contain a staging secret)
+public/cleval.local.js
+*.local.js
