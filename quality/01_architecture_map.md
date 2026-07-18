@@ -13,14 +13,15 @@ Browser (index.html)
 
 ## Job scoring
 - **Parser:** `parseJob(text)` — index.html:483. Regex-extracts budget type/amount, region, spend, hire rate, star rating, proposal count; builds `P.bans` / `P.flags`.
-- **Deterministic client rubric:** `scoreManual()` — index.html:538. 19-point model: Client /7 (fixed-price /6, the hourly "$25/hr avg paid" point is N/A, index.html:542) + Job /7 + Match /5 + saturation penalty. Decision bands at index.html:557–562.
-- **Authoritative displayed score:** `runEval()` — index.html:578. Ignores `scoreManual` and sends the raw job text to `/api/claude` with `system: AGENCY_CONTEXT` (fetch at index.html:588, model `claude-sonnet-4-6`, `max_tokens:2200`). The rendered /19 breakdown is model-generated, so it can differ from `scoreManual`.
+- **Authoritative deterministic score (R12, commit `7d8f395`):** `scoreManual()` — index.html:544. 19-point model: Client /7 (fixed-price /6, the hourly "$25/hr avg paid" point is N/A) + Job /7 + Match /5 + saturation penalty, with new-client fairness scaling (R13). Returns `{total, cli, job, mat, sat, decision, cliMax, achievableMax, isNew, integrity}`.
+- **`runEval()` — index.html (post-R12):** no longer scores. It calls `parseJob()` + `autofill()`, then renders `evalDecision()` = hard-ban override + `scoreManual()` /19, deterministically, with **zero model calls**. `evalDecision()`/`renderDecisionCard()` surface the verdict. The model is used ONLY by `genProposal()` (proposal prose) and the CL scorer/rewrite — never to produce or override the score.
 - **Model system context:** `AGENCY_CONTEXT` built by `buildContext()` — index.html:947–948 (the full-service rules, bans, decision bands, new-client fairness, honesty gate live in this prompt string).
 
 ## Hard bans / saturation / new-client rules
 - **Hard bans (code-enforced):** `parseJob` — index.html:511–519. Fixed-price `< $200` (511); finance/crypto/trading industries (513); weapons/defense (516); banned companies umbrage/stewart/cvs health/lynx (517); confirmed India/Bangladesh/Pakistan (`isBanCountry` 504, pushed 518); on-site 2+ days/week (519). Government/public-sector explicitly allowed (comment 514–515).
 - **Saturation (penalty, never a ban):** `SAT_PENALTY = -2` only for the `50+` proposals bucket — index.html:552; applied to total at index.html:555.
-- **New-client fairness / below-rate:** `< $40/hr` hourly is a **flag**, not a ban — index.html:522–525. Region outside allowed set is a flag, not an auto-skip — index.html:521. New-client fairness + integrity check are prompt-enforced only, inside `AGENCY_CONTEXT` (index.html:948, injected into `runEval`).
+- **New-client fairness / below-rate:** `< $40/hr` hourly is a **flag**, not a ban. Region outside allowed set is a flag, not an auto-skip. New-client fairness + integrity check are now **code-enforced** in `scoreManual()` (R13, commit `b86bbe1`): for `tenure==='new'`, unknowable history (spend, hire, $25/hr-avg) is N/A and the decision bands scale to the achievable max; the prompt copy in `AGENCY_CONTEXT` is now a mirror of the deterministic rule, not the source of truth.
+- **Pakistan hard ban (R14, commit `3a02808`):** `parseJob()` `isBanCountry` regex now includes `pakistan`/`pakistani` + major cities (index.html:510).
 - **Mirror copy (non-authoritative):** the same rules are echoed as UI/chat text at index.html:810–825, 988–996 — display only.
 
 ## Cover-letter (CL) scorer + rewrite loop

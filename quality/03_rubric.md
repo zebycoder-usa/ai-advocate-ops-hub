@@ -18,10 +18,12 @@ A veto gate is a pass/fail precondition. If any of these is not proven, the app 
 - **V6 — Production-unchanged proof:** evidence that `main`, the live Vercel app, the live Apps Script deployment, and real CLEval data were untouched until an explicit final approval naming an exact commit SHA.
 - **V7 — Independent audit reproduces the score:** a second, independent pass re-runs the checks and arrives at the same dimension scores from the same evidence.
 
+**Progress note (veto gates unchanged, still all required):** two dimensions that feed the gates are now satisfied by code. **Scoring-determinism** — the authoritative /19 is `scoreManual()` with the model confined to prose (R12, `7d8f395`), so D1 is deterministic and testable. **Honesty** — no code path lets the model produce or override a score, and proposal metrics remain constrained to `AGENCY_PROOF_BANK` / user text (feeds V4/D5). These are progress toward the score, not a waiver: V1–V7 remain open and must each be proven before any ≥9.0 rating.
+
 ## The 10 scored dimensions
 | # | Dimension | What ≥ 8.5 looks like | Primary evidence |
 |---|---|---|---|
-| D1 | **Correctness of scoring/ban logic** | `parseJob` + `scoreManual` and the AI scorer agree on bans, saturation penalty, new-client fairness, and decision bands across a fixed set of characterization cases. | characterization tests (added before any refactor) passing pre- and post-change |
+| D1 | **Correctness of scoring/ban logic** | `scoreManual()` is the single authoritative /19 (R12, `7d8f395`) — the model never scores. `parseJob` bans, saturation penalty, new-client fairness (R13, `b86bbe1`), Pakistan ban (R14, `3a02808`), and decision bands all pass a fixed set of characterization cases. | 40 characterization/scenario tests green; the 34 pre-refactor expectations unchanged across R12/R13/R14 |
 | D2 | **CL scorer + rewrite reliability** | CL rubric totals correctly; the 9.0 SEND threshold comes from one constant; rewrite loop converges without fabricating metrics. | tests + sample runs; threshold-constant diff |
 | D3 | **Data-integrity / idempotent logging** | CLEval writes are atomic, keyed, non-duplicating; 25-column schema reconciled; header/writer/client payload aligned. | duplicate-retry test on the staging Sheet showing one row |
 | D4 | **Identity & gate behavior** | Single-login gate, queue, heartbeat, auto-release, and admin force-release behave correctly within the accepted internal-trust model; GET cannot write. | gate transition tests; GET-reject proof |
