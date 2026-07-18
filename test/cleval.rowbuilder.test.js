@@ -82,6 +82,65 @@ describe('CLEval clevalRowFrom() decision mapping', () => {
   });
 });
 
+describe('CLEval evalCtx() populates every app-known column', () => {
+  it('wires parsed + form signals; only genuinely sourceless columns stay blank', () => {
+    const doc = app.doc;
+    // Job text carries: hire rate %, star rating, a job URL, hourly rate.
+    doc.getElementById('job-text').value =
+      'Full Stack Engineer. Hourly $60/hr. 4.9 stars. 100% hire rate. https://www.upwork.com/jobs/~xyz';
+    doc.getElementById('cl-job-link').value = ''; // force the URL-from-text path
+    // Evaluate form signals (as autofill() would set them from the post):
+    app.setVal('c-verified', true);   // payment verified
+    app.setVal('c-spend', '1');       // $50k+
+    app.setVal('j-props', '2');       // 20-50 proposals
+    app.setVal('b-type', 'hourly');
+    app.setVal('b-amt', '60');
+
+    const ctx = app.window.evalCtx();
+    const row = app.window.clevalRowFrom({ banned: false, decision: 'APPLY WITH BOOST' }, ctx);
+    const cells = app.window.buildCLEvalRow(row);
+
+    // --- populated from real signals ---
+    expect(row.payVerified).toBe('Yes');            // col 8
+    expect(row.totalSpend).toBe('$50k+');           // col 9
+    expect(row.proposals).toBe('20-50');            // col 10
+    expect(row.hiringRate).toBe('100');             // col 6
+    expect(row.clientRatings).toBe('4.9');          // col 7
+    expect(row.jobLink).toBe('https://www.upwork.com/jobs/~xyz'); // col 5
+    // --- already-working fields still correct ---
+    expect(row.fixedHourly).toBe('Hourly');
+    expect(row.flag).toBe('Green');
+    expect(row.applied).toBe('Yes');
+    expect(row.connects).toBe('6');
+    expect(row.bid).toBe('$60/hr');
+    expect(cells[24]).toBe('Un Opened');            // col 25 Ptoposal Status
+
+    // --- genuinely sourceless columns must stay blank (0-based indices) ---
+    // 11 Interviewing, 12 Invites sent, 13 Unanswered, 17 High, 18 Avg, 19 Low, 23 Job posted, 24 Open jobs
+    [10, 11, 12, 16, 17, 18, 22, 23].forEach((i) => expect(cells[i]).toBe(''));
+  });
+
+  it('SKIP still writes Red/No/Bid "-" while keeping the client signals', () => {
+    const doc = app.doc;
+    doc.getElementById('job-text').value = 'Crypto trading bot. Hourly $80/hr. Payment verified.';
+    app.setVal('c-verified', true);
+    app.setVal('c-spend', '2');
+    app.setVal('j-props', '1');
+    app.setVal('b-type', 'hourly');
+    app.setVal('b-amt', '80');
+    const ctx = app.window.evalCtx();
+    const row = app.window.clevalRowFrom(
+      { banned: true, decision: 'SKIP — HARD BAN', bans: ['Banned industry (finance/crypto/trading)'] }, ctx,
+    );
+    expect(row.applied).toBe('No');
+    expect(row.flag).toBe('Red');
+    expect(row.bid).toBe('-');
+    expect(row.connects).toBe('');
+    expect(row.payVerified).toBe('Yes');   // client signal still captured
+    expect(row.totalSpend).toBe('$1k-$50k');
+  });
+});
+
 describe('CLEval postCLEval() is staging-safe (never writes to the live backend)', () => {
   const R = { jobTitle: 'X', proposalStatus: 'Un Opened' };
 

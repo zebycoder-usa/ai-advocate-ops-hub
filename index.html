@@ -669,10 +669,7 @@ function runEval(){
      SKIP -> Red/No + connects blank + Bid '-'. No-op unless a staging endpoint
      is configured, so tests and local runs never write. */
   var apply=!d.banned && /^APPLY/.test(d.decision);
-  var amt=val('b-amt'), hourly=val('b-type')!=='fixed';
-  var ctx={ jobTitle:firstLine(jd), jobLink:(document.getElementById('cl-job-link')||{}).value||'',
-    fixedHourly: hourly?'Hourly':'Fixed', connects:'6',
-    bid: amt?('$'+amt+(hourly?'/hr':'')):'$40+/hr' };
+  var ctx=evalCtx();
   postCLEval(clevalRowFrom(d, ctx),
     clevalId([ (ME?ME.name:''), ctx.jobLink, ctx.jobTitle, todayKey(), (apply?'APPLY':'SKIP') ]));
 }
@@ -1232,17 +1229,41 @@ function clevalRowFrom(decision, ctx){
   return {
     assignee:'', date:'', timePkt:'',                 /* server-owned */
     jobTitle:ctx.jobTitle||'', jobLink:ctx.jobLink||'',
-    hiringRate:'', clientRatings:'', payVerified:'',
-    totalSpend:'', proposals:'', interviewing:'', invitesSent:'', unansweredInvites:'',
+    hiringRate:ctx.hiringRate||'', clientRatings:ctx.clientRatings||'', payVerified:ctx.payVerified||'',
+    totalSpend:ctx.totalSpend||'', proposals:ctx.proposals||'',
+    interviewing:'', invitesSent:'', unansweredInvites:'', /* Upwork client-activity, no source in app */
     flag: apply?'Green':'Red',
     applied: apply?'Yes':'No',
     fixedHourly: ctx.fixedHourly||'',
-    highBid:'', avgBid:'', lowBid:'',                 /* Upwork-only, unknown to app */
+    highBid:'', avgBid:'', lowBid:'',                 /* Upwork bid range, no source in app */
     connects: apply?(ctx.connects||''):'',
     bid: apply?(ctx.bid||''):'-',
     reason: decision.banned?((decision.bans||[]).join('; ')):(apply?'Applied':(decision.decision||'')),
-    jobPosted:'', openJobs:'',                        /* Upwork-only, unknown to app */
+    jobPosted:'', openJobs:'',                        /* Upwork-only, no source in app */
     proposalStatus:'Un Opened'
+  };
+}
+/* Gather every CLEval signal the app already has: parsed job fields + the
+   Evaluate form inputs (which autofill() populated from the post). Pure w.r.t.
+   the DOM so it is testable. Columns with no source anywhere stay blank. */
+function evalCtx(){
+  var jd=val('job-text')||'';
+  var P=parseJob(jd);
+  var amt=val('b-amt'), hourly=val('b-type')!=='fixed';
+  var spendLabels={'2':'$1k-$50k','1':'$50k+','1b':'$1-$1k','0':'$0 / new'};
+  var propLabels={'1':'Under 20','2':'20-50','3':'50+'};
+  var urlInText=(jd.match(/https?:\/\/[^\s)]+/)||[])[0]||'';
+  return {
+    jobTitle: firstLine(jd),
+    jobLink: (document.getElementById('cl-job-link')||{}).value||urlInText,
+    fixedHourly: hourly?'Hourly':'Fixed',
+    connects: '6',
+    bid: amt?('$'+amt+(hourly?'/hr':'')):'$40+/hr',
+    payVerified: chk('c-verified')?'Yes':'No',
+    totalSpend: spendLabels[val('c-spend')]||'',
+    proposals: propLabels[val('j-props')]||'',
+    hiringRate: (P.hireRate!=null?String(P.hireRate):''),
+    clientRatings: (P.rating!=null?String(P.rating):'')
   };
 }
 /* Deterministic idempotency key so retries/reloads and the score+rewrite pair
