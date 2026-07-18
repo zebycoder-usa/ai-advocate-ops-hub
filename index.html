@@ -538,6 +538,37 @@ function parseJob(text){
   var belowBudget = P.budgetType==='fixed' ? false : P.budgetType==='hourly' ? (P.amount!=null && P.amount<40) : false;
   if(belowBudget) P.flags.push('Below $40/hr rate floor — review before bidding');
   P.belowBudget=belowBudget;
+  /* ---- REAL Upwork-page fields for the CLEval row (verbatim page values, kept
+     separate from the scoring buckets above). Tolerates nav/footer noise. ---- */
+  var lines=t.split(/\r?\n/);
+  P.title='';
+  for(var li=0;li<lines.length;li++){
+    if(/account settings/i.test(lines[li])){
+      for(var lj=li+1;lj<lines.length;lj++){
+        var ln=lines[lj].trim();
+        if(ln && !/^\[.*\]\(.*\)$/.test(ln)){ P.title=ln; break; }   /* H1 after "Account Settings", skip markdown-link lines */
+      }
+      break;
+    }
+  }
+  if(!P.title){ var h1=t.match(/\n\s*([^\n]{12,140}?)\s*\n\s*posted\s+\d/i); if(h1) P.title=h1[1].trim(); }
+  var idm=t.match(/~(\d{12,})/);                     P.jobLink   = idm?('https://www.upwork.com/jobs/~'+idm[1]):'';
+  var rpm=t.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i); P.ratingPrecise = rpm?rpm[1]:'';   /* precise "X.XX of N reviews", not rounded */
+  P.payVerified = /payment method not verified/i.test(t) ? 'No' : (/payment method verified/i.test(t) ? 'Yes' : '');
+  var tsm=t.match(/(\$[\d.,]+\s*[kKmM]?)\s*total spent/i); P.totalSpendRaw = tsm?tsm[1].replace(/\s+/g,''):'';
+  var prm=t.match(/proposals:\s*(less than \d+|\d+\s*to\s*\d+|\d+\+?)/i); P.proposalsRaw = prm?prm[1].replace(/\s+/g,' ').trim():'';
+  var ivm=t.match(/interviewing:\s*(\d+)/i);         P.interviewing      = ivm?parseInt(ivm[1],10):null;
+  var ism=t.match(/invites sent:\s*(\d+)/i);         P.invitesSent       = ism?parseInt(ism[1],10):null;
+  var uim=t.match(/unanswered invites:\s*(\d+)/i);   P.unansweredInvites = uim?parseInt(uim[1],10):null;
+  var cnm=t.match(/send a proposal for:\s*(\d+)\s*connects/i); P.connects = cnm?parseInt(cnm[1],10):null;
+  var pam=t.match(/posted\s+([^\n]*?\bago)\b/i);     P.postedAgo         = pam?pam[1].trim():'';
+  var ojm=t.match(/(\d+)\s+open jobs?/i);            P.openJobs          = ojm?parseInt(ojm[1],10):null;
+  P.bidHigh='-'; P.bidAvg='-'; P.bidLow='-';
+  if(!/upgrade your membership to see the bid range/i.test(t)){
+    var bhm=t.match(/high[^$\d]{0,15}\$([\d.,]+)/i); if(bhm) P.bidHigh=bhm[1];
+    var bam=t.match(/avg[^$\d]{0,15}\$([\d.,]+)/i);  if(bam) P.bidAvg=bam[1];
+    var blm=t.match(/low[^$\d]{0,15}\$([\d.,]+)/i);  if(blm) P.bidLow=blm[1];
+  }
   return P;
 }
 function autofill(P){
@@ -1226,44 +1257,52 @@ function buildCLEvalRow(d){
 function clevalRowFrom(decision, ctx){
   decision=decision||{}; ctx=ctx||{};
   var apply = !decision.banned && /^APPLY/.test(decision.decision||'');
+  /* DEFAULT RULE: no cell is ever empty. Text columns default '-', count columns
+     default '0'. Counts are sent as strings so the server's `d.x||""` fallback
+     keeps a real 0 instead of blanking it. */
+  function T(v){ return (v!=null && v!=='') ? String(v) : '-'; }
+  function N(v){ return (v!=null && v!=='') ? String(v) : '0'; }
   return {
-    assignee:'', date:'', timePkt:'',                 /* server-owned */
-    jobTitle:ctx.jobTitle||'', jobLink:ctx.jobLink||'',
-    hiringRate:ctx.hiringRate||'', clientRatings:ctx.clientRatings||'', payVerified:ctx.payVerified||'',
-    totalSpend:ctx.totalSpend||'', proposals:ctx.proposals||'',
-    interviewing:'', invitesSent:'', unansweredInvites:'', /* Upwork client-activity, no source in app */
+    assignee:'', date:'', timePkt:'',                 /* server-owned (filled server-side) */
+    jobTitle:T(ctx.jobTitle), jobLink:T(ctx.jobLink),
+    hiringRate:T(ctx.hiringRate), clientRatings:T(ctx.clientRatings), payVerified:T(ctx.payVerified),
+    totalSpend:T(ctx.totalSpend), proposals:T(ctx.proposals),
+    interviewing:N(ctx.interviewing), invitesSent:N(ctx.invitesSent), unansweredInvites:N(ctx.unansweredInvites),
     flag: apply?'Green':'Red',
     applied: apply?'Yes':'No',
-    fixedHourly: ctx.fixedHourly||'',
-    highBid:'', avgBid:'', lowBid:'',                 /* Upwork bid range, no source in app */
-    connects: apply?(ctx.connects||''):'',
-    bid: apply?(ctx.bid||''):'-',
-    reason: decision.banned?((decision.bans||[]).join('; ')):(apply?'Applied':(decision.decision||'')),
-    jobPosted:'', openJobs:'',                        /* Upwork-only, no source in app */
+    fixedHourly:T(ctx.fixedHourly),
+    highBid:T(ctx.highBid), avgBid:T(ctx.avgBid), lowBid:T(ctx.lowBid),
+    connects:N(ctx.connects),
+    bid: apply?T(ctx.bid):'-',
+    reason: decision.banned?((decision.bans||[]).join('; ')):(apply?'Applied':T(decision.decision)),
+    jobPosted:T(ctx.jobPosted), openJobs:N(ctx.openJobs),
     proposalStatus:'Un Opened'
   };
 }
-/* Gather every CLEval signal the app already has: parsed job fields + the
-   Evaluate form inputs (which autofill() populated from the post). Pure w.r.t.
-   the DOM so it is testable. Columns with no source anywhere stay blank. */
+/* Gather every CLEval signal from the REAL pasted Upwork page (parseJob), kept
+   separate from the scoring buckets. Columns with no source anywhere are left
+   undefined here and defaulted ('-' / '0') by clevalRowFrom. */
 function evalCtx(){
   var jd=val('job-text')||'';
   var P=parseJob(jd);
-  var amt=val('b-amt'), hourly=val('b-type')!=='fixed';
-  var spendLabels={'2':'$1k-$50k','1':'$50k+','1b':'$1-$1k','0':'$0 / new'};
-  var propLabels={'1':'Under 20','2':'20-50','3':'50+'};
-  var urlInText=(jd.match(/https?:\/\/[^\s)]+/)||[])[0]||'';
+  var fixed=P.budgetType==='fixed', hourly=P.budgetType==='hourly';
   return {
-    jobTitle: firstLine(jd),
-    jobLink: (document.getElementById('cl-job-link')||{}).value||urlInText,
-    fixedHourly: hourly?'Hourly':'Fixed',
-    connects: '6',
-    bid: amt?('$'+amt+(hourly?'/hr':'')):'$40+/hr',
-    payVerified: chk('c-verified')?'Yes':'No',
-    totalSpend: spendLabels[val('c-spend')]||'',
-    proposals: propLabels[val('j-props')]||'',
-    hiringRate: (P.hireRate!=null?String(P.hireRate):''),
-    clientRatings: (P.rating!=null?String(P.rating):'')
+    jobTitle: P.title||firstLine(jd),
+    jobLink: P.jobLink||(document.getElementById('cl-job-link')||{}).value||'',
+    hiringRate: (P.amount!=null?String(P.amount):''),   /* Hourly rate OR Fixed amount, NOT the hire-rate % */
+    clientRatings: P.ratingPrecise,
+    payVerified: P.payVerified,
+    totalSpend: P.totalSpendRaw,
+    proposals: P.proposalsRaw,
+    interviewing: P.interviewing,
+    invitesSent: P.invitesSent,
+    unansweredInvites: P.unansweredInvites,
+    fixedHourly: fixed?'Fixed':(hourly?'Hourly':''),
+    highBid: P.bidHigh, avgBid: P.bidAvg, lowBid: P.bidLow,
+    connects: P.connects,
+    bid: '$40+/hr',                                     /* our quoted rate (computed); '-' on skip */
+    jobPosted: P.postedAgo,
+    openJobs: P.openJobs
   };
 }
 /* Deterministic idempotency key so retries/reloads and the score+rewrite pair

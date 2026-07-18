@@ -76,68 +76,110 @@ describe('CLEval clevalRowFrom() decision mapping', () => {
     );
     expect(row.flag).toBe('Red');
     expect(row.applied).toBe('No');
-    expect(row.connects).toBe('');
+    expect(row.connects).toBe('0');   // count default (no connects in ctx)
     expect(row.bid).toBe('-');
     expect(row.reason).toContain('Banned industry');
   });
 });
 
-describe('CLEval evalCtx() populates every app-known column', () => {
-  it('wires parsed + form signals; only genuinely sourceless columns stay blank', () => {
-    const doc = app.doc;
-    // Job text carries: hire rate %, star rating, a job URL, hourly rate.
-    doc.getElementById('job-text').value =
-      'Full Stack Engineer. Hourly $60/hr. 4.9 stars. 100% hire rate. https://www.upwork.com/jobs/~xyz';
-    doc.getElementById('cl-job-link').value = ''; // force the URL-from-text path
-    // Evaluate form signals (as autofill() would set them from the post):
-    app.setVal('c-verified', true);   // payment verified
-    app.setVal('c-spend', '1');       // $50k+
-    app.setVal('j-props', '2');       // 20-50 proposals
-    app.setVal('b-type', 'hourly');
-    app.setVal('b-amt', '60');
+describe('CLEval full Upwork-page parse -> exact row (3 real jobs)', () => {
+  // Build a realistic pasted page (nav + H1-after-"Account Settings" + the real
+  // source lines + footer noise). Order mirrors a real Upwork job page copy.
+  const page = (o) => [
+    'Upwork', 'Find work', 'My jobs', 'Messages', 'Notifications', 'Account Settings',
+    o.title,
+    'Posted ' + o.posted,
+    'Worldwide',
+    '[___](https://www.upwork.com/jobs/' + o.slug + '_~' + o.id + '/?referrer_url_path=find_work_home)',
+    'Summary', 'We need help with this project.',
+    '$' + o.amount + '.00 Fixed-price',
+    o.level,
+    'Send a proposal for: ' + o.connects + ' Connects',
+    'Proposals: ' + o.proposals,
+    'Interviewing: ' + o.interviewing,
+    'Invites sent: ' + o.invites,
+    'Unanswered invites: ' + o.unanswered,
+    o.bidRange, // 'Upgrade your membership to see the bid range' OR ''
+    'About the client',
+    o.payLine, // 'Payment method verified' | 'Payment method not verified'
+    o.rounded, // rounded noise like '5.0 out of 5'
+    o.reviews, // precise 'X.XX of N reviews'
+    o.location,
+    '$' + o.spend + ' total spent',
+    o.hires,
+    o.hireLine, // 'NN% hire rate, N open jobs'
+    'Member since Jan 2020',
+    'Terms of Service', 'Privacy Policy', '© Upwork',
+  ].join('\n');
 
+  const rowFor = (pg) => {
+    app.doc.getElementById('job-text').value = pg;
+    app.doc.getElementById('cl-job-link').value = '';
+    const d = app.window.evalDecision();
     const ctx = app.window.evalCtx();
-    const row = app.window.clevalRowFrom({ banned: false, decision: 'APPLY WITH BOOST' }, ctx);
-    const cells = app.window.buildCLEvalRow(row);
+    return app.window.buildCLEvalRow(app.window.clevalRowFrom(d, ctx));
+  };
+  // expected values for columns 4..25 (0-based indices 3..24)
+  const cols3to24 = (a) => a.slice(3, 25);
 
-    // --- populated from real signals ---
-    expect(row.payVerified).toBe('Yes');            // col 8
-    expect(row.totalSpend).toBe('$50k+');           // col 9
-    expect(row.proposals).toBe('20-50');            // col 10
-    expect(row.hiringRate).toBe('100');             // col 6
-    expect(row.clientRatings).toBe('4.9');          // col 7
-    expect(row.jobLink).toBe('https://www.upwork.com/jobs/~xyz'); // col 5
-    // --- already-working fields still correct ---
-    expect(row.fixedHourly).toBe('Hourly');
-    expect(row.flag).toBe('Green');
-    expect(row.applied).toBe('Yes');
-    expect(row.connects).toBe('6');
-    expect(row.bid).toBe('$60/hr');
-    expect(cells[24]).toBe('Un Opened');            // col 25 Ptoposal Status
-
-    // --- genuinely sourceless columns must stay blank (0-based indices) ---
-    // 11 Interviewing, 12 Invites sent, 13 Unanswered, 17 High, 18 Avg, 19 Low, 23 Job posted, 24 Open jobs
-    [10, 11, 12, 16, 17, 18, 22, 23].forEach((i) => expect(cells[i]).toBe(''));
+  it('JOB C ~022078427482786284164 (Pakistan hard ban)', () => {
+    const cells = rowFor(page({
+      title: 'Senior Full-Stack AI Engineer Needed to Build AI-Powered Browser Extension',
+      slug: 'Senior-Full-Stack-AI-Engineer', id: '022078427482786284164',
+      posted: '48 minutes ago', amount: '300', level: 'Expert', connects: '13',
+      proposals: '5 to 10', interviewing: '3', invites: '11', unanswered: '6',
+      bidRange: 'Upgrade your membership to see the bid range',
+      payLine: 'Payment method verified', rounded: '5.0 out of 5', reviews: '5.00 of 1 review',
+      location: 'Pakistan\nLahore 11:00 pm', spend: '70', hires: '2 hires, 1 active',
+      hireLine: '34% hire rate, 2 open jobs',
+    }));
+    expect(cols3to24(cells)).toEqual([
+      'Senior Full-Stack AI Engineer Needed to Build AI-Powered Browser Extension',
+      'https://www.upwork.com/jobs/~022078427482786284164',
+      '300', '5.00', 'Yes', '$70', '5 to 10', '3', '11', '6', 'Red', 'No', 'Fixed',
+      '-', '-', '-', '13', '-', 'Client in India/Bangladesh/Pakistan (hard ban)',
+      '48 minutes ago', '2', 'Un Opened',
+    ]);
   });
 
-  it('SKIP still writes Red/No/Bid "-" while keeping the client signals', () => {
-    const doc = app.doc;
-    doc.getElementById('job-text').value = 'Crypto trading bot. Hourly $80/hr. Payment verified.';
-    app.setVal('c-verified', true);
-    app.setVal('c-spend', '2');
-    app.setVal('j-props', '1');
-    app.setVal('b-type', 'hourly');
-    app.setVal('b-amt', '80');
-    const ctx = app.window.evalCtx();
-    const row = app.window.clevalRowFrom(
-      { banned: true, decision: 'SKIP — HARD BAN', bans: ['Banned industry (finance/crypto/trading)'] }, ctx,
-    );
-    expect(row.applied).toBe('No');
-    expect(row.flag).toBe('Red');
-    expect(row.bid).toBe('-');
-    expect(row.connects).toBe('');
-    expect(row.payVerified).toBe('Yes');   // client signal still captured
-    expect(row.totalSpend).toBe('$1k-$50k');
+  it('JOB B ~022078438161943164750 (fixed under $200, not verified)', () => {
+    const cells = rowFor(page({
+      title: 'Build AI Voice Assistant Mobile App MVP',
+      slug: 'Build-AI-Voice-Assistant', id: '022078438161943164750',
+      posted: '6 minutes ago', amount: '150', level: 'Entry level', connects: '14',
+      proposals: 'Less than 5', interviewing: '0', invites: '0', unanswered: '0',
+      bidRange: '', // absent -> defaults to '-'
+      payLine: 'Payment method not verified', rounded: '5.0 out of 5', reviews: '5.00 of 2 reviews',
+      location: 'UKR\nKherson 9:00 pm', spend: '575', hires: '1 hire',
+      hireLine: '100% hire rate, 1 open job',
+    }));
+    expect(cols3to24(cells)).toEqual([
+      'Build AI Voice Assistant Mobile App MVP',
+      'https://www.upwork.com/jobs/~022078438161943164750',
+      '150', '5.00', 'No', '$575', 'Less than 5', '0', '0', '0', 'Red', 'No', 'Fixed',
+      '-', '-', '-', '14', '-', 'Fixed-price under $200 ($150)',
+      '6 minutes ago', '1', 'Un Opened',
+    ]);
+  });
+
+  it('JOB A ~022078430146547204560 (fixed under $200, big spender)', () => {
+    const cells = rowFor(page({
+      title: 'n8n AI Automation Expert',
+      slug: 'n8n-AI-Automation-Expert', id: '022078430146547204560',
+      posted: '38 minutes ago', amount: '50', level: 'Intermediate', connects: '11',
+      proposals: '20 to 50', interviewing: '0', invites: '1', unanswered: '1',
+      bidRange: 'Upgrade your membership to see the bid range',
+      payLine: 'Payment method verified', rounded: '4.9 out of 5', reviews: '4.99 of 2,149 reviews',
+      location: 'United States\nHouston 10:00 am', spend: '26K', hires: '120 hires, 5 active',
+      hireLine: '100% hire rate, 87 open jobs',
+    }));
+    expect(cols3to24(cells)).toEqual([
+      'n8n AI Automation Expert',
+      'https://www.upwork.com/jobs/~022078430146547204560',
+      '50', '4.99', 'Yes', '$26K', '20 to 50', '0', '1', '1', 'Red', 'No', 'Fixed',
+      '-', '-', '-', '11', '-', 'Fixed-price under $200 ($50)',
+      '38 minutes ago', '87', 'Un Opened',
+    ]);
   });
 });
 
