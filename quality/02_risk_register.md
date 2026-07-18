@@ -23,5 +23,15 @@ Owner decisions treated as settled (context for the ACCEPTED items below): the w
 | R10 | **Claimed Script/Sheet IDs absent from repo source** (Script `1JhDZUh9…`, Ops DB `1V9h64Zw…`, Manual Jobs `143AHDs0…`). | not present in tracked files | Medium | **MUST-VERIFY LIVE** before trusting any deployment mapping |
 | R11 | **Repo lives inside OneDrive** (sync/lock race risk during writes/builds). | repo root path | Low | **ACCEPTED** — note; avoid concurrent sync during commits |
 
+## Correctness gaps found while writing Phase 3 characterization tests
+Both are pinned by passing tests that assert the CURRENT (incorrect) behavior, so the refactor phase can fix them under a net. Do NOT fix in the test phase.
+
+| # | Item | Where (file:line) | Severity | Disposition |
+|---|---|---|---|---|
+| R13 | **Deterministic `scoreManual()` does not implement the v9.3 new-client fairness rule.** The documented rule says `$0` spent / `0` hires / no reviews on a NEW account score as **N/A (neutral)**, not 0. `scoreManual` has no tenure input and scores `$0` spend as **0 points**; fairness exists only in the model prompt (`AGENCY_CONTEXT`/`runEval`). If the R12 refactor makes `scoreManual` authoritative without porting fairness, new legitimate clients will be under-scored. Pinned by test `KNOWN GAP (R13)…` (`c-spend:'0'` → `cli:5`). | `index.html:538–563` (`scoreManual`, no tenure/fairness); fairness prose only in `index.html:948` (`buildContext`) and `runEval` `index.html:584–586` | High | **MUST-FIX in refactor** (port new-client fairness into `scoreManual`) |
+| R14 | **Pakistan is not auto-detected by the hard-ban country regex**, although the ban message and CLAUDE.md name "India/Bangladesh/Pakistan". `isBanCountry` matches India/Bangladesh cities only — no `pakistan`/`karachi`/`lahore`/`islamabad`. A confirmed Pakistan client slips through as region `Other` (flag, not ban). Pinned by test `KNOWN GAP (R14)…`. | `index.html:504` (`isBanCountry` regex); message pushed at `index.html:518` | Medium | **MUST-FIX in refactor** (add Pakistan + major cities to the regex) |
+
+Note (not a bug): `scoreManual` has no domain→capability inference; the Match score is a manual/model-set signal. This is by design (a human sets the match dropdown), recorded here only so the R12 refactor keeps Match as an explicit input rather than assuming automatic domain detection.
+
 ## Honesty gate (non-negotiable content rule)
 Any generated client-facing proposal or cover letter must never contain a fabricated or unverifiable numeric metric. Enforced today by prompt rules in `AGENCY_PROOF_BANK` / `PROOF_VOICE_RULES` (`index.html:932`, `index.html:939`) and the CL prompts (`index.html:1060`, `index.html:1062`). Traceability of this gate is a scored rubric dimension in `03_rubric.md`.
