@@ -43,7 +43,8 @@ export function loadGas({ logSecret } = {}) {
           },
           setRichTextValue(v) {
             if (!rows[r - 1]) rows[r - 1] = [];
-            rows[r - 1][c - 1] = v && v._text !== undefined ? v._text : v;
+            // Store an inspectable {text, link} so tests can verify the "URL" link.
+            rows[r - 1][c - 1] = v && v._text !== undefined ? { text: v._text, link: v._link } : v;
             return this;
           },
         };

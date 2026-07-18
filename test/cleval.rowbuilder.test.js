@@ -2,7 +2,13 @@
 // order for a known APPLY, matching the real fixture, and that the client column
 // order matches the 25 target headers (parity with TABS.CLEval in Code.gs).
 import { describe, it, expect, beforeAll } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { loadApp } from './loadApp.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixture = (name) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
 
 let app;
 beforeAll(() => { app = loadApp(); });
@@ -82,103 +88,45 @@ describe('CLEval clevalRowFrom() decision mapping', () => {
   });
 });
 
-describe('CLEval full Upwork-page parse -> exact row (3 real jobs)', () => {
-  // Build a realistic pasted page (nav + H1-after-"Account Settings" + the real
-  // source lines + footer noise). Order mirrors a real Upwork job page copy.
-  const page = (o) => [
-    'Upwork', 'Find work', 'My jobs', 'Messages', 'Notifications', 'Account Settings',
-    o.title,
-    'Posted ' + o.posted,
-    'Worldwide',
-    '[___](https://www.upwork.com/jobs/' + o.slug + '_~' + o.id + '/?referrer_url_path=find_work_home)',
-    'Summary', 'We need help with this project.',
-    '$' + o.amount + '.00 Fixed-price',
-    o.level,
-    'Send a proposal for: ' + o.connects + ' Connects',
-    'Proposals: ' + o.proposals,
-    'Interviewing: ' + o.interviewing,
-    'Invites sent: ' + o.invites,
-    'Unanswered invites: ' + o.unanswered,
-    o.bidRange, // 'Upgrade your membership to see the bid range' OR ''
-    'About the client',
-    o.payLine, // 'Payment method verified' | 'Payment method not verified'
-    o.rounded, // rounded noise like '5.0 out of 5'
-    o.reviews, // precise 'X.XX of N reviews'
-    o.location,
-    '$' + o.spend + ' total spent',
-    o.hires,
-    o.hireLine, // 'NN% hire rate, N open jobs'
-    'Member since Jan 2020',
-    'Terms of Service', 'Privacy Policy', '© Upwork',
-  ].join('\n');
-
-  const rowFor = (pg) => {
-    app.doc.getElementById('job-text').value = pg;
+describe('CLEval full Upwork-page parse -> exact row (3 REAL fixtures, Usman format)', () => {
+  const rowObjFor = (file) => {
+    app.doc.getElementById('job-text').value = fixture(file);
     app.doc.getElementById('cl-job-link').value = '';
     const d = app.window.evalDecision();
     const ctx = app.window.evalCtx();
-    return app.window.buildCLEvalRow(app.window.clevalRowFrom(d, ctx));
+    return app.window.clevalRowFrom(d, ctx);
   };
-  // expected values for columns 4..25 (0-based indices 3..24)
-  const cols3to24 = (a) => a.slice(3, 25);
+  const cols3to24 = (cells) => cells.slice(3, 25);
 
-  it('JOB C ~022078427482786284164 (Pakistan hard ban)', () => {
-    const cells = rowFor(page({
-      title: 'Senior Full-Stack AI Engineer Needed to Build AI-Powered Browser Extension',
-      slug: 'Senior-Full-Stack-AI-Engineer', id: '022078427482786284164',
-      posted: '48 minutes ago', amount: '300', level: 'Expert', connects: '13',
-      proposals: '5 to 10', interviewing: '3', invites: '11', unanswered: '6',
-      bidRange: 'Upgrade your membership to see the bid range',
-      payLine: 'Payment method verified', rounded: '5.0 out of 5', reviews: '5.00 of 1 review',
-      location: 'Pakistan\nLahore 11:00 pm', spend: '70', hires: '2 hires, 1 active',
-      hireLine: '34% hire rate, 2 open jobs',
-    }));
-    expect(cols3to24(cells)).toEqual([
-      'Senior Full-Stack AI Engineer Needed to Build AI-Powered Browser Extension',
-      'https://www.upwork.com/jobs/~022078427482786284164',
-      '300', '5.00', 'Yes', '$70', '5 to 10', '3', '11', '6', 'Red', 'No', 'Fixed',
+  it('job_n8n.txt ~022078430146547204560', () => {
+    const row = rowObjFor('job_n8n.txt');
+    // the row OBJECT carries the real URL (server attaches it to the "URL" text)
+    expect(row.jobLink).toBe('https://www.upwork.com/jobs/~022078430146547204560');
+    expect(cols3to24(app.window.buildCLEvalRow(row))).toEqual([
+      'n8n AI Automation Expert', 'URL', '50', '4.99', 'Yes', '26k', '20 to 50',
+      '0', '1', '1', 'Red', 'No', 'Fixed', '-', '-', '-', '11', '-',
+      'Fixed-price under $200 ($50)', '38 minutes ago', '87', 'Un Opened',
+    ]);
+  });
+
+  it('job_voice.txt ~022078438161943164750', () => {
+    const row = rowObjFor('job_voice.txt');
+    expect(row.jobLink).toBe('https://www.upwork.com/jobs/~022078438161943164750');
+    expect(cols3to24(app.window.buildCLEvalRow(row))).toEqual([
+      'Build AI Voice Assistant Mobile App MVP', 'URL', '150', '5', 'No', '575', 'Less than 5',
+      '0', '0', '0', 'Red', 'No', 'Fixed', '-', '-', '-', '14', '-',
+      'Fixed-price under $200 ($150)', '6 minutes ago', '1', 'Un Opened',
+    ]);
+  });
+
+  it('job_browserext.txt ~022078427482786284164', () => {
+    const row = rowObjFor('job_browserext.txt');
+    expect(row.jobLink).toBe('https://www.upwork.com/jobs/~022078427482786284164');
+    expect(cols3to24(app.window.buildCLEvalRow(row))).toEqual([
+      'Senior Full-Stack AI Engineer Needed to Build AI-Powered Browser Extension', 'URL',
+      '300', '5', 'Yes', '70', '5 to 10', '3', '11', '6', 'Red', 'No', 'Fixed',
       '-', '-', '-', '13', '-', 'Client in India/Bangladesh/Pakistan (hard ban)',
       '48 minutes ago', '2', 'Un Opened',
-    ]);
-  });
-
-  it('JOB B ~022078438161943164750 (fixed under $200, not verified)', () => {
-    const cells = rowFor(page({
-      title: 'Build AI Voice Assistant Mobile App MVP',
-      slug: 'Build-AI-Voice-Assistant', id: '022078438161943164750',
-      posted: '6 minutes ago', amount: '150', level: 'Entry level', connects: '14',
-      proposals: 'Less than 5', interviewing: '0', invites: '0', unanswered: '0',
-      bidRange: '', // absent -> defaults to '-'
-      payLine: 'Payment method not verified', rounded: '5.0 out of 5', reviews: '5.00 of 2 reviews',
-      location: 'UKR\nKherson 9:00 pm', spend: '575', hires: '1 hire',
-      hireLine: '100% hire rate, 1 open job',
-    }));
-    expect(cols3to24(cells)).toEqual([
-      'Build AI Voice Assistant Mobile App MVP',
-      'https://www.upwork.com/jobs/~022078438161943164750',
-      '150', '5.00', 'No', '$575', 'Less than 5', '0', '0', '0', 'Red', 'No', 'Fixed',
-      '-', '-', '-', '14', '-', 'Fixed-price under $200 ($150)',
-      '6 minutes ago', '1', 'Un Opened',
-    ]);
-  });
-
-  it('JOB A ~022078430146547204560 (fixed under $200, big spender)', () => {
-    const cells = rowFor(page({
-      title: 'n8n AI Automation Expert',
-      slug: 'n8n-AI-Automation-Expert', id: '022078430146547204560',
-      posted: '38 minutes ago', amount: '50', level: 'Intermediate', connects: '11',
-      proposals: '20 to 50', interviewing: '0', invites: '1', unanswered: '1',
-      bidRange: 'Upgrade your membership to see the bid range',
-      payLine: 'Payment method verified', rounded: '4.9 out of 5', reviews: '4.99 of 2,149 reviews',
-      location: 'United States\nHouston 10:00 am', spend: '26K', hires: '120 hires, 5 active',
-      hireLine: '100% hire rate, 87 open jobs',
-    }));
-    expect(cols3to24(cells)).toEqual([
-      'n8n AI Automation Expert',
-      'https://www.upwork.com/jobs/~022078430146547204560',
-      '50', '4.99', 'Yes', '$26K', '20 to 50', '0', '1', '1', 'Red', 'No', 'Fixed',
-      '-', '-', '-', '11', '-', 'Fixed-price under $200 ($50)',
-      '38 minutes ago', '87', 'Un Opened',
     ]);
   });
 });

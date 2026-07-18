@@ -1,0 +1,144 @@
+Skip to content
+Upwork home
+
+Find work
+
+
+Deliver work
+
+
+Manage finances
+
+Messages
+Search
+
+Search category:
+Jobs
+
+
+
+Account Settings
+Senior Full-Stack AI Engineer Needed to Build AI-Powered Browser Extension
+Posted 48 minutes ago
+Worldwide
+
+Summary
+We're looking for an experienced full-stack engineer to build Sourcr, an AI-powered platform that discovers warm consulting opportunities from a user's own LinkedIn and X feeds via a browser extension.
+
+Scope
+Build a Chrome extension (Manifest V3) that passively reads public posts already visible in a user's authenticated LinkedIn/X feed.
+Develop a backend to score opportunities against user profiles using AI.
+Generate personalized email pitches and DMs (copy only, never send automatically).
+Build a Company Scan feature that analyzes a company's website and careers page, returning a fit score, reasoning, and outreach suggestions.
+Implement saved opportunities, user feedback (like/dislike), and secure APIs.
+Tech Stack
+
+Open to your recommendations, but experience with TypeScript, React/Next.js, Node.js, Browser Extensions, PostgreSQL, OpenAI/Anthropic APIs, Vector Databases, Docker, and AWS is preferred.
+
+Requirements
+Proven experience building Chrome extensions.
+Experience shipping AI/LLM-powered applications.
+Strong full-stack architecture skills.
+Clean, scalable code and good communication.
+Important
+
+This product must not scrape platforms, automate scrolling, access DMs/private content, or perform actions on behalf of users. Protecting users' LinkedIn and X accounts is a strict requirement.
+
+When Applying
+
+Please include:
+
+Relevant browser extension projects.
+AI products you've built.
+Your preferred tech stack.
+A brief overview of how you'd approach this architecture.
+
+This is an MVP with the potential for long-term collaboration across multiple AI products.
+
+Doc Link:
+
+https://docs.google.com/document/d/1dqAiwfAOCuyTItT-mYVHHFnx0cVbTiDwepmeN2QxKE4/edit?usp=sharing
+
+$300.00
+
+Fixed-price
+Intermediate
+I am looking for a mix of experience and value
+Contract-to-hire opportunity
+This lets talent know that this job could become full time.
+Learn more
+Project Type:One-time project
+Skills and Expertise
+Mandatory skills
+Google Chrome Extension
+JavaScript
+Node.js
+API
+Activity on this job
+Proposals:
+5 to 10
+Last viewed by client:
+44 minutes ago
+Interviewing:
+3
+Invites sent:
+11
+Unanswered invites:
+6
+Upgrade your membership to see the bid range
+Send a proposal for: 13 Connects
+Available Connects: 29
+About the client
+Payment method verified
+Phone number verified
+Rating is 5.0 out of 5.
+5.0
+5.00 of 1 review
+Pakistan
+Lahore4:58 PM
+6 jobs posted
+34% hire rate, 2 open jobs
+$70 total spent
+2 hires, 0 active
+Member since Nov 1, 2025
+Job link
+https://www.upwork.com/jobs/~022078427482786284164
+Copy link
+Client's recent history (1)
+Video Editor Needed for Professional Freelancer Profile Intro (1-2 Minutes)
+Rating is 5.0 out of 5.
+5.0
+Great experience with Abdul Hadi, Very professional and very clear about what he wants, Would love to work more!
+To freelancer: Syed Owais A.
+Rating is 5.0 out of 5.
+5.0
+Owais is a great resource with expert skill in his niche. I would recommend anyone looking for a video editor.
+Apr 2026 - Apr 2026
+Fixed-price $70.00
+Other open jobs by this Client (1)
+Senior Full-Stack AI Engineer (AI Hiring Platform)Hourly
+Footer navigation
+About Us
+Feedback
+Trust, Safety & Security
+Help & Support
+Upwork Foundation
+Terms of Service
+Privacy Policy
+CA Notice at Collection
+Your Privacy ChoicesCalifornia Consumer Privacy Act (CCPA) Opt-Out
+Accessibility
+Desktop App
+Cookie Policy
+Enterprise Solutions
+Release notes
+Follow Us
+Visit Upwork on Facebook
+Read Upwork company news on LinkedIn
+Follow @Upwork on Twitter
+Watch Upwork videos on YouTube
+Follow Upwork on Instagram
+Mobile app
+Download Upwork app from iTunes
+Download Upwork app from Google Play
+© 2015 - 2026 Upwork® Global LLC

@@ -40,6 +40,17 @@ describe('Code.gs logCLEval LOG_SECRET gate', () => {
     expect(gas.sheets.CLEval).toBeUndefined();
   });
 
+  it('Job Link cell renders as clickable "URL" linked to the ~id job URL', () => {
+    const gas = loadGas({ logSecret: SECRET });
+    const url = 'https://www.upwork.com/jobs/~022078430146547204560';
+    const res = gas.handle_({ action: 'logCLEval', secret: SECRET, evaluationId: 'ev_link',
+      name: 'Usman Saeed', row: { jobTitle: 'n8n AI Automation Expert', jobLink: url } });
+    expect(res.ok).toBe(true);
+    const cell = gas.sheets.CLEval._rows[1][4]; // Job Link column (rich text)
+    expect(cell.text).toBe('URL');   // shows "URL", not the raw URL
+    expect(cell.link).toBe(url);     // linked to the job URL
+  });
+
   it('idempotency still holds under the gate: same evaluationId twice -> one row', () => {
     const gas = loadGas({ logSecret: SECRET });
     const a = gas.handle_(req(SECRET));

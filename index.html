@@ -1246,9 +1246,12 @@ var CLEVAL_COLUMNS=[
 function buildCLEvalRow(d){
   d=d||{};
   return CLEVAL_COLUMNS.map(function(c){
-    var k=c[1];
-    if(k==='proposalStatus') return (d.proposalStatus!=null&&d.proposalStatus!=='')?String(d.proposalStatus):'Un Opened';
-    return d[k]!=null?String(d[k]):'';
+    var k=c[1], v=d[k];
+    if(k==='proposalStatus') return (v!=null&&v!=='')?String(v):'Un Opened';
+    /* Job Link renders as the clickable word "URL" (the URL itself is carried in
+       the row object for the server to attach as a rich-text link). */
+    if(k==='jobLink') return (typeof v==='string' && /^https?:\/\//i.test(v)) ? 'URL' : (v!=null&&v!==''?String(v):'-');
+    return v!=null?String(v):'';
   });
 }
 /* Map a deterministic evaluation decision to a CLEval row object.
@@ -1290,9 +1293,9 @@ function evalCtx(){
     jobTitle: P.title||firstLine(jd),
     jobLink: P.jobLink||(document.getElementById('cl-job-link')||{}).value||'',
     hiringRate: (P.amount!=null?String(P.amount):''),   /* Hourly rate OR Fixed amount, NOT the hire-rate % */
-    clientRatings: P.ratingPrecise,
+    clientRatings: (P.ratingPrecise?String(parseFloat(P.ratingPrecise)):''), /* 5.00->5, 4.99->4.99 */
     payVerified: P.payVerified,
-    totalSpend: P.totalSpendRaw,
+    totalSpend: (P.totalSpendRaw?P.totalSpendRaw.replace(/^\$/,'').toLowerCase():''), /* $26K->26k, $70->70 */
     proposals: P.proposalsRaw,
     interviewing: P.interviewing,
     invitesSent: P.invitesSent,

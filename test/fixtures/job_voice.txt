@@ -1,0 +1,126 @@
+Skip to content
+Upwork home
+
+Find work
+
+
+Deliver work
+
+
+Manage finances
+
+Messages
+Search
+
+Search category:
+Jobs
+
+
+
+Account Settings
+Build AI Voice Assistant Mobile App MVP
+Posted 6 minutes ago
+Worldwide
+
+Summary
+We are looking for AI Developer to build a simple MVP of an AI-powered mobile assistant.
+
+The application should support both chat and voice interactions, allowing users to ask questions and receive intelligent responses based on a custom knowledge base.
+
+What we need:
+• Integrate OpenAI API
+• Implement AI chat functionality
+• Add voice input and voice responses
+• Build a basic RAG knowledge base
+• Connect required APIs
+• Configure simple automation workflows using n8n
+
+$150.00
+
+Fixed-price
+Entry level
+I am looking for freelancers with the lowest rates
+Project Type:One-time project
+Skills and Expertise
+Mandatory skills
+Mobile App Development Consultation
+AI Agent Development
+AI Assistants
+OpenAI API
+RAG
+n8n
+API Integrations
+Voice AI experience (Vapi, ElevenLabs, Retell AI)
+Activity on this job
+Proposals:
+Less than 5
+Interviewing:
+0
+Invites sent:
+0
+Unanswered invites:
+0
+Send a proposal for: 14 Connects
+Available Connects: 29
+About the client
+Payment method not verified
+Phone number verified
+Rating is 5.0 out of 5.
+5.0
+5.00 of 2 reviews
+UKR
+Kherson2:58 PM
+3 jobs posted
+100% hire rate, 1 open job
+$575 total spent
+3 hires, 0 active
+Member since Feb 21, 2025
+Job link
+https://www.upwork.com/jobs/~022078438161943164750
+Copy link
+Client's recent history (2)
+Need AI /ML Developer
+Rating is 5.0 out of 5.
+5.0
+It was a pleasure collaborating with Dmytro and his team. Their well-structured approach and clear vision for the AI workout recommendation system mad…more
+To freelancer: Oleg R.
+Rating is 5.0 out of 5.
+5.0
+Nice. Unlike previous contractors who simply delivered what was asked, this team challenged our assumptions and improved our technical approach. The v…more
+Mar 2025 - Mar 2025
+Fixed-price $290.00
+Improvements and Enhancement of Flutter DeFi Calculator App
+Rating is 5.0 out of 5.
+5.0
+It was a great experience to work with Dmytro. Your clear requirements and organized approach made the development process efficient and productive. I…more
+To freelancer: Oleg R.
+Rating is 5.0 out of 5.
+5.0
+Great job! The team exceeded all expectations on our recent project. They brought technical skill and creative problem-solving that transformed our ap…more
+Feb 2025 - Mar 2025
+Fixed-price
+Footer navigation
+About Us
+Feedback
+Trust, Safety & Security
+Help & Support
+Upwork Foundation
+Terms of Service
+Privacy Policy
+CA Notice at Collection
+Your Privacy ChoicesCalifornia Consumer Privacy Act (CCPA) Opt-Out
+Accessibility
+Desktop App
+Cookie Policy
+Enterprise Solutions
+Release notes
+Follow Us
+Visit Upwork on Facebook
+Read Upwork company news on LinkedIn
+Follow @Upwork on Twitter
+Watch Upwork videos on YouTube
+Follow Upwork on Instagram
+Mobile app
+Download Upwork app from iTunes
+Download Upwork app from Google Play
+© 2015 - 2026 Upwork® Global LLC

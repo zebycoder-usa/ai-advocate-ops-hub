@@ -216,13 +216,13 @@ function isUpworkHttps_(u){
 function clevalServerRow_(d, actor){
   d = d || {};
   var tz="Asia/Karachi", ts=new Date();
-  var link = isUpworkHttps_(d.jobLink) ? d.jobLink : "";  /* rich-text link applied after append */
+  var link = isUpworkHttps_(d.jobLink) ? d.jobLink : "";  /* rich-text "URL" link applied after append */
   var cells = [
     actor || d.assignee || "",                       /* 1  Assignee (server-owned) */
     Utilities.formatDate(ts,tz,"M/d/yyyy"),          /* 2  Date (server-owned) */
     Utilities.formatDate(ts,tz,"HH:mm"),             /* 3  Time PKT (server-owned) */
     d.jobTitle||"",                                  /* 4  Job Title */
-    link,                                            /* 5  Job Link (validated) */
+    link?"URL":"-",                                  /* 5  Job Link -> clickable "URL" (link attached below) */
     d.hiringRate||"", d.clientRatings||"", d.payVerified||"",           /* 6-8 */
     d.totalSpend||"", d.proposals||"", d.interviewing||"",              /* 9-11 */
     d.invitesSent||"", d.unansweredInvites||"",                         /* 12-13 */
@@ -272,8 +272,8 @@ function handleLogCLEval_(data, name){
     var rowNumber=sheet.getLastRow();
     var link=(data.row||{}).jobLink;
     if(isUpworkHttps_(link)){
-      var rt=SpreadsheetApp.newRichTextValue().setText(link).setLinkUrl(link).build();
-      sheet.getRange(rowNumber,5).setRichTextValue(rt);   /* NEVER a =HYPERLINK() string */
+      var rt=SpreadsheetApp.newRichTextValue().setText("URL").setLinkUrl(link).build();
+      sheet.getRange(rowNumber,5).setRichTextValue(rt);   /* clickable "URL"; NEVER a =HYPERLINK() string */
     }
     if(evId) idemSet_(evId,"COMMITTED",rowNumber);
     return {ok:true,row:rowNumber,deduped:false};
