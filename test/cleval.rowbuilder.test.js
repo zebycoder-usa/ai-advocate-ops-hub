@@ -131,14 +131,17 @@ describe('CLEval full Upwork-page parse -> exact row (3 REAL fixtures, Usman for
   });
 });
 
-describe('CLEval postCLEval() is staging-safe (never writes to the live backend)', () => {
+describe('CLEval postCLEval() transport (proxy in prod, direct override in dev)', () => {
   const R = { jobTitle: 'X', proposalStatus: 'Un Opened' };
 
-  it('unset endpoint -> no network write at all', () => {
+  it('PRODUCTION (no override) -> POSTs to /api/cleval with NO secret in the browser', () => {
     app.window.CLEVAL_BACKEND = '';
     const before = app.fetchCalls.length;
     app.window.postCLEval(R, 'ev_test');
-    expect(app.fetchCalls.length).toBe(before); // no-op
+    expect(app.fetchCalls.length).toBe(before + 1);
+    const last = app.fetchLog[app.fetchLog.length - 1];
+    expect(last.url).toBe('/api/cleval');
+    expect(JSON.parse(last.body).secret).toBeUndefined(); // secret stays server-side
   });
 
   it('REFUSES to write when CLEVAL_BACKEND equals the live SEAT_BACKEND', () => {
@@ -146,15 +149,19 @@ describe('CLEval postCLEval() is staging-safe (never writes to the live backend)
     const before = app.fetchCalls.length;
     app.window.postCLEval(R, 'ev_test');
     expect(app.fetchCalls.length).toBe(before); // hard-refused, no write to live
+    app.window.CLEVAL_BACKEND = '';
   });
 
-  it('writes only to a DISTINCT staging endpoint', () => {
+  it('LOCAL/STAGING override -> POSTs directly to the staging endpoint WITH secret', () => {
     const STAGING = 'https://script.google.com/macros/s/STAGING_CLONE/exec';
     app.window.CLEVAL_BACKEND = STAGING;
+    app.window.CLEVAL_SECRET = 'staging-test-7714';
     const before = app.fetchCalls.length;
     app.window.postCLEval(R, 'ev_test');
     expect(app.fetchCalls.length).toBe(before + 1);
-    expect(String(app.fetchCalls[app.fetchCalls.length - 1])).toBe(STAGING);
-    app.window.CLEVAL_BACKEND = ''; // restore no-op default for other tests
+    const last = app.fetchLog[app.fetchLog.length - 1];
+    expect(last.url).toBe(STAGING);
+    expect(JSON.parse(last.body).secret).toBe('staging-test-7714');
+    app.window.CLEVAL_BACKEND = ''; // restore production default for other tests
   });
 });

@@ -18,6 +18,7 @@ const HTML_PATH = join(__dirname, '..', 'index.html');
 export function loadApp() {
   const html = readFileSync(HTML_PATH, 'utf8');
   const calls = [];
+  const log = [];
   const dom = new JSDOM(html, {
     runScripts: 'dangerously',
     url: 'http://localhost/', // gives jsdom a working localStorage
@@ -25,6 +26,7 @@ export function loadApp() {
       // Block ALL network before the inline <script> runs.
       window.fetch = (...args) => {
         calls.push(args[0]);
+        log.push({ url: args[0], body: args[1] && args[1].body });
         return Promise.reject(new Error('network disabled in characterization tests'));
       };
       // Silence the app's benign console noise during load.
@@ -41,6 +43,7 @@ export function loadApp() {
     // test helpers to drive the manual signal form:
     setVal: (id, v) => window.setVal(id, v),
     fetchCalls: calls,
+    fetchLog: log,
   };
 }
 

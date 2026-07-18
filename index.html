@@ -1319,14 +1319,16 @@ function clevalId(parts){
    no-op (local/dev/tests never write). Failures are swallowed so logging can never
    break the decision flow. The server owns Assignee/Date/Time/Status. */
 function postCLEval(rowObj, evId){
-  /* Staging-only. No endpoint configured -> no-op. Hard refuse to write CLEval to
-     the LIVE gate backend even if misconfigured, so a preview can never touch the
-     live Ops DB / CLEval. */
-  if(!CLEVAL_BACKEND || CLEVAL_BACKEND===SEAT_BACKEND) return;
+  /* Hard refuse to ever target the LIVE gate backend directly. */
+  if(CLEVAL_BACKEND===SEAT_BACKEND) return;
+  var direct = !!CLEVAL_BACKEND;                 /* a window.__CLEVAL__ override => direct (local/staging) */
+  var url = direct ? CLEVAL_BACKEND : CLEVAL_PROXY;
+  var body = {action:'logCLEval', evaluationId:evId, name:(ME?ME.name:''),
+    row:rowObj, cells:buildCLEvalRow(rowObj)};
+  if(direct) body.secret = CLEVAL_SECRET;        /* only the direct path carries the secret; the proxy injects it server-side */
   try{
-    fetch(CLEVAL_BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'logCLEval', secret:CLEVAL_SECRET, evaluationId:evId,
-        name:(ME?ME.name:''), row:rowObj, cells:buildCLEvalRow(rowObj)})}).catch(function(){});
+    fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(body)}).catch(function(){});
   }catch(e){ /* never break the flow */ }
 }
 /* CL Score tab: one keyed row per letter (score and rewrite share the id). */
@@ -1368,13 +1370,16 @@ function syncManualState(){
    Everything here is the SEAT gate and is prefixed seat*. */
 var SEAT_BACKEND = "https://script.google.com/macros/s/AKfycbwsAdkj8XwW-x8DykVJ4mXzNp4qzFbJFx2kSm4uAor2Wi6AMm6BhuRW0P19xdIVoZFWWw/exec";
 var SEAT_ADMINS  = ['Saqib Shahzad','Jahanzaib (Zeb)'];  // must match ADMINS in Code.gs
-/* CLEval logging targets a STAGING Apps Script endpoint. The URL and secret come
-   from runtime config injected by the staging deploy (window.__CLEVAL__), read
-   the same way SEAT_BACKEND is a var here — NEVER hardcode a secret. When unset
-   (e.g. local/dev/tests) logging is a silent no-op, so nothing is written. */
+/* CLEval logging.
+   PRODUCTION: the browser POSTs to the same-origin serverless proxy /api/cleval,
+   which holds CLEVAL_BACKEND + LOG_SECRET server-side (like /api/claude holds the
+   Anthropic key) — the browser never sees the secret.
+   LOCAL DEV / STAGING: a gitignored window.__CLEVAL__ = { url, secret } overrides
+   this to POST directly to a staging Apps Script /exec (secret in the body). */
 var CLEVAL_CFG     = (typeof window!=='undefined' && window.__CLEVAL__) || {};
-var CLEVAL_BACKEND = CLEVAL_CFG.url    || '';
+var CLEVAL_BACKEND = CLEVAL_CFG.url    || '';   /* direct staging override (local dev only) */
 var CLEVAL_SECRET  = CLEVAL_CFG.secret || '';
+var CLEVAL_PROXY   = '/api/cleval';             /* production path — no secret in the browser */
 var seatMe=null, seatStart=null, seatQ={holder:null,holderSince:null,waiting:[],pendingOffer:null};
 var seatPoll=null, seatBeat=null, seatBooted=false;
 

@@ -48,13 +48,16 @@ describe('R12: hard ban overrides the /19 deterministically', () => {
 });
 
 describe('R12: runEval() renders the deterministic card and never calls the model', () => {
-  it('no network fetch during runEval; card shows the in-app score, not the model', async () => {
+  it('no /api/claude (model) call during runEval; card shows the in-app score', async () => {
     setJob('React and FastAPI dashboard. Hourly $45/hr. Payment verified. United States.');
     scoreWith(app, STRONG_45);
     const before = app.fetchCalls.length;
     await app.window.runEval();
-    const after = app.fetchCalls.length;
-    expect(after).toBe(before); // runEval made zero /api/claude (or any) calls
+    const after = app.fetchCalls.slice(before).map(String);
+    // The score is deterministic: runEval must NOT call the model proxy.
+    expect(after.some((u) => u.includes('/api/claude'))).toBe(false);
+    // It does log the decision via the same-origin CLEval proxy (no secret in browser).
+    expect(after).toContain('/api/cleval');
 
     const html = app.window.document.getElementById('eval-out').innerHTML;
     const d = app.window.evalDecision(); // same DOM state runEval rendered from
