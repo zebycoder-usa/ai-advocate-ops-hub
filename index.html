@@ -575,28 +575,47 @@ function pickTemplate(){
   if(/retainer|long.?term|ongoing|part.?time|join our team/.test(s)) return TEMPLATES[11];
   return TEMPLATES[0];
 }
-async function runEval(){
+/* R12: the AUTHORITATIVE score/verdict is deterministic and computed in-app by
+   scoreManual() + the parseJob() hard-ban logic. The model is NEVER used to
+   produce or override the score — it only writes proposal prose (genProposal).
+   A hard ban overrides the /19 to SKIP. */
+function evalDecision(){
+  var jd=val('job-text')||'';
+  var P=parseJob(jd);
+  var s=scoreManual();
+  var flags=P.flags||[];
+  if(P.bans && P.bans.length){
+    return {banned:true, bans:P.bans.slice(), flags:flags,
+      total:s.total, cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, decision:'SKIP — HARD BAN'};
+  }
+  return {banned:false, bans:[], flags:flags,
+    total:s.total, cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, decision:s.decision};
+}
+function renderDecisionCard(d){
+  var fixed=val('b-type')==='fixed';
+  var cliMax=fixed?6:7;
+  var col=d.banned?'var(--red)':(d.total>=14?'var(--green)':d.total>=10?'var(--amber)':'var(--red)');
+  var pill=d.banned?'<span class="pill no">SKIP — HARD BAN</span>'
+    :'<span class="pill '+(d.total>=14?'ok':d.total>=10?'warn':'no')+'">'+esc(d.decision)+'</span>';
+  var h='<div class="card"><div class="eyebrow">Decision (scored in-app, deterministic — not the model)</div>'
+    +'<div class="flex" style="justify-content:space-between;align-items:center;margin-top:6px">'
+    +'<div class="scorebig" style="color:'+col+'">'+d.total+' <span style="font-size:16px;font-weight:400;color:var(--muted)">/ 19</span></div>'+pill+'</div>'
+    +barRow('Client',d.cli,cliMax)+barRow('Job',d.job,7)+barRow('Match',d.mat,5);
+  if(d.sat) h+='<p class="note" style="margin-top:6px;color:var(--amber)">Saturation penalty: '+d.sat+' (50+ proposals)</p>';
+  if(d.banned) h+='<div class="card" style="margin-top:10px;border-color:var(--red)"><div class="eyebrow" style="color:var(--red)">Hard bans</div><ul class="note" style="margin-top:6px">'+d.bans.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul></div>';
+  if(d.flags && d.flags.length) h+='<div class="note" style="margin-top:8px;color:var(--amber)">Flags: '+d.flags.map(esc).join('; ')+'</div>';
+  h+='<div class="src" style="margin-top:10px">Scored in-app from the signal boxes and hard-ban rules. The model writes proposal prose only, never the score.</div></div>';
+  return h;
+}
+function runEval(){
   if(!gate('evaluate')) return;
   var el=document.getElementById('eval-out');
   var jd=val('job-text');
   if(!jd.trim()){ el.innerHTML='<div class="card note">Paste the full job post first, then press Evaluate.</div>'; return; }
-  el.innerHTML='<div class="card note">Scoring live...</div>';
-  var tenureLabels={new:'New / little history',established:'Established',unknown:'Unknown'};
-  var tenure=tenureLabels[val('c-tenure')]||'Unknown';
-  var ask='Score this Upwork job now. Give the full 19-point breakdown (Client, Job, Match) with the proposal-count penalty and the final decision, following your scoring rules exactly (including the new-client fairness and integrity-check rules). Do not write the proposal here, the proposal buttons handle that.\n\nCLIENT TENURE ON UPWORK (user-selected): '+tenure+'\n\nJOB:\n'+jd;
-  try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
-      messages:[{role:'user',content:ask}]})});
-    if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Scoring failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
-    var data=await resp.json();
-    var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
-    if(!txt){ el.innerHTML='<div class="card note">The model returned no score. Try again.</div>'; return; }
-    el.innerHTML='<div class="card"><div class="eyebrow">Decision (scored live by Claude)</div><div class="md">'+mdToHtml(txt)+'</div></div>';
-    logAct('evaluate', firstLine(jd), 0, 'AI scored');
-  }catch(e){
-    el.innerHTML='<div class="card note">Scoring error: '+esc(String(e&&e.message?e.message:e))+'</div>';
-  }
+  var P=parseJob(jd); autofill(P);          /* pre-fill the signal boxes from the post */
+  var d=evalDecision();                     /* deterministic authoritative verdict */
+  el.innerHTML=renderDecisionCard(d);
+  logAct('evaluate', firstLine(jd), d.total, d.banned?'HARD BAN':d.decision);
 }
 
 /* ============================ PROPOSAL + COVER LETTER (local, works with no key) ============================ */
