@@ -217,7 +217,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       </div>
     </div>
     <div class="flex" style="margin-top:12px">
-      <button class="btn" onclick="runEval()">Evaluate (19-point)</button>
+      <button class="btn" onclick="evaluateJob()">Evaluate (19-point) + AI analysis</button>
       <button class="btn gold" onclick="genProposal('priority')">Generate proposal (120–160w)</button>
       <button class="btn ghost" onclick="genProposal('speed')">Speed bid (&lt;50w)</button>
     </div>
@@ -687,6 +687,30 @@ function renderDecisionCard(d){
   h+='<div class="src" style="margin-top:10px">Scored in-app from the signal boxes and hard-ban rules. The model writes proposal prose only, never the score.</div></div>';
   return h;
 }
+/* AI analysis of the pasted job (fit + risks), shown ALONGSIDE the deterministic
+   score. The 19-point score/decision stay deterministic and in-app; the model only
+   writes commentary. Real model output or a visible error — never a silent template. */
+async function aiAnalyzeJob(jd, d){
+  var box=document.getElementById('eval-ai'); if(!box) return;
+  var verdict=d.banned ? ('SKIP — HARD BAN ('+((d.bans||[]).join('; ')||'ban rule')+')')
+                       : (d.total+'/'+(d.max||19)+' -> '+d.decision);
+  var sys=AGENCY_CONTEXT+'\n\nYou are analysing ONE Upwork job post for the agency. The 19-point score and decision are computed deterministically in-app; do NOT produce, restate, or change a numeric score. Write a short, honest analysis in natural spoken English. No em dashes, no en dashes. Cover three labelled parts: FIT (why this job does or does not match our full-service agency and skills), RISKS (client red flags, scope, budget, timeline, or anything in the post that could waste connects), and RECOMMENDATION (one line, consistent with the in-app decision). Be specific to THIS post. Never invent client facts, metrics, employers, or numbers that are not in the post.';
+  var ask='IN-APP DECISION (authoritative, do not restate as a score): '+verdict+'\n\nJOB POST:\n'+jd+'\n\nWrite the FIT / RISKS / RECOMMENDATION analysis now.';
+  try{
+    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,system:sys,messages:[{role:'user',content:ask}]})});
+    if(!resp.ok){ var errt=''; try{errt=await resp.text();}catch(_e){} box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis failed (HTTP '+resp.status+')</b>'+(errt?': '+esc(errt.slice(0,200)):'')+'</div>'; return; }
+    var data=await resp.json();
+    if(data.error){ box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis error:</b> '+esc(data.error.message||String(data.error))+'</div>'; return; }
+    var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+    if(!txt){ box.innerHTML='<div class="card note" style="border-color:var(--red)">AI analysis returned no text. Try again.</div>'; return; }
+    box.innerHTML='<div class="card"><div class="eyebrow">AI analysis (fit &amp; risks) — written live by Claude</div>'
+      +'<div class="md" style="margin-top:6px">'+mdToHtml(txt)+'</div>'
+      +'<div class="src" style="margin-top:10px">Model commentary only. The '+d.total+'/'+(d.max||19)+' score and decision are computed in-app, not by the model.</div></div>';
+  }catch(e){
+    box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis error:</b> '+esc(String(e&&e.message?e.message:e))+'</div>';
+  }
+}
 function runEval(){
   if(!gate('evaluate')) return;
   var el=document.getElementById('eval-out');
@@ -694,7 +718,7 @@ function runEval(){
   if(!jd.trim()){ el.innerHTML='<div class="card note">Paste the full job post first, then press Evaluate.</div>'; return; }
   var P=parseJob(jd); autofill(P);          /* pre-fill the signal boxes from the post */
   var d=evalDecision();                     /* deterministic authoritative verdict */
-  el.innerHTML=renderDecisionCard(d);
+  el.innerHTML=renderDecisionCard(d);       /* R12: runEval stays model-free (score is deterministic) */
   logAct('evaluate', firstLine(jd), d.total, d.banned?'HARD BAN':d.decision);
   /* CLEval: log EVERY decision. APPLY -> Green/Yes + real connects+bid;
      SKIP -> Red/No + connects blank + Bid '-'. No-op unless a staging endpoint
@@ -703,6 +727,16 @@ function runEval(){
   var ctx=evalCtx();
   postCLEval(clevalRowFrom(d, ctx),
     clevalId([ (ME?ME.name:''), ctx.jobLink, ctx.jobTitle, todayKey(), (apply?'APPLY':'SKIP') ]));
+}
+/* Evaluate button: deterministic score first (runEval, model-free), then attach the
+   live AI analysis alongside it. Kept separate so the score path never calls the model. */
+function evaluateJob(){
+  runEval();
+  var el=document.getElementById('eval-out'); var jd=val('job-text');
+  if(!el || !jd || !jd.trim()) return;
+  if(!/deterministic/.test(el.innerHTML)) return;   /* card did not render (gate blocked) */
+  el.insertAdjacentHTML('beforeend','<div id="eval-ai" style="margin-top:12px"><div class="card note">Writing AI analysis (fit and risks)...</div></div>');
+  aiAnalyzeJob(jd, evalDecision());
 }
 
 /* ============================ PROPOSAL + COVER LETTER (local, works with no key) ============================ */
@@ -775,6 +809,8 @@ async function genProposal(mode){
   var el=document.getElementById("prop-out");
   var jd=val("job-text");
   if(!jd){ el.innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
+  var _bans=(parseJob(jd).bans)||[];
+  if(_bans.length){ el.innerHTML='<div class="card note" style="border-color:var(--red)"><b>Hard ban - no proposal.</b> This job hits a skip rule ('+_bans.map(esc).join('; ')+'). Banned jobs get 0 connects and no proposal.</div>'; return; }
   el.innerHTML='<div class="card note">Generating proposal...</div>';
   var ask='Write a winning Upwork proposal and intro message for this job, following your PROPOSAL '
     +'OUTPUT RULES exactly. Output ONLY the two labelled blocks (PROPOSAL and INTRO MESSAGE), '
