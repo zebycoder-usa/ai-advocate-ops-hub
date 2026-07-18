@@ -1103,13 +1103,23 @@ function demoAnswer(q){
 }
 async function askAI(){
   var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
-  var live=false;
+  var live=false, failReason='';
   try{
     var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,messages:chat})});
-    if(resp.ok){var data=await resp.json();var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');if(txt){pushMsg('ai',txt);chat.push({role:'assistant',content:txt});live=true;}}
-  }catch(e){}
-  if(!live){var a=demoAnswer(q);pushMsg('ai',a);chat.push({role:'assistant',content:a});}
+    if(resp.ok){var data=await resp.json();
+      if(data.error){ failReason='API error: '+(data.error.message||data.error); }
+      else{var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+        if(txt){pushMsg('ai',txt);chat.push({role:'assistant',content:txt});live=true;} else { failReason='the model returned no text'; }}
+    } else { var errt=''; try{errt=await resp.text();}catch(_e){} failReason='HTTP '+resp.status+(errt?': '+errt.slice(0,200):''); }
+  }catch(e){ failReason=(e&&e.message)?e.message:String(e); }
+  // A real failure must be visible, never silently masked as a live answer.
+  // Keep Demo mode working (no-key / artifact contexts) but label it clearly.
+  if(!live){
+    console.error('[askAI] live AI unavailable, falling back to Demo mode:', failReason);
+    pushMsg('sys','Live AI unavailable ('+failReason+') — showing a canned Demo-mode answer below, not a live response.');
+    var a=demoAnswer(q);pushMsg('ai','[Demo mode] '+a);chat.push({role:'assistant',content:a});
+  }
 }
 function renderAiMode(){
   document.getElementById('ai-mode').innerHTML='<span>\u2726</span><div><b>Works now in Demo mode everywhere; fully live inside Claude or with a key.</b> Open this app as an artifact in Claude and the bot answers live for free. On a plain URL it answers from Demo mode until Saqib\u2019s Anthropic API key (separate from Claude Max) is added as a server env var. Models: <b>claude-sonnet-4-6</b> proposals, <b>claude-haiku-4-5</b> cheap scoring.</div>';
