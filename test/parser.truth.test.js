@@ -217,16 +217,20 @@ describe('job_voice.txt — the $150 voice assistant MVP from an unverified Ukra
     expect(P.openJobs).toBe(1);
   });
 
-  it('does not count Ukraine as Europe, because it is not on the app Europe list', () => {
-    expect(P.isEurope).toBe(false);
+  // Was: expected false, pinning the defect that the Europe list omitted Ukraine,
+  // the Baltics, the Balkans and every country code. That cost a real Match point
+  // on a legitimate European client. CLAUDE.md bans only India, Bangladesh and
+  // Pakistan, so a Ukrainian client is simply an allowed European one.
+  it('counts a Ukrainian client as Europe', () => {
+    expect(P.isEurope).toBe(true);
   });
 
   it('does not treat Ukraine as a banned country', () => {
     expect(P.isBanCountry).toBe(false);
   });
 
-  it('files the client region as Other', () => {
-    expect(P.region).toBe('Other');
+  it('files the client region as Europe', () => {
+    expect(P.region).toBe('Europe');
   });
 
   it('sees the job is open Worldwide and is not US-only', () => {
@@ -244,8 +248,10 @@ describe('job_voice.txt — the $150 voice assistant MVP from an unverified Ukra
     expect(P.bans).toEqual(['Fixed-price under $200 ($150)']);
   });
 
-  it('flags the client region for review rather than skipping the job outright', () => {
-    expect(P.flags).toEqual(['Outside allowed regions (Other) — review, not auto-skip']);
+  // Was: expected the "Outside allowed regions (Other)" flag. That flag was a
+  // symptom of the incomplete Europe list, not a real finding about this client.
+  it('raises no review flags, because an allowed-region client has nothing to flag', () => {
+    expect(P.flags).toEqual([]);
   });
 });
 

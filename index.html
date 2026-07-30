@@ -489,40 +489,142 @@ function val(id){var e=document.getElementById(id);return e?e.value:'';}
 function chk(id){var e=document.getElementById(id);return e?e.checked:false;}
 function setVal(id,v){var e=document.getElementById(id); if(e==null)return; if(e.type==='checkbox')e.checked=!!v; else e.value=v;}
 /* ---- read the pasted Upwork job and detect bans/threshold automatically ---- */
+/* ============================ PAGE SECTION MODEL ============================
+   A pasted Upwork page is five regions in a fixed order:
+     1 site chrome, up to "Account Settings"
+     2 JOB      title, posted, location, summary, budget, skills
+     3 ACTIVITY proposals, interviewing, invites, connects, bid range
+     4 CLIENT   payment verified, rating, country, spend, hire rate, job link
+     5 NOISE    "Client's recent history", "Other open jobs", footer nav
+   Matching a value against the whole blob is what made a US client whose users
+   live in India a hard ban, read $11.70 (the client's AVERAGE hourly rate paid)
+   as a $95/hr job's rate, and typed an hourly job as fixed-price because the
+   client's other 23 jobs were fixed-price. Region 5 must never influence anything.
+
+   When a marker is absent (a hand-typed note, a partial paste) the section falls
+   back to the text before the noise, never to the noise itself, so short inputs
+   still parse the way they always did. */
+function pageSections_(t){
+  var body = t;
+  var acct = body.search(/^[ \t]*account settings[ \t]*$/im);
+  if (acct >= 0) body = body.slice(acct);
+
+  var noiseAt = -1;
+  [/client'?s recent history/i, /other open jobs by this client/i, /footer navigation/i]
+    .forEach(function (re) { var i = body.search(re); if (i >= 0 && (noiseAt < 0 || i < noiseAt)) noiseAt = i; });
+  var head  = noiseAt >= 0 ? body.slice(0, noiseAt) : body;
+  var noise = noiseAt >= 0 ? body.slice(noiseAt) : '';
+
+  var clientAt   = head.search(/about the client/i);
+  var preClient  = clientAt >= 0 ? head.slice(0, clientAt) : head;
+  var client     = clientAt >= 0 ? head.slice(clientAt) : head;
+
+  var actAt   = preClient.search(/activity on this job/i);
+  var job      = actAt >= 0 ? preClient.slice(0, actAt) : preClient;
+  var activity = actAt >= 0 ? preClient.slice(actAt) : head;
+
+  return { job: job, activity: activity, client: client, noise: noise, head: head, all: t };
+}
+
+/* A nice-to-have skill tag describes what would be handy, not what the job IS.
+   "Blockchain" sitting in that list is not a blockchain job. */
+function stripNiceToHave_(s) {
+  var a = s.search(/nice[- ]to[- ]have skills/i);
+  if (a < 0) return s;
+  var rest = s.slice(a);
+  var b = rest.search(/preferred qualifications|activity on this job/i);
+  return s.slice(0, a) + (b >= 0 ? rest.slice(b) : '');
+}
+
+/* Contexts where a ban word appears but the job is not that kind of work.
+   Neutralised before the ban patterns run, so "no crypto experience needed"
+   and "military-grade encryption" stop costing us real jobs. */
+var BAN_EXCEPTIONS = [
+  /\b(?:no|not|never|without|zero)\s+(?:\w+\s+){0,2}(?:crypto|cryptocurrency|blockchain|banking|forex|trading|weapons?|military|defen[cs]e)\b/i,
+  /\bmilitary[-\s]grade\b/i,
+  /\bdefen[cs]e\s+(?:against|in\s+depth|of\s+the)\b/i,
+  /\bdefensive\b/i,
+  /\bself[-\s]defen[cs]e\b/i
+];
+function banScan_(text) {
+  var s = String(text || '');
+  BAN_EXCEPTIONS.forEach(function (re) { s = s.replace(new RegExp(re.source, 'gi'), ' '); });
+  return s;
+}
+
 function parseJob(text){
-  var t=(text||'').replace(/–|—/g,'-'); var low=t.toLowerCase();
+  var t=(text||'').replace(/–|—/g,'-');
+  var S=pageSections_(t);
+  /* Ban scanning reads THIS job's own description only, minus nice-to-have tags
+     and minus the benign contexts above. */
+  var low=banScan_(stripNiceToHave_(S.job)).toLowerCase();
   var P={budgetType:null,amount:null,proposalsLow:null,worldwide:false,usOnly:false,verified:false,spent:null,rating:null,hireRate:null,bans:[],flags:[]};
-  if(/fixed[-\s]?price/i.test(t)) P.budgetType='fixed'; else if(/\/\s?hr|per hour|hourly|an?\s+hour/i.test(t)) P.budgetType='hourly';
-  var m=t.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed[-\s]?price/i)||t.match(/fixed[-\s]?price[^$\d]{0,40}\$? ?([\d,]+(?:\.\d+)?)/i);
-  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
-  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*(?:an?\s+hour|per hour)/i);
-  if(!m) m=t.match(/([\d,]+(?:\.\d+)?)\s*(?:dollars?|usd)\b/i);
-  if(!m) m=t.match(/\$ ?([\d,]+(?:\.\d+)?)/);
+  /* Budget: JOB BLOCK ONLY. The client's other open jobs carry their own
+     "Fixed-price" labels and their own dollar figures. */
+  var jb=S.job;
+  if(/fixed[-\s]?price/i.test(jb)) P.budgetType='fixed'; else if(/\/\s?hr|per hour|hourly|an?\s+hour/i.test(jb)) P.budgetType='hourly';
+  /* Belt and braces: never read a rate off an "avg hourly rate paid" line, which
+     is the client's history, not this job's budget. */
+  var mt=jb.replace(/\$?\s*[\d.,]+\s*\/?\s*hr\s*avg hourly rate paid/ig,' ').replace(/avg hourly rate paid/ig,' ');
+  var m=mt.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed[-\s]?price/i)||mt.match(/fixed[-\s]?price[^$\d]{0,40}\$? ?([\d,]+(?:\.\d+)?)/i);
+  if(!m) m=mt.match(/\$? ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
+  if(!m) m=mt.match(/\$? ?([\d,]+(?:\.\d+)?)\s*(?:an?\s+hour|per hour)/i);
+  if(!m) m=mt.match(/([\d,]+(?:\.\d+)?)\s*(?:dollars?|usd)\b/i);
+  if(!m) m=mt.match(/\$ ?([\d,]+(?:\.\d+)?)/);
   if(m) P.amount=parseFloat(m[1].replace(/,/g,''));
-  var pp=t.match(/proposals?:?\s*\n?\s*(\d+)\s*(?:to|-)\s*(\d+)/i)||t.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*proposals/i);
+  /* Proposals: ACTIVITY BLOCK. proposalsLow is always the LOW bound of the
+     bucket, so "Less than 5" is 0, matching "20 to 50" meaning 20. */
+  var ab=S.activity;
+  var pp=ab.match(/proposals?:?\s*\n?\s*(\d+)\s*(?:to|-)\s*(\d+)/i)||ab.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*proposals/i);
   if(pp) P.proposalsLow=parseInt(pp[1],10);
   else{
-    var lt=t.match(/(?:less than|fewer than|under)\s*(\d+)\s*proposals/i)||t.match(/proposals?:?\s*(?:less than|fewer than|under)\s*(\d+)/i);
-    if(lt) P.proposalsLow=parseInt(lt[1],10);
-    else{var p2=t.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i)||t.match(/(\d+)\s*\+?\s*proposals/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
+    var lt=ab.match(/(?:less than|fewer than|under)\s*(\d+)\s*proposals/i)||ab.match(/proposals?:?\s*(?:less than|fewer than|under)\s*(\d+)/i);
+    if(lt) P.proposalsLow=0;
+    else{var p2=ab.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i)||ab.match(/(\d+)\s*\+?\s*proposals/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
   }
-  P.worldwide=/\bworldwide\b/i.test(t);
-  P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(t);
+  /* Where the JOB may be worked from. This is the job's own restriction and is
+     NOT the client's country: "Worldwide" jobs are routinely posted by US
+     clients, and reading usOnly off the whole page made every such job look
+     US-only because "United States" appears down in the client panel. */
+  P.worldwide=/\bworldwide\b/i.test(S.job);
+  P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(S.job);
   /* ---- TASK 2: region detection. US + Europe allowed; India/Bangladesh hard ban ---- */
-  P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|england|scotland|wales|ireland|germany|german|france|french|spain|spanish|italy|italian|netherlands|dutch|belgium|sweden|swedish|norway|denmark|danish|finland|finnish|poland|polish|portugal|portuguese|austria|austrian|switzerland|swiss|czech|greece|greek|romania|hungary|berlin|munich|london|paris|madrid|amsterdam|stockholm|dublin|zurich|lisbon|warsaw)\b/i.test(t);
+  /* Region is a fact about the CLIENT, so it reads the client block. The list
+     was missing Ukraine, the Baltics, most of the Balkans and every country
+     code, which cost a Match point on real European clients: job_voice.txt is a
+     "UKR / Kherson" client and scored as "Other". */
+  P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|\bgbr\b|england|scotland|wales|ireland|\birl\b|germany|german|\bdeu\b|\bger\b|france|french|\bfra\b|spain|spanish|\besp\b|italy|italian|\bita\b|netherlands|dutch|\bnld\b|belgium|\bbel\b|sweden|swedish|\bswe\b|norway|norwegian|\bnor\b|denmark|danish|\bdnk\b|finland|finnish|\bfin\b|poland|polish|\bpol\b|portugal|portuguese|\bprt\b|austria|austrian|\baut\b|switzerland|swiss|\bche\b|czech|czechia|\bcze\b|greece|greek|\bgrc\b|romania|romanian|\brou\b|hungary|hungarian|\bhun\b|ukraine|ukrainian|\bukr\b|bulgaria|bulgarian|\bbgr\b|croatia|croatian|\bhrv\b|serbia|serbian|\bsrb\b|slovakia|slovak|\bsvk\b|slovenia|slovenian|\bsvn\b|lithuania|lithuanian|\bltu\b|latvia|latvian|\blva\b|estonia|estonian|\best\b|iceland|\bisl\b|luxembourg|\blux\b|cyprus|\bcyp\b|malta|\bmlt\b|moldova|\bmda\b|albania|\balb\b|berlin|munich|hamburg|frankfurt|london|manchester|paris|lyon|madrid|barcelona|amsterdam|rotterdam|stockholm|dublin|zurich|geneva|lisbon|porto|warsaw|krakow|prague|vienna|budapest|bucharest|athens|helsinki|oslo|copenhagen|brussels|milan|rome|kyiv|kiev|kherson|lviv|odesa|odessa|sofia|zagreb|belgrade|bratislava|ljubljana|vilnius|riga|tallinn)\b/i.test(S.client);
   /* R14: Pakistan is a required hard-ban country. Includes the country word,
      the demonym (pakistani), and major cities. All matched with \b whole-word
      boundaries; none of the added tokens is a whole-word substring of an
      allowed US/Europe location, so no extra guard beyond the 'indiana' one is
      needed (e.g. 'islamabad' cannot match 'Islamic'; 'multan' cannot match
      'multi'). */
-  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune|pakistan|pakistani|karachi|lahore|islamabad|rawalpindi|faisalabad|multan|peshawar|quetta)\b/i.test(t) && !/\bindiana\b/i.test(low);
-  P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : ((P.usOnly||/\bunited states\b/i.test(t))?'US':'Other'));
-  P.verified=/payment (?:method )?verified|verified payment/i.test(t);
-  var sp=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
+  /* The policy is "clients CONFIRMED in India, Bangladesh or Pakistan", and
+     "unknown region is NOT a ban". So this reads the CLIENT BLOCK only. Run
+     against the whole page it banned clean, well-paid jobs whose only sin was a
+     US client mentioning users in India, or a past contract in Bangalore listed
+     in the client's history.
+     The "indiana" guard is gone: it was ANDed onto the WHOLE expression, so one
+     occurrence of that word anywhere switched the entire ban off, including for
+     a client explicitly located in Mumbai. It was never needed either, because
+     \bindia\b cannot match "Indiana". */
+  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune|pakistan|pakistani|karachi|lahore|islamabad|rawalpindi|faisalabad|multan|peshawar|quetta)\b/i.test(S.client);
+  /* The label understates the rule (Pakistan is banned too) but is load-bearing:
+     two call sites compare against this exact string. Renaming belongs with the
+     single-source-of-truth work, not here. */
+  P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : (/\bunited states\b|\busa\b|\bus[-\s]?based\b/i.test(S.client)?'US':'Other'));
+  /* Everything below is a fact about the CLIENT, so all of it reads the client
+     block. Read page-wide, the client's past contracts and other open jobs
+     supplied spend figures and star ratings that belong to nobody. */
+  var cb=S.client;
+  P.verified=/payment (?:method )?verified|verified payment/i.test(cb);
+  var sp=cb.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
   if(sp){var n=parseFloat(sp[1].replace(/,/g,''));var u=(sp[2]||'').toLowerCase();P.spent=u==='k'?n*1000:u==='m'?n*1e6:n;}
-  var rt=t.match(/([\d.]+)\s*stars?\b/i)||t.match(/([\d.]+)\s*\/\s*5\b/i)||t.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
-  var hr=t.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
+  /* Prefer the precise "4.99 of 2,149 reviews" over the rounded "5.0" badge that
+     sits directly above it, so rating and ratingPrecise stop disagreeing. */
+  var rt=cb.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i)||cb.match(/([\d.]+)\s*stars?\b/i)||cb.match(/([\d.]+)\s*\/\s*5\b/i)||cb.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
+  var hr=cb.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
   if(P.budgetType==='fixed' && P.amount!=null && P.amount<200) P.bans.push('Fixed-price under $200 ($'+P.amount+')');
   /* Proposal saturation is NOT a ban — it is scored as a penalty in runEval (see SAT_PENALTY). */
   if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
@@ -552,22 +654,28 @@ function parseJob(text){
     }
   }
   if(!P.title){ var h1=t.match(/\n\s*([^\n]{12,140}?)\s*\n\s*posted\s+\d/i); if(h1) P.title=h1[1].trim(); }
-  var idm=t.match(/~(\d{12,})/);                     P.jobLink   = idm?('https://www.upwork.com/jobs/~'+idm[1]):'';
-  var rpm=t.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i); P.ratingPrecise = rpm?rpm[1]:'';   /* precise "X.XX of N reviews", not rounded */
-  P.payVerified = /payment method not verified/i.test(t) ? 'No' : (/payment method verified/i.test(t) ? 'Yes' : '');
-  var tsm=t.match(/(\$[\d.,]+\s*[kKmM]?)\s*total spent/i); P.totalSpendRaw = tsm?tsm[1].replace(/\s+/g,''):'';
-  var prm=t.match(/proposals:\s*(less than \d+|\d+\s*to\s*\d+|\d+\+?)/i); P.proposalsRaw = prm?prm[1].replace(/\s+/g,' ').trim():'';
-  var ivm=t.match(/interviewing:\s*(\d+)/i);         P.interviewing      = ivm?parseInt(ivm[1],10):null;
-  var ism=t.match(/invites sent:\s*(\d+)/i);         P.invitesSent       = ism?parseInt(ism[1],10):null;
-  var uim=t.match(/unanswered invites:\s*(\d+)/i);   P.unansweredInvites = uim?parseInt(uim[1],10):null;
-  var cnm=t.match(/send a proposal for:\s*(\d+)\s*connects/i); P.connects = cnm?parseInt(cnm[1],10):null;
-  var pam=t.match(/posted\s+([^\n]*?\bago)\b/i);     P.postedAgo         = pam?pam[1].trim():'';
-  var ojm=t.match(/(\d+)\s+open jobs?/i);            P.openJobs          = ojm?parseInt(ojm[1],10):null;
+  var idm=cb.match(/~(\d{12,})/)||t.match(/~(\d{12,})/); P.jobLink = idm?('https://www.upwork.com/jobs/~'+idm[1]):'';
+  var rpm=cb.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i); P.ratingPrecise = rpm?rpm[1]:'';   /* precise "X.XX of N reviews", not rounded */
+  P.payVerified = /payment method not verified/i.test(cb) ? 'No' : (/payment method verified/i.test(cb) ? 'Yes' : '');
+  /* Upwork renders spend three ways: "$26K total spent", "$10K+ total spent" for
+     an established client, and "$0 spent" for a new one. The old pattern required
+     the first shape exactly, so this column was blank for most clients while the
+     scoring path read the same figure with a looser pattern and silently disagreed. */
+  var tsm=cb.match(/(\$[\d.,]+\s*[kKmM]?\+?)\s*(?:total\s+)?spent\b/i); P.totalSpendRaw = tsm?tsm[1].replace(/\s+/g,''):'';
+  var prm=ab.match(/proposals:\s*(less than \d+|\d+\s*to\s*\d+|\d+\+?)/i); P.proposalsRaw = prm?prm[1].replace(/\s+/g,' ').trim():'';
+  var ivm=ab.match(/interviewing:\s*(\d+)/i);        P.interviewing      = ivm?parseInt(ivm[1],10):null;
+  var ism=ab.match(/invites sent:\s*(\d+)/i);        P.invitesSent       = ism?parseInt(ism[1],10):null;
+  var uim=ab.match(/unanswered invites:\s*(\d+)/i);  P.unansweredInvites = uim?parseInt(uim[1],10):null;
+  var cnm=ab.match(/send a proposal for:\s*(\d+)\s*connects/i); P.connects = cnm?parseInt(cnm[1],10):null;
+  var pam=S.job.match(/posted\s+([^\n]*?\bago)\b/i)||t.match(/posted\s+([^\n]*?\bago)\b/i); P.postedAgo = pam?pam[1].trim():'';
+  var ojm=cb.match(/(\d+)\s+open jobs?/i);           P.openJobs          = ojm?parseInt(ojm[1],10):null;
   P.bidHigh='-'; P.bidAvg='-'; P.bidLow='-';
-  if(!/upgrade your membership to see the bid range/i.test(t)){
-    var bhm=t.match(/high[^$\d]{0,15}\$([\d.,]+)/i); if(bhm) P.bidHigh=bhm[1];
-    var bam=t.match(/avg[^$\d]{0,15}\$([\d.,]+)/i);  if(bam) P.bidAvg=bam[1];
-    var blm=t.match(/low[^$\d]{0,15}\$([\d.,]+)/i);  if(blm) P.bidLow=blm[1];
+  /* Competitor bid range lives in the activity block. Read page-wide, the words
+     "high", "avg" and "low" matched ordinary prose anywhere on the page. */
+  if(!/upgrade your membership to see the bid range/i.test(ab)){
+    var bhm=ab.match(/high[^$\d]{0,15}\$([\d.,]+)/i); if(bhm) P.bidHigh=bhm[1];
+    var bam=ab.match(/avg[^$\d]{0,15}\$([\d.,]+)/i);  if(bam) P.bidAvg=bam[1];
+    var blm=ab.match(/low[^$\d]{0,15}\$([\d.,]+)/i);  if(blm) P.bidLow=blm[1];
   }
   return P;
 }
