@@ -945,6 +945,70 @@ function echoProblem(job){
   }
   return ph;
 }
+/* ============================ PROPOSAL GUARD ============================
+   Nothing in this app ever checked a word of generated text before it reached
+   the clipboard and then a paying client. Every rule in CLAUDE.md and in all
+   four prompts was enforced only by the model choosing to comply, and the one
+   measurement function in the file (a word counter) had its value handed to the
+   model rather than compared to anything. This makes those rules deterministic.
+
+   validateProposal(text, opts) -> { ok, violations:[{rule, detail}] }
+     opts = { proofBank, jobText, mode: 'proposal' | 'speed' } */
+var PROPOSAL_MIN_WORDS = 120, PROPOSAL_MAX_WORDS = 180;
+var BADGE_RE = /\b(top\s+rated(\s+plus)?|job\s+success\s+score|jss|rising\s+talent)\b/i;
+
+/* The PROPOSAL block only. The draft also carries an INTRO MESSAGE block and may
+   carry a preamble, and neither counts toward the proposal's word budget. */
+function proposalBlock_(text){
+  var s=String(text||'');
+  var m=s.match(/^[ \t]*PROPOSAL[ \t]*:?[ \t]*$/im);
+  if(!m) return s;                                   /* unlabelled text IS the proposal */
+  var rest=s.slice(s.indexOf(m[0])+m[0].length);
+  var end=rest.search(/^[ \t]*INTRO\s+MESSAGE[ \t]*:?[ \t]*$/im);
+  return end>=0?rest.slice(0,end):rest;
+}
+function wordCount_(s){ return String(s||'').trim().split(/\s+/).filter(Boolean).length; }
+function numbersIn_(s){ return String(s||'').match(/\d[\d,]*(?:\.\d+)?/g)||[]; }
+/* A year, or an ordinary small count like "3 steps" or "2 weeks", needs no source.
+   Any other figure is a claim and must trace back to the proof bank or the post. */
+function exemptNumber_(raw){
+  if(/^(19|20)\d\d$/.test(raw)) return true;
+  var n=parseFloat(String(raw).replace(/,/g,''));
+  return isFinite(n) && n===Math.round(n) && n>=1 && n<=12;
+}
+
+function validateProposal(text, opts){
+  opts=opts||{}; var s=String(text||''), v=[];
+
+  if(/[–—]/.test(s)) v.push({rule:'dash', detail:'Contains an em dash or en dash. House style is commas and periods.'});
+
+  var ph=s.match(/\[[^\]\n]+\]/);
+  if(ph) v.push({rule:'placeholder', detail:'Contains an unfilled placeholder: '+ph[0]});
+
+  var badge=s.match(BADGE_RE);
+  if(badge) v.push({rule:'badge', detail:'Claims the platform badge "'+badge[0]+'". Badges are not deliverables and score zero as proof.'});
+
+  if(opts.mode!=='speed'){
+    var wc=wordCount_(proposalBlock_(s));
+    if(wc<PROPOSAL_MIN_WORDS||wc>PROPOSAL_MAX_WORDS)
+      v.push({rule:'length', detail:'The PROPOSAL block is '+wc+' words. It must be '+PROPOSAL_MIN_WORDS+' to '+PROPOSAL_MAX_WORDS+'.'});
+  }
+
+  var src=numbersIn_(String(opts.proofBank||'')+'\n'+String(opts.jobText||'')).map(function(x){return x.replace(/,/g,'');});
+  var bad=[];
+  numbersIn_(s).forEach(function(raw){
+    if(exemptNumber_(raw)) return;
+    if(src.indexOf(raw.replace(/,/g,''))<0 && bad.indexOf(raw)<0) bad.push(raw);
+  });
+  if(bad.length) v.push({rule:'unbacked-number', detail:'Not in the proof bank or the job post: '+bad.join(', ')});
+
+  /* One voice throughout. "I" stays case sensitive so AI and API are not flagged. */
+  if(/\bwe\b|\bour\b/i.test(s) && (/\bI\b/.test(s)||/\b(me|my)\b/i.test(s)))
+    v.push({rule:'voice', detail:'Mixes "I/me/my" with the agency "we". Pick one voice and keep it.'});
+
+  return {ok:v.length===0, violations:v};
+}
+
 /* TASK 1: problem-first, first person, real stack, no invented metrics/names, ends on ONE question.
    120-160 words for the full proposal. Free template mode (works with no API key);
    live Claude generation plugs in later via the proxy. No personal names, no agency mention. */
@@ -972,8 +1036,18 @@ async function genProposal(mode){
     var data=await resp.json();
     var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
     if(!txt){ el.innerHTML='<div class="card note">The model returned no text. Try again.</div>'; return; }
-    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
+    /* Check the draft BEFORE it can be copied. This is the only deterministic
+       enforcement of the house rules that exists; up to here they were a request
+       to the model. */
+    var vr=validateProposal(txt,{proofBank:AGENCY_PROOF_BANK, jobText:jd, mode:(mode==="speed"?"speed":"proposal")});
+    var vHtml=vr.ok?'':'<div class="card" data-violations style="margin-top:10px;border-color:var(--red)">'
+      +'<div class="eyebrow" style="color:var(--red)">Not ready to send. Fix these first.</div>'
+      +'<ul class="note" style="margin-top:6px">'
+      +vr.violations.map(function(x){return '<li><b>'+esc(x.rule)+'</b>: '+esc(x.detail)+'</li>';}).join('')
+      +'</ul><div class="src" style="margin-top:8px">Regenerate, or edit the draft in Upwork after copying the corrected text by hand.</div></div>';
+    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)"'+(vr.ok?'':' disabled')+'>Copy proposal</button></div>'
       +'<div class="md" data-copy>'+mdToHtml(txt)+'</div>'
+      +vHtml
       +'<div class="src" style="margin-top:10px">Generated live by Claude from the job post and the agency brief. Review before sending.</div></div>';
     logAct("proposal", firstLine(jd), 0, mode==="speed"?"speed draft":"proposal draft");
   }catch(e){
@@ -993,7 +1067,16 @@ function question(job){var s=(job||'').toLowerCase();
 function oneWord(s){return (s||'project').split(' ').slice(0,3).join(' ');}
 function cap(s){s=s||'';return s.charAt(0).toUpperCase()+s.slice(1);}
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function copyText(btn){var c=btn.closest('.card').querySelector('[data-copy]');navigator.clipboard.writeText(c.innerText);btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);}
+function copyText(btn){
+  var card=btn&&btn.closest?btn.closest('.card'):null; if(!card) return;
+  /* A disabled attribute is a hint, not a guard. Refuse here too, so the draft
+     cannot reach the clipboard via a direct call, a keyboard activation, or a
+     re-enabled button. */
+  if(card.querySelector('[data-violations]')) return;
+  var c=card.querySelector('[data-copy]'); if(!c) return;
+  navigator.clipboard.writeText(c.innerText);
+  btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);
+}
 
 /* ============================ PIPELINE + AUTO-LOG ============================ */
 /* ============================ PIPELINE + AUTO-LOG ============================ */
