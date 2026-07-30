@@ -509,19 +509,39 @@ function pageSections_(t){
   var acct = body.search(/^[ \t]*account settings[ \t]*$/im);
   if (acct >= 0) body = body.slice(acct);
 
+  /* Every marker here is a STANDALONE Upwork heading, so each is anchored to its
+     own line. Matched as loose phrases, a client's own prose truncated the job
+     block and silently killed every hard ban and the budget on that job:
+     "About the client: a Series B fintech building a crypto trading desk" moved
+     the whole description into the client region, where banScan_ never looks,
+     turning a hard SKIP into APPLY. The client heading takes the LAST match, so
+     a description that quotes the heading cannot drag the boundary earlier. */
+  function firstAt_(s, src){ var m = new RegExp(src, 'im').exec(s); return m ? m.index : -1; }
+  function lastAt_(s, src){ var g = new RegExp(src, 'gim'), m, at = -1; while ((m = g.exec(s))) at = m.index; return at; }
+
+  var actAt    = firstAt_(body, '^[ \\t]*activity on this job[ \\t]*$');
+  var clientAt = lastAt_(body,  '^[ \\t]*about the client[ \\t]*$');
+
   var noiseAt = -1;
-  [/client'?s recent history/i, /other open jobs by this client/i, /footer navigation/i]
-    .forEach(function (re) { var i = body.search(re); if (i >= 0 && (noiseAt < 0 || i < noiseAt)) noiseAt = i; });
+  ['^[ \\t]*client\'?s recent history', '^[ \\t]*other open jobs by this client', '^[ \\t]*footer navigation[ \\t]*$']
+    .forEach(function (src) { var i = firstAt_(body, src); if (i >= 0 && (noiseAt < 0 || i < noiseAt)) noiseAt = i; });
+  /* Noise only ever FOLLOWS the client panel on a real page. A hit before it is
+     the description mentioning the phrase, and honouring it collapsed all four
+     regions onto the same short prefix, voiding the entire parse. */
+  if (noiseAt >= 0 && noiseAt < Math.max(actAt, clientAt)) noiseAt = -1;
+
   var head  = noiseAt >= 0 ? body.slice(0, noiseAt) : body;
   var noise = noiseAt >= 0 ? body.slice(noiseAt) : '';
+  if (clientAt >= 0 && noiseAt >= 0 && clientAt >= noiseAt) clientAt = -1;
+  if (actAt    >= 0 && noiseAt >= 0 && actAt    >= noiseAt) actAt    = -1;
+  if (actAt >= 0 && clientAt >= 0 && actAt > clientAt) actAt = -1;   /* activity precedes the client panel */
 
-  var clientAt   = head.search(/about the client/i);
-  var preClient  = clientAt >= 0 ? head.slice(0, clientAt) : head;
-  var client     = clientAt >= 0 ? head.slice(clientAt) : head;
-
-  var actAt   = preClient.search(/activity on this job/i);
-  var job      = actAt >= 0 ? preClient.slice(0, actAt) : preClient;
-  var activity = actAt >= 0 ? preClient.slice(actAt) : head;
+  /* No client heading means a hand-typed note or a partial paste. The client
+     region then falls back to the head rather than to nothing, because a bare
+     string like "Client is a Pakistani-owned startup" must still ban. */
+  var job = head, activity = head, client = head;
+  if (clientAt >= 0) { client = head.slice(clientAt); job = head.slice(0, clientAt); activity = head.slice(0, clientAt); }
+  if (actAt >= 0)    { activity = clientAt >= 0 ? head.slice(actAt, clientAt) : head.slice(actAt); job = head.slice(0, actAt); }
 
   return { job: job, activity: activity, client: client, noise: noise, head: head, all: t };
 }
@@ -529,11 +549,23 @@ function pageSections_(t){
 /* A nice-to-have skill tag describes what would be handy, not what the job IS.
    "Blockchain" sitting in that list is not a blockchain job. */
 function stripNiceToHave_(s) {
-  var a = s.search(/nice[- ]to[- ]have skills/i);
+  /* Anchored to its own line, because this must only ever match the Upwork skills
+     HEADING. Matched loosely it also hit ordinary prose ("Nice to have skills:
+     Docker, Kubernetes."), and since the old terminator looked for "Activity on
+     this job", which pageSections_ has already cut away, the strip then ran to
+     the end of the description and deleted the sentence saying what the product
+     actually was. A crypto job came back APPLY WITH BOOST with an empty ban list. */
+  var a = s.search(/^[ \t]*nice[- ]to[- ]have skills[ \t]*:?[ \t]*$/im);
   if (a < 0) return s;
   var rest = s.slice(a);
-  var b = rest.search(/preferred qualifications|activity on this job/i);
-  return s.slice(0, a) + (b >= 0 ? rest.slice(b) : '');
+  var b = rest.search(/^[ \t]*(preferred qualifications|skills and expertise|project type|budget)\b/im);
+  if (b < 0) {
+    var blank = rest.search(/\n[ \t]*\n/);
+    /* Never swallow more than a chip list's worth. Removing description prose is
+       how a ban goes missing without anyone seeing it. */
+    b = blank >= 0 ? blank : Math.min(rest.length, 300);
+  }
+  return s.slice(0, a) + rest.slice(b);
 }
 
 /* Contexts where a ban word appears but the job is not that kind of work.
@@ -685,7 +717,7 @@ function parseJob(text){
    on its own: what an unknown client should be worth is an open owner decision,
    not something to settle inside a contamination fix. */
 var SIGNAL_BASELINE = {
-  'b-type':'', 'b-amt':'', 'j-props':'1', 'j-scope':'1', 'j-long':false,
+  'b-type':'hourly', 'b-amt':'', 'j-props':'1', 'j-scope':'1', 'j-long':false,
   'c-verified':true, 'c-us':true, 'c-tenure':'unknown', 'c-spend':'2', 'c-hire':'1',
   'm-match':'3', 'm-proof':true, 'j-ban':false
 };
@@ -706,7 +738,11 @@ function autofill(P){
   setVal('c-us', P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)>=0);
   if(P.spent!=null) setVal('c-spend', (P.spent>=1000&&P.spent<=50000)?'2':P.spent>50000?'1':P.spent>0?'1b':'0');
   if(P.hireRate!=null) setVal('c-hire', P.hireRate>=50?'2':P.hireRate>=20?'1':'0');
-  setVal('j-ban', P.bans.length>0);
+  /* Only ever RAISE this. Writing false wiped the operator's own tick on the
+     next Evaluate press, and pressing Evaluate is the only way to see the tick
+     take effect. resetSignals clears it on a genuinely new job, which is the
+     one place it should go back to false. */
+  if(P.bans.length) setVal('j-ban', true);
 }
 function scoreManual(){
   var fixed=val('b-type')==='fixed';
@@ -959,13 +995,38 @@ var BADGE_RE = /\b(top\s+rated(\s+plus)?|job\s+success\s+score|jss|rising\s+tale
 
 /* The PROPOSAL block only. The draft also carries an INTRO MESSAGE block and may
    carry a preamble, and neither counts toward the proposal's word budget. */
+/* The model does not always label the blocks the way the prompt asks. It writes
+   "**PROPOSAL**", "## Proposal", "PROPOSAL:", or "COVER LETTER", and CLAUDE.md
+   itself calls the second block a cover letter in one place and an intro message
+   in another. A strict label match folded the whole draft into the word count and
+   blocked the copy button on compliant work. */
+var OPEN_LABEL_RE  = /^[ \t]*(?:#{1,6}[ \t]*)?\**[ \t]*(?:PROPOSAL|COVER[ \t]+LETTER)\b[^\n]*$/im;
+var CLOSE_LABEL_RE = /^[ \t]*(?:#{1,6}[ \t]*)?\**[ \t]*(?:INTRO[ \t]+MESSAGE|COVER[ \t]+LETTER|INTRO)\b[^\n]*$/im;
+
 function proposalBlock_(text){
   var s=String(text||'');
-  var m=s.match(/^[ \t]*PROPOSAL[ \t]*:?[ \t]*$/im);
+  var m=OPEN_LABEL_RE.exec(s);
   if(!m) return s;                                   /* unlabelled text IS the proposal */
-  var rest=s.slice(s.indexOf(m[0])+m[0].length);
-  var end=rest.search(/^[ \t]*INTRO\s+MESSAGE[ \t]*:?[ \t]*$/im);
+  var rest=s.slice(m.index+m[0].length);
+  var end=rest.search(CLOSE_LABEL_RE);
   return end>=0?rest.slice(0,end):rest;
+}
+/* What actually reaches the client. The model's preamble ("Here is your draft,
+   review before sending") is not sent, so a dash or a bracket in it must not
+   block the bid. */
+function sendableText_(text){
+  var s=String(text||'');
+  var m=OPEN_LABEL_RE.exec(s);
+  return m?s.slice(m.index):s;
+}
+/* Mirroring the client's exact words is rule 4 of PROOF_VOICE_RULES, and those
+   words routinely contain "I". Quoting the client is not the agency speaking in
+   the first person, so quoted spans are excluded from the voice test. */
+function unquoted_(s){
+  return String(s||'')
+    .replace(/"[^"]*"/g,' ')
+    .replace(/[“][^”]*[”]/g,' ')
+    .replace(/^[ \t]*(?:you (?:wrote|said|put it)|your words)[^\n]*$/gim,' ');
 }
 function wordCount_(s){ return String(s||'').trim().split(/\s+/).filter(Boolean).length; }
 function numbersIn_(s){ return String(s||'').match(/\d[\d,]*(?:\.\d+)?/g)||[]; }
@@ -978,11 +1039,15 @@ function exemptNumber_(raw){
 }
 
 function validateProposal(text, opts){
-  opts=opts||{}; var s=String(text||''), v=[];
+  opts=opts||{}; var raw=String(text||'');
+  /* Judge only what a client will actually receive. Running these rules over the
+     model's preamble blocked bids on text that never leaves the app. */
+  var s=sendableText_(raw), v=[];
 
   if(/[–—]/.test(s)) v.push({rule:'dash', detail:'Contains an em dash or en dash. House style is commas and periods.'});
 
-  var ph=s.match(/\[[^\]\n]+\]/);
+  /* A markdown link or a citation marker is not an unfilled placeholder. */
+  var ph=s.replace(/\[[^\]\n]*\]\([^)\n]*\)/g,' ').match(/\[[^\]\n]*[A-Za-z]{2}[^\]\n]*\]/);
   if(ph) v.push({rule:'placeholder', detail:'Contains an unfilled placeholder: '+ph[0]});
 
   var badge=s.match(BADGE_RE);
@@ -995,16 +1060,27 @@ function validateProposal(text, opts){
   }
 
   var src=numbersIn_(String(opts.proofBank||'')+'\n'+String(opts.jobText||'')).map(function(x){return x.replace(/,/g,'');});
+  /* Only figures that read as a CLAIM need a source. Version strings, standards,
+     protocol names and durations are ordinary technical English, and reporting
+     them blocked proposals that stated nothing about past results at all. */
+  var claimText=s
+    .replace(/\b(?:v|version|python|node|react|next|angular|vue|php|java|go|rust|http|https|oauth|iso|soc|gpt|claude|llama|manifest|es|css|html|postgres|postgresql|mysql|redis|kubernetes|k8s|cuda)[ \t]*[.\-]?[ \t]*\d[\d.]*/gi,' ')
+    .replace(/\b\d+[ \t]*(?:hours?|hrs?|days?|weeks?|months?|years?|sprints?|steps?|stages?|rounds?|people|engineers?|specialists?)\b/gi,' ')
+    .replace(/\b(?:24\/7|99\.9%?|100%)\b/gi,' ')
+    .replace(/\b\d+(?:st|nd|rd|th)\b/gi,' ')
+    .replace(/\b\d+\s*x\b/gi,' ');
   var bad=[];
-  numbersIn_(s).forEach(function(raw){
+  numbersIn_(claimText).forEach(function(raw){
     if(exemptNumber_(raw)) return;
     if(src.indexOf(raw.replace(/,/g,''))<0 && bad.indexOf(raw)<0) bad.push(raw);
   });
   if(bad.length) v.push({rule:'unbacked-number', detail:'Not in the proof bank or the job post: '+bad.join(', ')});
 
-  /* One voice throughout. "I" stays case sensitive so AI and API are not flagged. */
-  if(/\bwe\b|\bour\b/i.test(s) && (/\bI\b/.test(s)||/\b(me|my)\b/i.test(s)))
-    v.push({rule:'voice', detail:'Mixes "I/me/my" with the agency "we". Pick one voice and keep it.'});
+  /* One voice throughout. "I" stays case sensitive so AI and API are not flagged,
+     and quoted client words are excluded so mirroring the brief stays legal. */
+  var uq=unquoted_(s);
+  if(/\bwe\b|\bour\b/i.test(uq) && (/\bI\b/.test(uq)||/\b(me|my)\b/i.test(uq)))
+    v.push({rule:'voice', detail:'Mixes "I/me/my" with the agency "we" outside a quote. Pick one voice and keep it.'});
 
   return {ok:v.length===0, violations:v};
 }
@@ -1091,7 +1167,10 @@ function logAct(action, job, score, decision){
 function shortlist(){
   if(!gate('pipeline')) return;
   var job=val('job-text')||'(paste a job in Evaluate first)';
-  var P=parseJob(job); var sc = (P.bans.length||(P.worldwide&&!P.usOnly)||P.belowBudget)?0:scoreManual().total;
+  /* One source of truth. This used to run a second, contradictory rule engine
+     whose 'worldwide without a US marker' rule exists in no policy document,
+     so the pipeline showed 0 for jobs the decision card had just scored 16. */
+  var d=evalDecision(); var sc = d.banned ? 0 : d.total;
   mem.pipeline.push({id:Date.now(), job:firstLine(job), score:sc, stage:'Shortlisted', by:ME.name});
   save('pipeline',mem.pipeline); logAct('shortlist',firstLine(job),sc,'shortlisted'); renderPipeline();
 }
