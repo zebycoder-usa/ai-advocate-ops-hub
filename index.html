@@ -679,10 +679,29 @@ function parseJob(text){
   }
   return P;
 }
+/* Every scoring input, at the value it must hold when the page says nothing.
+   runEval resets to this before autofill writes, so job N is never scored on
+   job N-1's answers. Values match the HTML defaults, so this changes no score
+   on its own: what an unknown client should be worth is an open owner decision,
+   not something to settle inside a contamination fix. */
+var SIGNAL_BASELINE = {
+  'b-type':'', 'b-amt':'', 'j-props':'1', 'j-scope':'1', 'j-long':false,
+  'c-verified':true, 'c-us':true, 'c-tenure':'unknown', 'c-spend':'2', 'c-hire':'1',
+  'm-match':'3', 'm-proof':true, 'j-ban':false
+};
+function resetSignals(){ Object.keys(SIGNAL_BASELINE).forEach(function(k){ setVal(k, SIGNAL_BASELINE[k]); }); }
+var LAST_EVAL_JD=null;   /* the job text the signal boxes currently describe */
+
 function autofill(P){
   if(P.budgetType) setVal('b-type',P.budgetType);
   if(P.amount!=null) setVal('b-amt',String(P.amount));
-  if(P.proposalsLow!=null) setVal('j-props', P.proposalsLow>=20?'3':P.proposalsLow>=10?'2':P.proposalsLow>=5?'1':'0');
+  /* Buckets must match the dropdown's own labels: Under 20 / 20-50 / 50+.
+     Anything 20 or over used to select option 3, the one labelled
+     "50+ (heavily saturated)", so a job showing "20 to 50" (Upwork's most
+     common bucket) lost its 2 job points AND took the -2 saturation penalty:
+     a 4 point swing, on the wrong side of every band. Counts under 5 wrote '0',
+     which is not an option this select has, blanking it and forfeiting 2 more. */
+  if(P.proposalsLow!=null) setVal('j-props', P.proposalsLow>=50?'3':P.proposalsLow>=20?'2':'1');
   setVal('c-verified',P.verified);
   setVal('c-us', P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)>=0);
   if(P.spent!=null) setVal('c-spend', (P.spent>=1000&&P.spent<=50000)?'2':P.spent>50000?'1':P.spent>0?'1b':'0');
@@ -770,10 +789,19 @@ function evalDecision(){
   var s=scoreManual();
   var flags=(P.flags||[]).slice();
   if(s.integrity) flags.push('verify client authenticity: inconsistent history');
+  /* The manual override. It is the ONLY way to record a ban the regexes cannot
+     see: a client region recognised from the profile, a company known by
+     reputation, a condition buried in an attachment. It was written by autofill
+     and read by nothing, so ticking it changed nothing and the app answered with
+     APPLY and a polished proposal. */
+  var manualBan=chk('j-ban');
   var base={cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, total:s.total,
     cliMax:s.cliMax, max:(s.isNew?s.achievableMax:19), isNew:s.isNew, flags:flags};
-  if(P.bans && P.bans.length){
-    base.banned=true; base.bans=P.bans.slice(); base.decision='SKIP — HARD BAN';
+  if((P.bans && P.bans.length) || manualBan){
+    base.banned=true;
+    base.bans=(P.bans||[]).slice();
+    if(manualBan && !base.bans.length) base.bans.push('Marked as a HARD BAN by the operator');
+    base.decision='SKIP — HARD BAN';
     return base;
   }
   base.banned=false; base.bans=[]; base.decision=s.decision;
@@ -824,6 +852,14 @@ function runEval(){
   var el=document.getElementById('eval-out');
   var jd=val('job-text');
   if(!jd.trim()){ el.innerHTML='<div class="card note">Paste the full job post first, then press Evaluate.</div>'; return; }
+  /* Reset on a NEW job only. autofill writes a field only when the parser found
+     it, and never touches Scope, Skill match, Portfolio proof, Long-term or
+     Client tenure at all, so without this every job after the first in a sitting
+     was scored partly on the previous job's answers. Pasting job after job is
+     the documented workflow, so that was the normal path, not an edge case.
+     Keying on the job text means re-evaluating the SAME job keeps an operator's
+     deliberate corrections, which is the whole point of the manual signals. */
+  if(jd!==LAST_EVAL_JD){ resetSignals(); LAST_EVAL_JD=jd; }
   var P=parseJob(jd); autofill(P);          /* pre-fill the signal boxes from the post */
   var d=evalDecision();                     /* deterministic authoritative verdict */
   el.innerHTML=renderDecisionCard(d);       /* R12: runEval stays model-free (score is deterministic) */
@@ -917,7 +953,11 @@ async function genProposal(mode){
   var el=document.getElementById("prop-out");
   var jd=val("job-text");
   if(!jd){ el.innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
+  /* Honour the manual override here too. A proposal is the expensive, outward
+     facing artifact: an operator who has marked this job banned must not be
+     handed one anyway, and it must not cost a model call. */
   var _bans=(parseJob(jd).bans)||[];
+  if(chk('j-ban') && !_bans.length) _bans=['Marked as a HARD BAN by the operator'];
   if(_bans.length){ el.innerHTML='<div class="card note" style="border-color:var(--red)"><b>Hard ban - no proposal.</b> This job hits a skip rule ('+_bans.map(esc).join('; ')+'). Banned jobs get 0 connects and no proposal.</div>'; return; }
   el.innerHTML='<div class="card note">Generating proposal...</div>';
   var ask='Write a winning Upwork proposal and intro message for this job, following your PROPOSAL '
@@ -1512,9 +1552,19 @@ function initTheme(){
 }
 /* When a job description is pasted, the AI scores it, so grey out the manual signal boxes and proposal-count dropdown. */
 function syncManualState(){
-  var has=((typeof val==='function'?val('job-text'):'')||'').trim().length>0;
-  var card=document.getElementById('signal-card'); if(card) card.classList.toggle('manual-dim',has);
-  var jp=document.getElementById('j-props'); if(jp) jp.classList.toggle('manual-dim',has);
+  /* This used to add .manual-dim (opacity + pointer-events:none) to the entire
+     signal card and to j-props whenever the job box was non-empty, which during
+     real use is always. That pinned five of the twelve inputs the scorer reads
+     to their HTML defaults, because autofill never writes Scope, Skill match,
+     Portfolio proof, Long-term or Client tenure: the operator simply could not
+     reach them with a mouse. Two of the three score dimensions became
+     near-constants, and since Match then never dropped below 4, the "Match 4+"
+     condition on APPLY WITH BOOST was a permanent pass that gated nothing.
+     The only workaround, setting the dropdowns BEFORE pasting, is documented
+     nowhere. The inputs now stay operable; autofill still pre-fills whatever it
+     can actually find on the page. */
+  var card=document.getElementById('signal-card'); if(card) card.classList.remove('manual-dim');
+  var jp=document.getElementById('j-props'); if(jp) jp.classList.remove('manual-dim');
 }
 
 /* ============================ SEAT GATE ============================
