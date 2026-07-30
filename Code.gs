@@ -40,7 +40,14 @@ function setup(){ Object.keys(TABS).forEach(function(n){ sheet_(n); }); var id=s
 function hm_(min){ min=Math.round(min||0); var h=Math.floor(min/60),m=min%60; return h+"h "+m+"m"; }
 
 /* ---- queue I/O ---- */
-function readQueue_(){
+/* allowRelease: only a caller holding the script lock may trigger the stale-holder
+   auto-release, because that path WRITES (queue + ActivityLog). Reading the queue
+   must never mutate it. getLogs is reachable over GET, so with the release wired
+   into the read a stray link, a prefetch or a crawler could take the seat away
+   from whoever was mid-bid, and it ran outside the lock, racing every other
+   transition. The stale holder is now released on the next real gate action,
+   which is precisely when it matters. */
+function readQueue_(allowRelease){
   var s = sheet_("Queue");
   if(s.getLastRow()<2){ s.appendRow(["","","","",new Date(),""]); }
   var r = s.getRange(2,1,1,6).getValues()[0];
@@ -49,7 +56,7 @@ function readQueue_(){
   var q = {holder:r[0]||null,holderSince:r[1]||null,waiting:waiting,pendingOffer:r[3]||null,holderHeartbeat:r[5]||null};
 
   /* auto-release a holder who stopped sending heartbeats (crashed tab, closed laptop) */
-  if(q.holder && q.holderHeartbeat){
+  if(allowRelease && q.holder && q.holderHeartbeat){
     var lastHb = new Date(q.holderHeartbeat).getTime();
     if(!isNaN(lastHb) && (Date.now()-lastHb)>STALE_MS){
       var staleHolder = q.holder;
@@ -74,6 +81,12 @@ function writeQueue_(q){
 function qJoin_(q,name){
   if(!q.holder){
     q.holder=name; q.holderSince=new Date().toISOString(); q.holderHeartbeat=new Date().toISOString();
+    /* Filling the seat cancels any outstanding offer, and the new holder must
+       not also sit in the waiting list. A pendingOffer that outlives the seat
+       being filled is a redeemable token: the stale offeree can later accept
+       and take the profile from whoever is now bidding on it. */
+    q.pendingOffer=null;
+    q.waiting=q.waiting.filter(function(x){return x.name!==name;});
     return "HOLDER";
   }
   if(q.holder===name){ q.holderHeartbeat=new Date().toISOString(); return "HOLDER"; }
@@ -98,6 +111,14 @@ function qDecline_(q,name){
 }
 function qAccept_(q,name){
   var who=name||q.pendingOffer; if(!who) return null;
+  /* An accept is valid ONLY from the person actually offered the seat, and only
+     while the seat is free. Without these two guards any caller could POST
+     {action:'gateAccept',name:'X'} and evict whoever was mid-bid, even having
+     never logged in or queued. Both checks sit above the waiting-list filter so
+     a refused accept mutates nothing: it must not consume the rightful
+     offeree's turn or drop the caller out of the line. */
+  if(q.pendingOffer!==who) return null;
+  if(q.holder) return null;
   q.waiting=q.waiting.filter(function(x){return x.name!==who;});
   q.holder=who; q.holderSince=new Date().toISOString(); q.holderHeartbeat=new Date().toISOString();
   q.pendingOffer=null; return who;
@@ -260,13 +281,19 @@ function handleLogCLEval_(data, name){
   var lock=LockService.getScriptLock();
   try{ lock.waitLock(LOCK_MS); } catch(e){ return {ok:false,error:"CLEval busy, try again in a moment."}; }
   try{
+    var sheet=resolveCLEvalSheet_(data.sheet);
     if(evId){
       var ex=idemFind_(evId);
       if(ex && String(ex.status)==="COMMITTED" && ex.rowNumber) return {ok:true,row:ex.rowNumber,deduped:true};
       if(ex && ex.rowNumber){ idemSet_(evId,"COMMITTED",ex.rowNumber); return {ok:true,row:ex.rowNumber,deduped:true}; }
-      idemSet_(evId,"PENDING","");
+      /* Reserve the DESTINATION ROW before appending. This was written as PENDING
+         with an empty rowNumber, so a crash between the append below and the
+         COMMITTED write left a row on the sheet that the ledger could not point
+         at. The recovery guard above tests ex.rowNumber, which was "", so the
+         retry fell straight through and appended a duplicate: the exact crash
+         the ledger exists to survive. */
+      idemSet_(evId,"PENDING",sheet.getLastRow()+1);
     }
-    var sheet=resolveCLEvalSheet_(data.sheet);
     var row=clevalServerRow_(data.row||{}, name);
     sheet.appendRow(row);
     var rowNumber=sheet.getLastRow();
@@ -318,7 +345,9 @@ function handle_(data){
   catch(e){ return {ok:false,error:"Gate is busy, try again in a moment."}; }
 
   try{
-    var q=readQueue_();
+    /* true: we hold the lock here, so this is the one place allowed to run the
+       stale-holder auto-release, which writes. */
+    var q=readQueue_(true);
 
     if(action==="login"){
       var st=qJoin_(q,name); writeQueue_(q); openSession_(name);

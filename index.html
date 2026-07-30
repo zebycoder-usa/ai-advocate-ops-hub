@@ -489,40 +489,142 @@ function val(id){var e=document.getElementById(id);return e?e.value:'';}
 function chk(id){var e=document.getElementById(id);return e?e.checked:false;}
 function setVal(id,v){var e=document.getElementById(id); if(e==null)return; if(e.type==='checkbox')e.checked=!!v; else e.value=v;}
 /* ---- read the pasted Upwork job and detect bans/threshold automatically ---- */
+/* ============================ PAGE SECTION MODEL ============================
+   A pasted Upwork page is five regions in a fixed order:
+     1 site chrome, up to "Account Settings"
+     2 JOB      title, posted, location, summary, budget, skills
+     3 ACTIVITY proposals, interviewing, invites, connects, bid range
+     4 CLIENT   payment verified, rating, country, spend, hire rate, job link
+     5 NOISE    "Client's recent history", "Other open jobs", footer nav
+   Matching a value against the whole blob is what made a US client whose users
+   live in India a hard ban, read $11.70 (the client's AVERAGE hourly rate paid)
+   as a $95/hr job's rate, and typed an hourly job as fixed-price because the
+   client's other 23 jobs were fixed-price. Region 5 must never influence anything.
+
+   When a marker is absent (a hand-typed note, a partial paste) the section falls
+   back to the text before the noise, never to the noise itself, so short inputs
+   still parse the way they always did. */
+function pageSections_(t){
+  var body = t;
+  var acct = body.search(/^[ \t]*account settings[ \t]*$/im);
+  if (acct >= 0) body = body.slice(acct);
+
+  var noiseAt = -1;
+  [/client'?s recent history/i, /other open jobs by this client/i, /footer navigation/i]
+    .forEach(function (re) { var i = body.search(re); if (i >= 0 && (noiseAt < 0 || i < noiseAt)) noiseAt = i; });
+  var head  = noiseAt >= 0 ? body.slice(0, noiseAt) : body;
+  var noise = noiseAt >= 0 ? body.slice(noiseAt) : '';
+
+  var clientAt   = head.search(/about the client/i);
+  var preClient  = clientAt >= 0 ? head.slice(0, clientAt) : head;
+  var client     = clientAt >= 0 ? head.slice(clientAt) : head;
+
+  var actAt   = preClient.search(/activity on this job/i);
+  var job      = actAt >= 0 ? preClient.slice(0, actAt) : preClient;
+  var activity = actAt >= 0 ? preClient.slice(actAt) : head;
+
+  return { job: job, activity: activity, client: client, noise: noise, head: head, all: t };
+}
+
+/* A nice-to-have skill tag describes what would be handy, not what the job IS.
+   "Blockchain" sitting in that list is not a blockchain job. */
+function stripNiceToHave_(s) {
+  var a = s.search(/nice[- ]to[- ]have skills/i);
+  if (a < 0) return s;
+  var rest = s.slice(a);
+  var b = rest.search(/preferred qualifications|activity on this job/i);
+  return s.slice(0, a) + (b >= 0 ? rest.slice(b) : '');
+}
+
+/* Contexts where a ban word appears but the job is not that kind of work.
+   Neutralised before the ban patterns run, so "no crypto experience needed"
+   and "military-grade encryption" stop costing us real jobs. */
+var BAN_EXCEPTIONS = [
+  /\b(?:no|not|never|without|zero)\s+(?:\w+\s+){0,2}(?:crypto|cryptocurrency|blockchain|banking|forex|trading|weapons?|military|defen[cs]e)\b/i,
+  /\bmilitary[-\s]grade\b/i,
+  /\bdefen[cs]e\s+(?:against|in\s+depth|of\s+the)\b/i,
+  /\bdefensive\b/i,
+  /\bself[-\s]defen[cs]e\b/i
+];
+function banScan_(text) {
+  var s = String(text || '');
+  BAN_EXCEPTIONS.forEach(function (re) { s = s.replace(new RegExp(re.source, 'gi'), ' '); });
+  return s;
+}
+
 function parseJob(text){
-  var t=(text||'').replace(/–|—/g,'-'); var low=t.toLowerCase();
+  var t=(text||'').replace(/–|—/g,'-');
+  var S=pageSections_(t);
+  /* Ban scanning reads THIS job's own description only, minus nice-to-have tags
+     and minus the benign contexts above. */
+  var low=banScan_(stripNiceToHave_(S.job)).toLowerCase();
   var P={budgetType:null,amount:null,proposalsLow:null,worldwide:false,usOnly:false,verified:false,spent:null,rating:null,hireRate:null,bans:[],flags:[]};
-  if(/fixed[-\s]?price/i.test(t)) P.budgetType='fixed'; else if(/\/\s?hr|per hour|hourly|an?\s+hour/i.test(t)) P.budgetType='hourly';
-  var m=t.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed[-\s]?price/i)||t.match(/fixed[-\s]?price[^$\d]{0,40}\$? ?([\d,]+(?:\.\d+)?)/i);
-  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
-  if(!m) m=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*(?:an?\s+hour|per hour)/i);
-  if(!m) m=t.match(/([\d,]+(?:\.\d+)?)\s*(?:dollars?|usd)\b/i);
-  if(!m) m=t.match(/\$ ?([\d,]+(?:\.\d+)?)/);
+  /* Budget: JOB BLOCK ONLY. The client's other open jobs carry their own
+     "Fixed-price" labels and their own dollar figures. */
+  var jb=S.job;
+  if(/fixed[-\s]?price/i.test(jb)) P.budgetType='fixed'; else if(/\/\s?hr|per hour|hourly|an?\s+hour/i.test(jb)) P.budgetType='hourly';
+  /* Belt and braces: never read a rate off an "avg hourly rate paid" line, which
+     is the client's history, not this job's budget. */
+  var mt=jb.replace(/\$?\s*[\d.,]+\s*\/?\s*hr\s*avg hourly rate paid/ig,' ').replace(/avg hourly rate paid/ig,' ');
+  var m=mt.match(/\$ ?([\d,]+(?:\.\d+)?)\s*\n?\s*fixed[-\s]?price/i)||mt.match(/fixed[-\s]?price[^$\d]{0,40}\$? ?([\d,]+(?:\.\d+)?)/i);
+  if(!m) m=mt.match(/\$? ?([\d,]+(?:\.\d+)?)\s*\/\s*hr/i);
+  if(!m) m=mt.match(/\$? ?([\d,]+(?:\.\d+)?)\s*(?:an?\s+hour|per hour)/i);
+  if(!m) m=mt.match(/([\d,]+(?:\.\d+)?)\s*(?:dollars?|usd)\b/i);
+  if(!m) m=mt.match(/\$ ?([\d,]+(?:\.\d+)?)/);
   if(m) P.amount=parseFloat(m[1].replace(/,/g,''));
-  var pp=t.match(/proposals?:?\s*\n?\s*(\d+)\s*(?:to|-)\s*(\d+)/i)||t.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*proposals/i);
+  /* Proposals: ACTIVITY BLOCK. proposalsLow is always the LOW bound of the
+     bucket, so "Less than 5" is 0, matching "20 to 50" meaning 20. */
+  var ab=S.activity;
+  var pp=ab.match(/proposals?:?\s*\n?\s*(\d+)\s*(?:to|-)\s*(\d+)/i)||ab.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*proposals/i);
   if(pp) P.proposalsLow=parseInt(pp[1],10);
   else{
-    var lt=t.match(/(?:less than|fewer than|under)\s*(\d+)\s*proposals/i)||t.match(/proposals?:?\s*(?:less than|fewer than|under)\s*(\d+)/i);
-    if(lt) P.proposalsLow=parseInt(lt[1],10);
-    else{var p2=t.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i)||t.match(/(\d+)\s*\+?\s*proposals/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
+    var lt=ab.match(/(?:less than|fewer than|under)\s*(\d+)\s*proposals/i)||ab.match(/proposals?:?\s*(?:less than|fewer than|under)\s*(\d+)/i);
+    if(lt) P.proposalsLow=0;
+    else{var p2=ab.match(/proposals?:?\s*\n?\s*(\d+)\s*\+?/i)||ab.match(/(\d+)\s*\+?\s*proposals/i); if(p2) P.proposalsLow=parseInt(p2[1],10);}
   }
-  P.worldwide=/\bworldwide\b/i.test(t);
-  P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(t);
+  /* Where the JOB may be worked from. This is the job's own restriction and is
+     NOT the client's country: "Worldwide" jobs are routinely posted by US
+     clients, and reading usOnly off the whole page made every such job look
+     US-only because "United States" appears down in the client panel. */
+  P.worldwide=/\bworldwide\b/i.test(S.job);
+  P.usOnly=/united states|\busa\b|us[-\s]?based|u\.?s\.?\.?\s*only|us only|only us\b/i.test(S.job);
   /* ---- TASK 2: region detection. US + Europe allowed; India/Bangladesh hard ban ---- */
-  P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|england|scotland|wales|ireland|germany|german|france|french|spain|spanish|italy|italian|netherlands|dutch|belgium|sweden|swedish|norway|denmark|danish|finland|finnish|poland|polish|portugal|portuguese|austria|austrian|switzerland|swiss|czech|greece|greek|romania|hungary|berlin|munich|london|paris|madrid|amsterdam|stockholm|dublin|zurich|lisbon|warsaw)\b/i.test(t);
+  /* Region is a fact about the CLIENT, so it reads the client block. The list
+     was missing Ukraine, the Baltics, most of the Balkans and every country
+     code, which cost a Match point on real European clients: job_voice.txt is a
+     "UKR / Kherson" client and scored as "Other". */
+  P.isEurope=/\b(europe|european|eu[-\s]?based|united kingdom|\buk\b|\bgbr\b|england|scotland|wales|ireland|\birl\b|germany|german|\bdeu\b|\bger\b|france|french|\bfra\b|spain|spanish|\besp\b|italy|italian|\bita\b|netherlands|dutch|\bnld\b|belgium|\bbel\b|sweden|swedish|\bswe\b|norway|norwegian|\bnor\b|denmark|danish|\bdnk\b|finland|finnish|\bfin\b|poland|polish|\bpol\b|portugal|portuguese|\bprt\b|austria|austrian|\baut\b|switzerland|swiss|\bche\b|czech|czechia|\bcze\b|greece|greek|\bgrc\b|romania|romanian|\brou\b|hungary|hungarian|\bhun\b|ukraine|ukrainian|\bukr\b|bulgaria|bulgarian|\bbgr\b|croatia|croatian|\bhrv\b|serbia|serbian|\bsrb\b|slovakia|slovak|\bsvk\b|slovenia|slovenian|\bsvn\b|lithuania|lithuanian|\bltu\b|latvia|latvian|\blva\b|estonia|estonian|\best\b|iceland|\bisl\b|luxembourg|\blux\b|cyprus|\bcyp\b|malta|\bmlt\b|moldova|\bmda\b|albania|\balb\b|berlin|munich|hamburg|frankfurt|london|manchester|paris|lyon|madrid|barcelona|amsterdam|rotterdam|stockholm|dublin|zurich|geneva|lisbon|porto|warsaw|krakow|prague|vienna|budapest|bucharest|athens|helsinki|oslo|copenhagen|brussels|milan|rome|kyiv|kiev|kherson|lviv|odesa|odessa|sofia|zagreb|belgrade|bratislava|ljubljana|vilnius|riga|tallinn)\b/i.test(S.client);
   /* R14: Pakistan is a required hard-ban country. Includes the country word,
      the demonym (pakistani), and major cities. All matched with \b whole-word
      boundaries; none of the added tokens is a whole-word substring of an
      allowed US/Europe location, so no extra guard beyond the 'indiana' one is
      needed (e.g. 'islamabad' cannot match 'Islamic'; 'multan' cannot match
      'multi'). */
-  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune|pakistan|pakistani|karachi|lahore|islamabad|rawalpindi|faisalabad|multan|peshawar|quetta)\b/i.test(t) && !/\bindiana\b/i.test(low);
-  P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : ((P.usOnly||/\bunited states\b/i.test(t))?'US':'Other'));
-  P.verified=/payment (?:method )?verified|verified payment/i.test(t);
-  var sp=t.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
+  /* The policy is "clients CONFIRMED in India, Bangladesh or Pakistan", and
+     "unknown region is NOT a ban". So this reads the CLIENT BLOCK only. Run
+     against the whole page it banned clean, well-paid jobs whose only sin was a
+     US client mentioning users in India, or a past contract in Bangalore listed
+     in the client's history.
+     The "indiana" guard is gone: it was ANDed onto the WHOLE expression, so one
+     occurrence of that word anywhere switched the entire ban off, including for
+     a client explicitly located in Mumbai. It was never needed either, because
+     \bindia\b cannot match "Indiana". */
+  P.isBanCountry=/\b(india|indian|bangladesh|bangladeshi|dhaka|bengaluru|bangalore|mumbai|kolkata|hyderabad|chennai|pune|pakistan|pakistani|karachi|lahore|islamabad|rawalpindi|faisalabad|multan|peshawar|quetta)\b/i.test(S.client);
+  /* The label understates the rule (Pakistan is banned too) but is load-bearing:
+     two call sites compare against this exact string. Renaming belongs with the
+     single-source-of-truth work, not here. */
+  P.region = P.isBanCountry?'India/Bangladesh' : (P.isEurope?'Europe' : (/\bunited states\b|\busa\b|\bus[-\s]?based\b/i.test(S.client)?'US':'Other'));
+  /* Everything below is a fact about the CLIENT, so all of it reads the client
+     block. Read page-wide, the client's past contracts and other open jobs
+     supplied spend figures and star ratings that belong to nobody. */
+  var cb=S.client;
+  P.verified=/payment (?:method )?verified|verified payment/i.test(cb);
+  var sp=cb.match(/\$? ?([\d,]+(?:\.\d+)?)\s*([km])?\s*\+?\s*(?:total\s+)?spent\b/i);
   if(sp){var n=parseFloat(sp[1].replace(/,/g,''));var u=(sp[2]||'').toLowerCase();P.spent=u==='k'?n*1000:u==='m'?n*1e6:n;}
-  var rt=t.match(/([\d.]+)\s*stars?\b/i)||t.match(/([\d.]+)\s*\/\s*5\b/i)||t.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
-  var hr=t.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
+  /* Prefer the precise "4.99 of 2,149 reviews" over the rounded "5.0" badge that
+     sits directly above it, so rating and ratingPrecise stop disagreeing. */
+  var rt=cb.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i)||cb.match(/([\d.]+)\s*stars?\b/i)||cb.match(/([\d.]+)\s*\/\s*5\b/i)||cb.match(/rating is ([\d.]+) out of 5/i); if(rt) P.rating=parseFloat(rt[1]);
+  var hr=cb.match(/(\d+)\s*%\s*hire rate/i); if(hr) P.hireRate=parseInt(hr[1],10);
   if(P.budgetType==='fixed' && P.amount!=null && P.amount<200) P.bans.push('Fixed-price under $200 ($'+P.amount+')');
   /* Proposal saturation is NOT a ban — it is scored as a penalty in runEval (see SAT_PENALTY). */
   if(/\b(banking|fintech|forex|crypto|cryptocurrency|blockchain|trading desk|trading bot|hedge fund)\b/i.test(low)) P.bans.push('Banned industry (finance/crypto/trading)');
@@ -552,29 +654,54 @@ function parseJob(text){
     }
   }
   if(!P.title){ var h1=t.match(/\n\s*([^\n]{12,140}?)\s*\n\s*posted\s+\d/i); if(h1) P.title=h1[1].trim(); }
-  var idm=t.match(/~(\d{12,})/);                     P.jobLink   = idm?('https://www.upwork.com/jobs/~'+idm[1]):'';
-  var rpm=t.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i); P.ratingPrecise = rpm?rpm[1]:'';   /* precise "X.XX of N reviews", not rounded */
-  P.payVerified = /payment method not verified/i.test(t) ? 'No' : (/payment method verified/i.test(t) ? 'Yes' : '');
-  var tsm=t.match(/(\$[\d.,]+\s*[kKmM]?)\s*total spent/i); P.totalSpendRaw = tsm?tsm[1].replace(/\s+/g,''):'';
-  var prm=t.match(/proposals:\s*(less than \d+|\d+\s*to\s*\d+|\d+\+?)/i); P.proposalsRaw = prm?prm[1].replace(/\s+/g,' ').trim():'';
-  var ivm=t.match(/interviewing:\s*(\d+)/i);         P.interviewing      = ivm?parseInt(ivm[1],10):null;
-  var ism=t.match(/invites sent:\s*(\d+)/i);         P.invitesSent       = ism?parseInt(ism[1],10):null;
-  var uim=t.match(/unanswered invites:\s*(\d+)/i);   P.unansweredInvites = uim?parseInt(uim[1],10):null;
-  var cnm=t.match(/send a proposal for:\s*(\d+)\s*connects/i); P.connects = cnm?parseInt(cnm[1],10):null;
-  var pam=t.match(/posted\s+([^\n]*?\bago)\b/i);     P.postedAgo         = pam?pam[1].trim():'';
-  var ojm=t.match(/(\d+)\s+open jobs?/i);            P.openJobs          = ojm?parseInt(ojm[1],10):null;
+  var idm=cb.match(/~(\d{12,})/)||t.match(/~(\d{12,})/); P.jobLink = idm?('https://www.upwork.com/jobs/~'+idm[1]):'';
+  var rpm=cb.match(/([\d.]+)\s+of\s+[\d,]+\s+reviews?/i); P.ratingPrecise = rpm?rpm[1]:'';   /* precise "X.XX of N reviews", not rounded */
+  P.payVerified = /payment method not verified/i.test(cb) ? 'No' : (/payment method verified/i.test(cb) ? 'Yes' : '');
+  /* Upwork renders spend three ways: "$26K total spent", "$10K+ total spent" for
+     an established client, and "$0 spent" for a new one. The old pattern required
+     the first shape exactly, so this column was blank for most clients while the
+     scoring path read the same figure with a looser pattern and silently disagreed. */
+  var tsm=cb.match(/(\$[\d.,]+\s*[kKmM]?\+?)\s*(?:total\s+)?spent\b/i); P.totalSpendRaw = tsm?tsm[1].replace(/\s+/g,''):'';
+  var prm=ab.match(/proposals:\s*(less than \d+|\d+\s*to\s*\d+|\d+\+?)/i); P.proposalsRaw = prm?prm[1].replace(/\s+/g,' ').trim():'';
+  var ivm=ab.match(/interviewing:\s*(\d+)/i);        P.interviewing      = ivm?parseInt(ivm[1],10):null;
+  var ism=ab.match(/invites sent:\s*(\d+)/i);        P.invitesSent       = ism?parseInt(ism[1],10):null;
+  var uim=ab.match(/unanswered invites:\s*(\d+)/i);  P.unansweredInvites = uim?parseInt(uim[1],10):null;
+  var cnm=ab.match(/send a proposal for:\s*(\d+)\s*connects/i); P.connects = cnm?parseInt(cnm[1],10):null;
+  var pam=S.job.match(/posted\s+([^\n]*?\bago)\b/i)||t.match(/posted\s+([^\n]*?\bago)\b/i); P.postedAgo = pam?pam[1].trim():'';
+  var ojm=cb.match(/(\d+)\s+open jobs?/i);           P.openJobs          = ojm?parseInt(ojm[1],10):null;
   P.bidHigh='-'; P.bidAvg='-'; P.bidLow='-';
-  if(!/upgrade your membership to see the bid range/i.test(t)){
-    var bhm=t.match(/high[^$\d]{0,15}\$([\d.,]+)/i); if(bhm) P.bidHigh=bhm[1];
-    var bam=t.match(/avg[^$\d]{0,15}\$([\d.,]+)/i);  if(bam) P.bidAvg=bam[1];
-    var blm=t.match(/low[^$\d]{0,15}\$([\d.,]+)/i);  if(blm) P.bidLow=blm[1];
+  /* Competitor bid range lives in the activity block. Read page-wide, the words
+     "high", "avg" and "low" matched ordinary prose anywhere on the page. */
+  if(!/upgrade your membership to see the bid range/i.test(ab)){
+    var bhm=ab.match(/high[^$\d]{0,15}\$([\d.,]+)/i); if(bhm) P.bidHigh=bhm[1];
+    var bam=ab.match(/avg[^$\d]{0,15}\$([\d.,]+)/i);  if(bam) P.bidAvg=bam[1];
+    var blm=ab.match(/low[^$\d]{0,15}\$([\d.,]+)/i);  if(blm) P.bidLow=blm[1];
   }
   return P;
 }
+/* Every scoring input, at the value it must hold when the page says nothing.
+   runEval resets to this before autofill writes, so job N is never scored on
+   job N-1's answers. Values match the HTML defaults, so this changes no score
+   on its own: what an unknown client should be worth is an open owner decision,
+   not something to settle inside a contamination fix. */
+var SIGNAL_BASELINE = {
+  'b-type':'', 'b-amt':'', 'j-props':'1', 'j-scope':'1', 'j-long':false,
+  'c-verified':true, 'c-us':true, 'c-tenure':'unknown', 'c-spend':'2', 'c-hire':'1',
+  'm-match':'3', 'm-proof':true, 'j-ban':false
+};
+function resetSignals(){ Object.keys(SIGNAL_BASELINE).forEach(function(k){ setVal(k, SIGNAL_BASELINE[k]); }); }
+var LAST_EVAL_JD=null;   /* the job text the signal boxes currently describe */
+
 function autofill(P){
   if(P.budgetType) setVal('b-type',P.budgetType);
   if(P.amount!=null) setVal('b-amt',String(P.amount));
-  if(P.proposalsLow!=null) setVal('j-props', P.proposalsLow>=20?'3':P.proposalsLow>=10?'2':P.proposalsLow>=5?'1':'0');
+  /* Buckets must match the dropdown's own labels: Under 20 / 20-50 / 50+.
+     Anything 20 or over used to select option 3, the one labelled
+     "50+ (heavily saturated)", so a job showing "20 to 50" (Upwork's most
+     common bucket) lost its 2 job points AND took the -2 saturation penalty:
+     a 4 point swing, on the wrong side of every band. Counts under 5 wrote '0',
+     which is not an option this select has, blanking it and forfeiting 2 more. */
+  if(P.proposalsLow!=null) setVal('j-props', P.proposalsLow>=50?'3':P.proposalsLow>=20?'2':'1');
   setVal('c-verified',P.verified);
   setVal('c-us', P.region!=='India/Bangladesh' && getAllowedRegions().indexOf(P.region)>=0);
   if(P.spent!=null) setVal('c-spend', (P.spent>=1000&&P.spent<=50000)?'2':P.spent>50000?'1':P.spent>0?'1b':'0');
@@ -662,10 +789,19 @@ function evalDecision(){
   var s=scoreManual();
   var flags=(P.flags||[]).slice();
   if(s.integrity) flags.push('verify client authenticity: inconsistent history');
+  /* The manual override. It is the ONLY way to record a ban the regexes cannot
+     see: a client region recognised from the profile, a company known by
+     reputation, a condition buried in an attachment. It was written by autofill
+     and read by nothing, so ticking it changed nothing and the app answered with
+     APPLY and a polished proposal. */
+  var manualBan=chk('j-ban');
   var base={cli:s.cli, job:s.job, mat:s.mat, sat:s.sat, total:s.total,
     cliMax:s.cliMax, max:(s.isNew?s.achievableMax:19), isNew:s.isNew, flags:flags};
-  if(P.bans && P.bans.length){
-    base.banned=true; base.bans=P.bans.slice(); base.decision='SKIP — HARD BAN';
+  if((P.bans && P.bans.length) || manualBan){
+    base.banned=true;
+    base.bans=(P.bans||[]).slice();
+    if(manualBan && !base.bans.length) base.bans.push('Marked as a HARD BAN by the operator');
+    base.decision='SKIP — HARD BAN';
     return base;
   }
   base.banned=false; base.bans=[]; base.decision=s.decision;
@@ -697,7 +833,7 @@ async function aiAnalyzeJob(jd, d){
   var sys=AGENCY_CONTEXT+'\n\nYou are analysing ONE Upwork job post for the agency. The 19-point score and decision are computed deterministically in-app; do NOT produce, restate, or change a numeric score. Write a short, honest analysis in natural spoken English. No em dashes, no en dashes. Cover three labelled parts: FIT (why this job does or does not match our full-service agency and skills), RISKS (client red flags, scope, budget, timeline, or anything in the post that could waste connects), and RECOMMENDATION (one line, consistent with the in-app decision). Be specific to THIS post. Never invent client facts, metrics, employers, or numbers that are not in the post.';
   var ask='IN-APP DECISION (authoritative, do not restate as a score): '+verdict+'\n\nJOB POST:\n'+jd+'\n\nWrite the FIT / RISKS / RECOMMENDATION analysis now.';
   try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,system:sys,messages:[{role:'user',content:ask}]})});
     if(!resp.ok){ var errt=''; try{errt=await resp.text();}catch(_e){} box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis failed (HTTP '+resp.status+')</b>'+(errt?': '+esc(errt.slice(0,200)):'')+'</div>'; return; }
     var data=await resp.json();
@@ -716,6 +852,14 @@ function runEval(){
   var el=document.getElementById('eval-out');
   var jd=val('job-text');
   if(!jd.trim()){ el.innerHTML='<div class="card note">Paste the full job post first, then press Evaluate.</div>'; return; }
+  /* Reset on a NEW job only. autofill writes a field only when the parser found
+     it, and never touches Scope, Skill match, Portfolio proof, Long-term or
+     Client tenure at all, so without this every job after the first in a sitting
+     was scored partly on the previous job's answers. Pasting job after job is
+     the documented workflow, so that was the normal path, not an edge case.
+     Keying on the job text means re-evaluating the SAME job keeps an operator's
+     deliberate corrections, which is the whole point of the manual signals. */
+  if(jd!==LAST_EVAL_JD){ resetSignals(); LAST_EVAL_JD=jd; }
   var P=parseJob(jd); autofill(P);          /* pre-fill the signal boxes from the post */
   var d=evalDecision();                     /* deterministic authoritative verdict */
   el.innerHTML=renderDecisionCard(d);       /* R12: runEval stays model-free (score is deterministic) */
@@ -801,6 +945,70 @@ function echoProblem(job){
   }
   return ph;
 }
+/* ============================ PROPOSAL GUARD ============================
+   Nothing in this app ever checked a word of generated text before it reached
+   the clipboard and then a paying client. Every rule in CLAUDE.md and in all
+   four prompts was enforced only by the model choosing to comply, and the one
+   measurement function in the file (a word counter) had its value handed to the
+   model rather than compared to anything. This makes those rules deterministic.
+
+   validateProposal(text, opts) -> { ok, violations:[{rule, detail}] }
+     opts = { proofBank, jobText, mode: 'proposal' | 'speed' } */
+var PROPOSAL_MIN_WORDS = 120, PROPOSAL_MAX_WORDS = 180;
+var BADGE_RE = /\b(top\s+rated(\s+plus)?|job\s+success\s+score|jss|rising\s+talent)\b/i;
+
+/* The PROPOSAL block only. The draft also carries an INTRO MESSAGE block and may
+   carry a preamble, and neither counts toward the proposal's word budget. */
+function proposalBlock_(text){
+  var s=String(text||'');
+  var m=s.match(/^[ \t]*PROPOSAL[ \t]*:?[ \t]*$/im);
+  if(!m) return s;                                   /* unlabelled text IS the proposal */
+  var rest=s.slice(s.indexOf(m[0])+m[0].length);
+  var end=rest.search(/^[ \t]*INTRO\s+MESSAGE[ \t]*:?[ \t]*$/im);
+  return end>=0?rest.slice(0,end):rest;
+}
+function wordCount_(s){ return String(s||'').trim().split(/\s+/).filter(Boolean).length; }
+function numbersIn_(s){ return String(s||'').match(/\d[\d,]*(?:\.\d+)?/g)||[]; }
+/* A year, or an ordinary small count like "3 steps" or "2 weeks", needs no source.
+   Any other figure is a claim and must trace back to the proof bank or the post. */
+function exemptNumber_(raw){
+  if(/^(19|20)\d\d$/.test(raw)) return true;
+  var n=parseFloat(String(raw).replace(/,/g,''));
+  return isFinite(n) && n===Math.round(n) && n>=1 && n<=12;
+}
+
+function validateProposal(text, opts){
+  opts=opts||{}; var s=String(text||''), v=[];
+
+  if(/[–—]/.test(s)) v.push({rule:'dash', detail:'Contains an em dash or en dash. House style is commas and periods.'});
+
+  var ph=s.match(/\[[^\]\n]+\]/);
+  if(ph) v.push({rule:'placeholder', detail:'Contains an unfilled placeholder: '+ph[0]});
+
+  var badge=s.match(BADGE_RE);
+  if(badge) v.push({rule:'badge', detail:'Claims the platform badge "'+badge[0]+'". Badges are not deliverables and score zero as proof.'});
+
+  if(opts.mode!=='speed'){
+    var wc=wordCount_(proposalBlock_(s));
+    if(wc<PROPOSAL_MIN_WORDS||wc>PROPOSAL_MAX_WORDS)
+      v.push({rule:'length', detail:'The PROPOSAL block is '+wc+' words. It must be '+PROPOSAL_MIN_WORDS+' to '+PROPOSAL_MAX_WORDS+'.'});
+  }
+
+  var src=numbersIn_(String(opts.proofBank||'')+'\n'+String(opts.jobText||'')).map(function(x){return x.replace(/,/g,'');});
+  var bad=[];
+  numbersIn_(s).forEach(function(raw){
+    if(exemptNumber_(raw)) return;
+    if(src.indexOf(raw.replace(/,/g,''))<0 && bad.indexOf(raw)<0) bad.push(raw);
+  });
+  if(bad.length) v.push({rule:'unbacked-number', detail:'Not in the proof bank or the job post: '+bad.join(', ')});
+
+  /* One voice throughout. "I" stays case sensitive so AI and API are not flagged. */
+  if(/\bwe\b|\bour\b/i.test(s) && (/\bI\b/.test(s)||/\b(me|my)\b/i.test(s)))
+    v.push({rule:'voice', detail:'Mixes "I/me/my" with the agency "we". Pick one voice and keep it.'});
+
+  return {ok:v.length===0, violations:v};
+}
+
 /* TASK 1: problem-first, first person, real stack, no invented metrics/names, ends on ONE question.
    120-160 words for the full proposal. Free template mode (works with no API key);
    live Claude generation plugs in later via the proxy. No personal names, no agency mention. */
@@ -809,7 +1017,11 @@ async function genProposal(mode){
   var el=document.getElementById("prop-out");
   var jd=val("job-text");
   if(!jd){ el.innerHTML='<div class="card note">Paste the job post first.</div>'; return; }
+  /* Honour the manual override here too. A proposal is the expensive, outward
+     facing artifact: an operator who has marked this job banned must not be
+     handed one anyway, and it must not cost a model call. */
   var _bans=(parseJob(jd).bans)||[];
+  if(chk('j-ban') && !_bans.length) _bans=['Marked as a HARD BAN by the operator'];
   if(_bans.length){ el.innerHTML='<div class="card note" style="border-color:var(--red)"><b>Hard ban - no proposal.</b> This job hits a skip rule ('+_bans.map(esc).join('; ')+'). Banned jobs get 0 connects and no proposal.</div>'; return; }
   el.innerHTML='<div class="card note">Generating proposal...</div>';
   var ask='Write a winning Upwork proposal and intro message for this job, following your PROPOSAL '
@@ -817,15 +1029,25 @@ async function genProposal(mode){
     +'no score, no preamble.\n\nJOB:\n'+jd;
   if(mode==="speed") ask+=' Keep the proposal on the shorter side, about 120 words.';
   try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
       messages:[{role:'user',content:ask}]})});
     if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Proposal generation failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
     var data=await resp.json();
     var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
     if(!txt){ el.innerHTML='<div class="card note">The model returned no text. Try again.</div>'; return; }
-    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)">Copy proposal</button></div>'
+    /* Check the draft BEFORE it can be copied. This is the only deterministic
+       enforcement of the house rules that exists; up to here they were a request
+       to the model. */
+    var vr=validateProposal(txt,{proofBank:AGENCY_PROOF_BANK, jobText:jd, mode:(mode==="speed"?"speed":"proposal")});
+    var vHtml=vr.ok?'':'<div class="card" data-violations style="margin-top:10px;border-color:var(--red)">'
+      +'<div class="eyebrow" style="color:var(--red)">Not ready to send. Fix these first.</div>'
+      +'<ul class="note" style="margin-top:6px">'
+      +vr.violations.map(function(x){return '<li><b>'+esc(x.rule)+'</b>: '+esc(x.detail)+'</li>';}).join('')
+      +'</ul><div class="src" style="margin-top:8px">Regenerate, or edit the draft in Upwork after copying the corrected text by hand.</div></div>';
+    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)"'+(vr.ok?'':' disabled')+'>Copy proposal</button></div>'
       +'<div class="md" data-copy>'+mdToHtml(txt)+'</div>'
+      +vHtml
       +'<div class="src" style="margin-top:10px">Generated live by Claude from the job post and the agency brief. Review before sending.</div></div>';
     logAct("proposal", firstLine(jd), 0, mode==="speed"?"speed draft":"proposal draft");
   }catch(e){
@@ -845,7 +1067,16 @@ function question(job){var s=(job||'').toLowerCase();
 function oneWord(s){return (s||'project').split(' ').slice(0,3).join(' ');}
 function cap(s){s=s||'';return s.charAt(0).toUpperCase()+s.slice(1);}
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function copyText(btn){var c=btn.closest('.card').querySelector('[data-copy]');navigator.clipboard.writeText(c.innerText);btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);}
+function copyText(btn){
+  var card=btn&&btn.closest?btn.closest('.card'):null; if(!card) return;
+  /* A disabled attribute is a hint, not a guard. Refuse here too, so the draft
+     cannot reach the clipboard via a direct call, a keyboard activation, or a
+     re-enabled button. */
+  if(card.querySelector('[data-violations]')) return;
+  var c=card.querySelector('[data-copy]'); if(!c) return;
+  navigator.clipboard.writeText(c.innerText);
+  btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);
+}
 
 /* ============================ PIPELINE + AUTO-LOG ============================ */
 /* ============================ PIPELINE + AUTO-LOG ============================ */
@@ -1141,7 +1372,7 @@ async function askAI(){
   var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
   var live=false, failReason='';
   try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,messages:chat})});
     if(resp.ok){var data=await resp.json();
       if(data.error){ failReason='API error: '+(data.error.message||data.error); }
@@ -1263,7 +1494,7 @@ async function improveCL(){
    claude() action only reads data.prompt and ignores system/model/max_tokens,
    so it cannot serve this feature. */
 async function callBackend(opts){
-  var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+  var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:opts.model||'claude-sonnet-4-6',max_tokens:opts.max_tokens||800,
       system:opts.system,messages:[{role:'user',content:opts.message}]})});
   if(!resp.ok){ var errt=await resp.text(); throw new Error('HTTP '+resp.status+': '+errt); }
@@ -1373,7 +1604,9 @@ function postCLEval(rowObj, evId){
     row:rowObj, cells:buildCLEvalRow(rowObj)};
   if(direct) body.secret = CLEVAL_SECRET;        /* only the direct path carries the secret; the proxy injects it server-side */
   try{
-    fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    /* apiFetch only attaches the token for our own /api/ endpoints, so the
+       direct staging URL is unaffected. */
+    apiFetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify(body)}).catch(function(){});
   }catch(e){ /* never break the flow */ }
 }
@@ -1404,9 +1637,19 @@ function initTheme(){
 }
 /* When a job description is pasted, the AI scores it, so grey out the manual signal boxes and proposal-count dropdown. */
 function syncManualState(){
-  var has=((typeof val==='function'?val('job-text'):'')||'').trim().length>0;
-  var card=document.getElementById('signal-card'); if(card) card.classList.toggle('manual-dim',has);
-  var jp=document.getElementById('j-props'); if(jp) jp.classList.toggle('manual-dim',has);
+  /* This used to add .manual-dim (opacity + pointer-events:none) to the entire
+     signal card and to j-props whenever the job box was non-empty, which during
+     real use is always. That pinned five of the twelve inputs the scorer reads
+     to their HTML defaults, because autofill never writes Scope, Skill match,
+     Portfolio proof, Long-term or Client tenure: the operator simply could not
+     reach them with a mouse. Two of the three score dimensions became
+     near-constants, and since Match then never dropped below 4, the "Match 4+"
+     condition on APPLY WITH BOOST was a permanent pass that gated nothing.
+     The only workaround, setting the dropdowns BEFORE pasting, is documented
+     nowhere. The inputs now stay operable; autofill still pre-fills whatever it
+     can actually find on the page. */
+  var card=document.getElementById('signal-card'); if(card) card.classList.remove('manual-dim');
+  var jp=document.getElementById('j-props'); if(jp) jp.classList.remove('manual-dim');
 }
 
 /* ============================ SEAT GATE ============================
@@ -1426,6 +1669,44 @@ var CLEVAL_CFG     = (typeof window!=='undefined' && window.__CLEVAL__) || {};
 var CLEVAL_BACKEND = CLEVAL_CFG.url    || '';   /* direct staging override (local dev only) */
 var CLEVAL_SECRET  = CLEVAL_CFG.secret || '';
 var CLEVAL_PROXY   = '/api/cleval';             /* production path — no secret in the browser */
+
+/* ---- shared gate token ----
+   api/_guard.js rejects every request once APP_GATE_TOKEN is set in Vercel, so
+   the browser has to present it. Without this, setting that variable would 401
+   all three AI features and CLEval logging for the whole team at once.
+   The token is a shared team key, not a password: it stops the internet from
+   spending the Anthropic balance, it does not identify who is bidding. */
+var GATE_TOKEN_KEY='aia_gate_token';
+function gateToken(){ try{ return (LS_OK&&localStorage.getItem(GATE_TOKEN_KEY))||''; }catch(e){ return ''; } }
+function setGateToken(v){ try{ if(LS_OK) localStorage.setItem(GATE_TOKEN_KEY,String(v||'').trim()); }catch(e){} }
+function askGateToken(){
+  try{
+    if(typeof window==='undefined'||typeof window.prompt!=='function') return '';
+    var v=window.prompt('Ops Hub access key (ask Zeb or Saqib). Stored on this browser only.');
+    if(v&&v.trim()){ setGateToken(v); return v.trim(); }
+  }catch(e){}
+  return '';
+}
+/* Every call to our OWN serverless endpoints goes through here, so the token is
+   attached in one place and a 401 asks for it once instead of failing silently
+   in three separate features. */
+async function apiFetch(url, opts){
+  opts=opts||{};
+  var mine=String(url||'').indexOf('/api/')===0;
+  function withToken(tok){
+    var h={}; var src=opts.headers||{};
+    Object.keys(src).forEach(function(k){ h[k]=src[k]; });
+    if(mine&&tok) h['Authorization']='Bearer '+tok;
+    var o={}; Object.keys(opts).forEach(function(k){ o[k]=opts[k]; });
+    o.headers=h; return o;
+  }
+  var r=await fetch(url, withToken(gateToken()));
+  if(mine && r && r.status===401){
+    var t=askGateToken();
+    if(t) r=await fetch(url, withToken(t));
+  }
+  return r;
+}
 var seatMe=null, seatStart=null, seatQ={holder:null,holderSince:null,waiting:[],pendingOffer:null};
 var seatPoll=null, seatBeat=null, seatBooted=false;
 
