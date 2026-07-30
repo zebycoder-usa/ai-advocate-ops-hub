@@ -389,8 +389,13 @@ describe('gate: a GET-reachable read must not mutate state', () => {
    handleLogCLEval_ reserves the evaluationId as PENDING with no row number,
    then appends, then commits. A crash between the append and the commit leaves
    the ledger saying PENDING/"" while the row is already on the sheet, so the
-   retry appends a duplicate. The crash is simulated by rewinding the ledger row
-   to its post-reserve state, which is byte-for-byte what the sheet would hold.
+   retry cannot tell the write landed and appends a duplicate.
+
+   The crash is produced for real: the CLEval append is made to throw straight
+   after the row lands, so the ledger keeps exactly what the app itself reserved.
+   These tests therefore say nothing about HOW the reservation is stored, only
+   that a retry after a crash must land on the existing row instead of a
+   second one.
    ===================================================================== */
 describe('CLEval: retry after a crash between the pending write and the commit', () => {
   const SECRET = 'gate-safety-secret';
@@ -402,21 +407,45 @@ describe('CLEval: retry after a crash between the pending write and the commit',
     row: { jobTitle: 'n8n AI Automation Expert', jobLink: 'https://www.upwork.com/jobs/~022078430146547204560' },
   };
 
-  // Rewind the ledger to "reserved but never committed" while leaving the
-  // already-appended CLEval row in place: the exact mid-write crash state.
-  function crashAfterAppend(gas, evId) {
-    const led = gas.sheets._Idempotency._rows;
-    for (let i = 1; i < led.length; i++) {
-      if (String(led[i][0]) === evId) { led[i][1] = 'PENDING'; led[i][2] = ''; }
-    }
+  // The CLEval and _Idempotency tabs are created lazily by the first write, so
+  // do one throwaway write to materialise them and then empty both back to their
+  // header row. This leaves real sheet objects to wrap, on a clean ledger.
+  function primeSheets(gas) {
+    gas.handle_({ ...REQ, evaluationId: 'ev_prime' });
+    gas.sheets.CLEval._rows.length = 1;
+    gas.sheets._Idempotency._rows.length = 1;
+  }
+
+  // Kill the next write the way a dying Apps Script execution does: the CLEval
+  // row lands on the sheet, then the execution stops before the ledger is
+  // committed. Whatever the reserve step recorded is left exactly as the app
+  // wrote it, so this makes no assumption about the ledger's internal format.
+  // (An earlier version of this helper hand-wrote the ledger back to
+  // PENDING/"" — that hardcoded today's reservation shape and could not be
+  // satisfied by any implementation that reserves the row number up front.)
+  function crashAfterNextAppend(gas) {
+    const s = gas.sheets.CLEval;
+    const orig = s.appendRow;
+    s.appendRow = function (r) {
+      orig.call(s, r);
+      s.appendRow = orig;               // only the first append dies
+      throw new Error('simulated crash after append, before commit');
+    };
+  }
+
+  // Post-condition: exactly one CLEval row is on the sheet and the ledger holds
+  // whatever the app reserved for it.
+  function firstWriteCrashes(gas) {
+    primeSheets(gas);
+    crashAfterNextAppend(gas);
+    expect(() => gas.handle_(REQ)).toThrow();
+    expect(dataRows(gas, 'CLEval')).toHaveLength(1); // the row really did land
   }
 
   it('writes exactly one CLEval row when the same evaluationId is retried', () => {
     const gas = loadGas({ logSecret: SECRET });
-    gas.handle_(REQ);
-    expect(dataRows(gas, 'CLEval')).toHaveLength(1); // pre-condition: the first write landed
+    firstWriteCrashes(gas);
 
-    crashAfterAppend(gas, REQ.evaluationId);
     gas.handle_(REQ);
 
     expect(dataRows(gas, 'CLEval')).toHaveLength(1);
@@ -424,8 +453,7 @@ describe('CLEval: retry after a crash between the pending write and the commit',
 
   it('reports the retry as deduped rather than as a fresh write', () => {
     const gas = loadGas({ logSecret: SECRET });
-    gas.handle_(REQ);
-    crashAfterAppend(gas, REQ.evaluationId);
+    firstWriteCrashes(gas);
 
     const retry = gas.handle_(REQ);
 
@@ -434,20 +462,20 @@ describe('CLEval: retry after a crash between the pending write and the commit',
 
   it('points the retry at the row that already exists', () => {
     const gas = loadGas({ logSecret: SECRET });
-    const first = gas.handle_(REQ);
-    crashAfterAppend(gas, REQ.evaluationId);
+    firstWriteCrashes(gas);
+    const landedRow = gas.sheets.CLEval._rows.length; // 1-based row of the crashed append
 
     const retry = gas.handle_(REQ);
 
-    expect(retry.row).toBe(first.row);
+    expect(retry.row).toBe(landedRow);
   });
 
   it('does not duplicate across three retries of the same crashed write', () => {
     const gas = loadGas({ logSecret: SECRET });
+    firstWriteCrashes(gas);
+
     gas.handle_(REQ);
-    crashAfterAppend(gas, REQ.evaluationId);
     gas.handle_(REQ);
-    crashAfterAppend(gas, REQ.evaluationId);
     gas.handle_(REQ);
 
     expect(dataRows(gas, 'CLEval')).toHaveLength(1);

@@ -1,10 +1,18 @@
 // ============================================================================
 // proposal.guard.test.js — CONTRACT tests for the proposal validator (Stage 4).
 //
-// STATUS: THE WHOLE SUITE IS RED TODAY, ON PURPOSE. window.validateProposal does
-// not exist yet. This file is the specification Stage 4 implements against; a
-// failing assertion here is the proof that the guard is still missing, not a bug
-// in the test. Do not weaken an assertion to get green.
+// STATUS: window.validateProposal does not exist yet, so every POSITIVE probe
+// ("this text must trip rule X") is red today, on purpose. This file is the
+// specification Stage 4 implements against; a failing assertion here is the proof
+// that the guard is still missing, not a bug in the test. Do not weaken an
+// assertion to get green.
+//
+// HOW TO READ A GREEN LINE TODAY: the NEGATIVE probes ("this text must NOT trip
+// rule X") pass while the validator is absent, because a validator that does not
+// exist cannot raise a false positive. They are false-positive guards that only
+// start earning their keep once Stage 4 lands. The gap itself is proved by the
+// three shape tests plus every positive probe below — do not read the green half
+// of the run as "half the guard already works".
 //
 // THE CONTRACT under test — a global on window:
 //
@@ -15,7 +23,16 @@
 //   'placeholder'      any [bracketed placeholder]
 //   'badge'            any claim of Top Rated / Top Rated Plus / Job Success Score / JSS / Rising Talent
 //   'length'           the PROPOSAL block outside 120 to 180 words (mode 'proposal' only)
-//   'unbacked-number'  any number in the text present in neither opts.proofBank nor opts.jobText
+//   'unbacked-number'  a claimed figure in the text present in neither opts.proofBank
+//                      nor opts.jobText. Years (19xx / 20xx) and ordinary small
+//                      counts ("3 steps", "2 weeks") are exempt.
+//                      THAT EXEMPTION IS AN UNMADE OWNER DECISION: PROOF_VOICE_RULES
+//                      rule 5 in index.html says "Never state a number that is not in
+//                      the AGENCY PROOF BANK or the user's own letter", with no
+//                      carve-out, yet the app's own question() emits "in the first 2
+//                      weeks", which a literal reading would flag. The exemption tests
+//                      below are kept as the proposed reading and are reported as
+//                      blockedByDecision, not as app defects.
 //   'voice'            mixes first person singular (I, me, my) with the mandated agency "we"
 //
 //   ok is true only when violations is empty.
@@ -439,8 +456,13 @@ describe('ok is true only when violations is empty', () => {
 // ===========================================================================
 describe('safety: validation is pure and never touches the network', () => {
   it('the only fetch the harness ever saw is the blocked seat-boot call', () => {
+    // The `|^$|undefined` alternatives this assertion used to carry made it
+    // nearly unfailable — an https://evil.example/undefined call would have
+    // satisfied it. Pin the one call the harness legitimately sees: seatBoot()
+    // hitting the Apps Script exec endpoint, which loadApp() rejects offline.
+    expect(app.fetchCalls.length).toBeGreaterThan(0); // otherwise this is vacuous
     app.fetchCalls.forEach((u) => {
-      expect(String(u)).toMatch(/script\.google\.com|^$|undefined/);
+      expect(String(u)).toMatch(/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/);
     });
   });
 
@@ -475,8 +497,10 @@ describe('safety: validation is pure and never touches the network', () => {
 // ############################################################################
 // ===========================================================================
 describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
+  let harness;   // the loadApp() handle for THIS test's window
   let w;
   let writes;
+  let stubCalls; // every URL genProposal asked the in-process stub for
 
   // A draft with three unmistakable, open violations: an em dash, a bracketed
   // placeholder, and a badge claim.
@@ -489,12 +513,15 @@ describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
   // for the /api/claude response. No network: the stub resolves in-process.
   async function render(draftText, mode = 'priority') {
     w.setVal('job-text', JOB_TEXT);
-    w.fetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ content: [{ type: 'text', text: draftText }] }),
-      text: async () => '',
-    });
+    w.fetch = async (url) => {
+      stubCalls.push(String(url));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ content: [{ type: 'text', text: draftText }] }),
+        text: async () => '',
+      };
+    };
     await w.genProposal(mode);
     return w.document.getElementById('prop-out');
   }
@@ -504,10 +531,13 @@ describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
   }
 
   beforeEach(() => {
-    // Fresh window per test so one render cannot leak into the next.
-    const fresh = loadApp();
-    w = fresh.window;
+    // Fresh window per test so one render cannot leak into the next. Keep the
+    // handle: its fetchCalls array is the ONLY witness of a real network call
+    // from this window, and the network test below has to read that one.
+    harness = loadApp();
+    w = harness.window;
     writes = [];
+    stubCalls = [];
     // jsdom has no clipboard; give the app one we can inspect.
     Object.defineProperty(w.navigator, 'clipboard', {
       value: { writeText: (t) => { writes.push(String(t)); return Promise.resolve(); } },
@@ -529,10 +559,15 @@ describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
   });
 
   it('renders without touching the network (passes today)', async () => {
-    const fresh = loadApp();
-    const before = fresh.fetchCalls.length;
+    // This used to build a SECOND, unused window and compare that window's
+    // counter before and after — a render on `w` could never move it, so the
+    // assertion could not fail. Read the counter of the window actually being
+    // rendered into, and pin what the in-process stub was asked for.
+    const before = harness.fetchCalls.length;
     await render(CLEAN_PROPOSAL);
-    expect(fresh.fetchCalls.length).toBe(before);
+    expect(harness.fetchCalls.length).toBe(before); // no reach-around to real fetch
+    expect(stubCalls.length).toBeGreaterThan(0);    // the stub really was the path taken
+    stubCalls.forEach((u) => expect(u).toBe('/api/claude')); // same-origin proxy only
   });
 
   it('surfaces the open violations in the card as [data-violations]', async () => {

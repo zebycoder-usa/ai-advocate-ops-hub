@@ -155,9 +155,15 @@ describe('1. cross-job contamination: evaluating job A must not change job B', (
     expect(second).toEqual(first);
   });
 
-  it('evaluating a new job clears the previous job\'s hand-set signal inputs', () => {
+  it('evaluating a new job leaves the signal inputs where that job alone would leave them', () => {
     // The mechanism behind the score drift above: these five inputs are read by
     // scoreManual() and written by nobody when a new job is evaluated.
+    //
+    // The reference is a window that has evaluated CLEAN_HIGH_VALUE and nothing
+    // else — NOT a pristine window. Asserting against pristine defaults would
+    // additionally forbid autofill() from ever deriving these five from the post,
+    // which nobody has specified either way; the invariant that is actually owed
+    // is "same job in the textarea -> same inputs, whatever came before".
     const app = loadApp();
     app.window.setVal('job-text', SATURATED_LOW_VALUE);
     app.window.setVal('j-scope', '0');
@@ -169,16 +175,18 @@ describe('1. cross-job contamination: evaluating job A must not change job B', (
 
     evaluate(app, CLEAN_HIGH_VALUE);
 
-    const fresh = loadApp();
+    const alone = loadApp();
+    evaluate(alone, CLEAN_HIGH_VALUE);
+
     ['j-scope', 'm-match', 'c-tenure'].forEach((id) => {
       expect(app.doc.getElementById(id).value,
         `${id} still holds the previous job's value`)
-        .toBe(fresh.doc.getElementById(id).value);
+        .toBe(alone.doc.getElementById(id).value);
     });
     ['j-long', 'm-proof'].forEach((id) => {
       expect(app.doc.getElementById(id).checked,
         `${id} still holds the previous job's value`)
-        .toBe(fresh.doc.getElementById(id).checked);
+        .toBe(alone.doc.getElementById(id).checked);
     });
   });
 });

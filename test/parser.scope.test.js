@@ -28,6 +28,14 @@
 // POLICY IS FROZEN. Nothing here changes which industries/companies/countries
 // are banned, what a point is worth, or where a band sits. Every "must still
 // ban" case is asserted so this suite can never be used to weaken a real ban.
+//
+// TWO GROUPS HERE ARE BLOCKED ON AN OWNER DECISION, not on code (see the notes
+// on each): group 3 (does an idiomatic / negated / nice-to-have mention of a
+// banned word still count as that industry?) and group 8 (is Ukraine on the
+// Europe list?). Group 8 additionally CONTRADICTS a sibling suite that is green
+// today — parser.truth.test.js pins job_voice.txt to isEurope=false,
+// region='Other' and the outside-region flag. Both suites cannot be satisfied;
+// the owner has to say which one is right before either is changed.
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -238,7 +246,15 @@ describe('2 — the same words in their OWN section must still hard ban', () => 
 /* ==================================== 3. negation & compounds in the JOB BLOCK
    These are inside region 2 — the right section — so section routing alone will
    not fix them; they need the ban matcher to understand context. They are the
-   second-biggest source of false SKIPs. */
+   second-biggest source of false SKIPs.
+
+   BLOCKED ON AN OWNER DECISION. Each of the four cases below asks for a CARVE-OUT
+   from a frozen ban list ("this mention of the banned word does not count"), and
+   nobody has ruled on carve-outs. The decision the owner owes is: does a negated
+   ("no crypto experience needed"), idiomatic ("military-grade encryption",
+   "defense against prompt injection") or nice-to-have-tag mention of a banned
+   word still ban the job? The two companion assertions at the end of the group
+   are the floor and must never be relaxed whichever way the ruling goes. */
 describe('3 — negations and compounds in the job block must not ban', () => {
   it('"no crypto experience needed" is not a crypto job', () => {
     // JUDGEMENT CALL: unambiguous. The client is explicitly ruling crypto OUT.
@@ -339,22 +355,50 @@ describe('4 — budget type and amount come from the job block only', () => {
 
 /* ============================================== 5. the client avg-rate trap
    "$11.70 /hr avg hourly rate paid" lives in the CLIENT block. It is a history
-   statistic about the buyer, never the budget of the job being scored. */
+   statistic about the buyer, never the budget of the job being scored.
+
+   TEST BUG, FIXED HERE. This group used to run on n8nAsHourly(). On that base
+   the region-5 bait "Fixed-price $20.00" matches first, so amount came back 20
+   — meaning the group only ever re-proved group 4, and its own point-of-the-
+   group assertions (not.toBe(11.7), not.toBe(8)) could not have failed however
+   parseJob behaved. The base below removes the fixed-price bait from REGION 5
+   ONLY, by renaming the "Fixed-price" labels on the client's past contracts.
+   Everything else — the job block's "$95.00 / Hourly" and the client block's
+   "$11.70 /hr avg hourly rate paid" — is untouched, so the client's average is
+   now the only money-shaped decoy outside the job block. On this base today's
+   parser really does return 11.70 as the job's rate, mark belowBudget true and
+   raise a false "Below $40/hr" flag on a $95/hr job. */
+const MARK_HISTORY = "Client's recent history";
+const n8nAvgRateTrap = () => {
+  const t = n8nAsHourly();
+  const i = t.indexOf(MARK_HISTORY);
+  if (i < 0) throw new Error('fixture no longer has a client-history section');
+  return t.slice(0, i) + t.slice(i).replace(/Fixed-price/g, 'Contract');
+};
+
 describe('5 — the client "avg hourly rate paid" is not the job rate', () => {
+  it('the isolating base leaves the client average as the only decoy', () => {
+    const t = n8nAvgRateTrap();
+    const i = t.indexOf(MARK_HISTORY);
+    expect(t.slice(0, i)).toContain(N8N_HOURLY_BUDGET);      // job block still $95/Hourly
+    expect(t.slice(i)).not.toContain('Fixed-price');         // region-5 bait removed
+    expect(t).toContain('$11.70 /hr avg hourly rate paid');  // the trap under test
+  });
+
   it('a $95/hr job whose client averages $11.70/hr parses as 95', () => {
-    const P = parse(n8nAsHourly());
+    const P = parse(n8nAvgRateTrap());
     expect(P.amount).toBe(95);
     expect(P.amount).not.toBe(11.7);
   });
 
   it('the client avg rate cannot drag a good job under the $40 floor', () => {
-    const P = parse(n8nAsHourly());
+    const P = parse(n8nAvgRateTrap());
     expect(P.belowBudget).toBe(false);
+    expect(P.flags).not.toContain('Below $40/hr rate floor — review before bidding');
   });
 
   it('a low client avg rate injected into the CLIENT block is still ignored', () => {
-    const t = intoClient(n8nAsHourly(), '$8.00 /hr avg hourly rate paid');
-    const P = parse(t);
+    const P = parse(intoClient(n8nAvgRateTrap(), '$8.00 /hr avg hourly rate paid'));
     expect(P.amount).toBe(95);
     expect(P.amount).not.toBe(8);
   });
@@ -439,7 +483,18 @@ describe('7 — total spent parses beyond the exact "$26K total spent" shape', (
    client falls through to region "Other" and gets flagged. Ukraine is a normal,
    allowed European market for us — the flag is a false positive, not policy.
    This does NOT propose adding any region to the allowed set; Europe is already
-   allowed, the list is just incomplete. */
+   allowed, the list is just incomplete.
+
+   BLOCKED ON AN OWNER DECISION, and on a direct conflict with a GREEN sibling
+   suite. parser.truth.test.js asserts the opposite for this very fixture:
+     "does not count Ukraine as Europe, because it is not on the app Europe list"
+        -> expect(P.isEurope).toBe(false)
+     "files the client region as Other"          -> expect(P.region).toBe('Other')
+     "flags the client region for review ..."    -> expect(P.flags).toEqual([...])
+   Those three pass today; the three below cannot pass at the same time. Do not
+   change index.html for either suite until the owner rules on the one question:
+   is Ukraine (and the "UKR" code Upwork prints) on our Europe list or not? The
+   loser's assertions get updated, and only then. */
 describe('8 — a Ukrainian client is inside the allowed regions', () => {
   it('job_voice.txt is not flagged as outside the allowed regions', () => {
     const P = parse(fixture('job_voice.txt'));
