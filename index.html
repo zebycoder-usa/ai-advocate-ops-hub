@@ -833,7 +833,7 @@ async function aiAnalyzeJob(jd, d){
   var sys=AGENCY_CONTEXT+'\n\nYou are analysing ONE Upwork job post for the agency. The 19-point score and decision are computed deterministically in-app; do NOT produce, restate, or change a numeric score. Write a short, honest analysis in natural spoken English. No em dashes, no en dashes. Cover three labelled parts: FIT (why this job does or does not match our full-service agency and skills), RISKS (client red flags, scope, budget, timeline, or anything in the post that could waste connects), and RECOMMENDATION (one line, consistent with the in-app decision). Be specific to THIS post. Never invent client facts, metrics, employers, or numbers that are not in the post.';
   var ask='IN-APP DECISION (authoritative, do not restate as a score): '+verdict+'\n\nJOB POST:\n'+jd+'\n\nWrite the FIT / RISKS / RECOMMENDATION analysis now.';
   try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,system:sys,messages:[{role:'user',content:ask}]})});
     if(!resp.ok){ var errt=''; try{errt=await resp.text();}catch(_e){} box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis failed (HTTP '+resp.status+')</b>'+(errt?': '+esc(errt.slice(0,200)):'')+'</div>'; return; }
     var data=await resp.json();
@@ -1029,7 +1029,7 @@ async function genProposal(mode){
     +'no score, no preamble.\n\nJOB:\n'+jd;
   if(mode==="speed") ask+=' Keep the proposal on the shorter side, about 120 words.';
   try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
       messages:[{role:'user',content:ask}]})});
     if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Proposal generation failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
@@ -1372,7 +1372,7 @@ async function askAI(){
   var inp=document.getElementById('ai-in');var q=inp.value.trim();if(!q)return;inp.value='';pushMsg('user',q);chat.push({role:'user',content:q});
   var live=false, failReason='';
   try{
-    var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,messages:chat})});
     if(resp.ok){var data=await resp.json();
       if(data.error){ failReason='API error: '+(data.error.message||data.error); }
@@ -1494,7 +1494,7 @@ async function improveCL(){
    claude() action only reads data.prompt and ignores system/model/max_tokens,
    so it cannot serve this feature. */
 async function callBackend(opts){
-  var resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+  var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:opts.model||'claude-sonnet-4-6',max_tokens:opts.max_tokens||800,
       system:opts.system,messages:[{role:'user',content:opts.message}]})});
   if(!resp.ok){ var errt=await resp.text(); throw new Error('HTTP '+resp.status+': '+errt); }
@@ -1604,7 +1604,9 @@ function postCLEval(rowObj, evId){
     row:rowObj, cells:buildCLEvalRow(rowObj)};
   if(direct) body.secret = CLEVAL_SECRET;        /* only the direct path carries the secret; the proxy injects it server-side */
   try{
-    fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    /* apiFetch only attaches the token for our own /api/ endpoints, so the
+       direct staging URL is unaffected. */
+    apiFetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify(body)}).catch(function(){});
   }catch(e){ /* never break the flow */ }
 }
@@ -1667,6 +1669,44 @@ var CLEVAL_CFG     = (typeof window!=='undefined' && window.__CLEVAL__) || {};
 var CLEVAL_BACKEND = CLEVAL_CFG.url    || '';   /* direct staging override (local dev only) */
 var CLEVAL_SECRET  = CLEVAL_CFG.secret || '';
 var CLEVAL_PROXY   = '/api/cleval';             /* production path — no secret in the browser */
+
+/* ---- shared gate token ----
+   api/_guard.js rejects every request once APP_GATE_TOKEN is set in Vercel, so
+   the browser has to present it. Without this, setting that variable would 401
+   all three AI features and CLEval logging for the whole team at once.
+   The token is a shared team key, not a password: it stops the internet from
+   spending the Anthropic balance, it does not identify who is bidding. */
+var GATE_TOKEN_KEY='aia_gate_token';
+function gateToken(){ try{ return (LS_OK&&localStorage.getItem(GATE_TOKEN_KEY))||''; }catch(e){ return ''; } }
+function setGateToken(v){ try{ if(LS_OK) localStorage.setItem(GATE_TOKEN_KEY,String(v||'').trim()); }catch(e){} }
+function askGateToken(){
+  try{
+    if(typeof window==='undefined'||typeof window.prompt!=='function') return '';
+    var v=window.prompt('Ops Hub access key (ask Zeb or Saqib). Stored on this browser only.');
+    if(v&&v.trim()){ setGateToken(v); return v.trim(); }
+  }catch(e){}
+  return '';
+}
+/* Every call to our OWN serverless endpoints goes through here, so the token is
+   attached in one place and a 401 asks for it once instead of failing silently
+   in three separate features. */
+async function apiFetch(url, opts){
+  opts=opts||{};
+  var mine=String(url||'').indexOf('/api/')===0;
+  function withToken(tok){
+    var h={}; var src=opts.headers||{};
+    Object.keys(src).forEach(function(k){ h[k]=src[k]; });
+    if(mine&&tok) h['Authorization']='Bearer '+tok;
+    var o={}; Object.keys(opts).forEach(function(k){ o[k]=opts[k]; });
+    o.headers=h; return o;
+  }
+  var r=await fetch(url, withToken(gateToken()));
+  if(mine && r && r.status===401){
+    var t=askGateToken();
+    if(t) r=await fetch(url, withToken(t));
+  }
+  return r;
+}
 var seatMe=null, seatStart=null, seatQ={holder:null,holderSince:null,waiting:[],pendingOffer:null};
 var seatPoll=null, seatBeat=null, seatBooted=false;
 
