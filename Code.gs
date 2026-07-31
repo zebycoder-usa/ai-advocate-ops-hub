@@ -78,6 +78,7 @@ function readQueue_(allowRelease){
       q.holder=null; q.holderSince=null; q.holderHeartbeat=null;
       q.pendingOffer = q.waiting.length ? q.waiting[0].name : null;
       writeQueue_(q);
+      closeSession_(staleHolder,null,0,0,0,"TIMED OUT");
       sheet_("ActivityLog").appendRow([new Date(),staleHolder,"AUTO_RELEASE","","","","","","","","",
         "Auto-released after 12 min inactivity (heartbeat timeout).",""]);
     }
@@ -178,7 +179,10 @@ function openSession_(name){
   s.appendRow([id,name,new Date(),"","","",0,0,0,"ACTIVE"]);
   return id;
 }
-function closeSession_(name,durationMin,jds,proposals,copies){
+/* status defaults to CLOSED. The stale auto-release passes TIMED OUT, so a
+   session that simply vanished is distinguishable from a clean sign-out: the
+   logout time on a timed-out row is when we NOTICED, not when they left. */
+function closeSession_(name,durationMin,jds,proposals,copies,status){
   var s=sheet_("Sessions"); var last=s.getLastRow(); if(last<2) return;
   var vals=s.getRange(2,1,last-1,10).getValues();
   for(var i=vals.length-1;i>=0;i--){
@@ -186,11 +190,11 @@ function closeSession_(name,durationMin,jds,proposals,copies){
       var row=i+2; var login=vals[i][2]; var now=new Date();
       var dmin=(typeof durationMin==="number"&&durationMin>=0)?durationMin
                :(login instanceof Date?Math.round((now-login)/60000):"");
-      s.getRange(row,4,1,7).setValues([[now,dmin,hm_(dmin||0),jds||0,proposals||0,copies||0,"CLOSED"]]);
+      s.getRange(row,4,1,7).setValues([[now,dmin,hm_(dmin||0),jds||0,proposals||0,copies||0,status||"CLOSED"]]);
       return dmin;
     }
   }
-  s.appendRow(["(auto)",name,"",new Date(),durationMin||"",hm_(durationMin||0),jds||0,proposals||0,copies||0,"CLOSED"]);
+  s.appendRow(["(auto)",name,"",new Date(),durationMin||"",hm_(durationMin||0),jds||0,proposals||0,copies||0,status||"CLOSED"]);
   return durationMin;
 }
 
@@ -350,6 +354,31 @@ function dayNum_(v){
   return isNaN(d.getTime()) ? NaN : d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
 }
 
+/* ---- read the session history back ----
+   Who signed in when, and when they signed out. The Sessions sheet has been
+   written since v11 and nothing could ever read a row of it. READ ONLY: no lock,
+   no writes, and deliberately readQueue_ is NOT called, so listing sessions can
+   never trigger the stale auto-release. */
+function handleListSessions_(data){
+  var want=PropertiesService.getScriptProperties().getProperty('LOG_SECRET');
+  if(!want || !data || data.secret!==want) return {ok:false,error:'unauthorized'};
+  var s=sheet_("Sessions"), last=s.getLastRow();
+  if(last<2) return {ok:true,headers:TABS.Sessions.slice(),rows:[],total:0};
+
+  var limit=Math.min(Math.max(parseInt(data.limit,10)||500,1),2000);
+  var all=s.getRange(2,1,last-1,TABS.Sessions.length).getValues();
+
+  /* Login Time is column 3. Calendar-day comparison, for the same reason
+     listCLEval needs one: an ISO date parsed as UTC against a local-midnight
+     cell drops every row dated exactly on the boundary. */
+  if(data.since){
+    var fromDay=dayNum_(data.since);
+    if(!isNaN(fromDay)) all=all.filter(function(r){ var d=dayNum_(r[2]); return !isNaN(d) && d>=fromDay; });
+  }
+  var total=all.length;
+  return {ok:true,headers:TABS.Sessions.slice(),rows:all.slice(Math.max(0,total-limit)),total:total};
+}
+
 /* ---- read the job history back ----
    The app could write CLEval rows and never read one. Without this there is no
    filterable list, no duplicate check, and no way to record what happened after
@@ -444,6 +473,7 @@ function handle_(data){
   if(action==="claude")  return callClaude_(data.prompt||"", data.system, data.message, data.model, data.max_tokens);
   if(action==="logCLEval") return handleLogCLEval_(data, name);
   if(action==="listCLEval") return handleListCLEval_(data);
+  if(action==="listSessions") return handleListSessions_(data);
   if(action==="updateCLEvalStatus") return handleUpdateCLEvalStatus_(data, name);
   if(!GATE_ACTIONS[action]) return {ok:true,note:"no-op"};
 
@@ -492,7 +522,7 @@ function doPost(e){
    POST so a stray link or prefetch cannot release a seat, write a CLEval row, or
    spend Claude tokens (R4). Only genuinely read-only actions may run on GET. */
 var POST_ONLY = {login:1, logout:1, heartbeat:1, gateAccept:1, gateDecline:1, forceRelease:1,
-                 log:1, claude:1, logCLEval:1, listCLEval:1, updateCLEvalStatus:1};
+                 log:1, claude:1, logCLEval:1, listCLEval:1, updateCLEvalStatus:1, listSessions:1};
 function doGet(e){
   var p=(e&&e.parameter)||{};
   if(POST_ONLY[p.action]) return json_({ok:false,error:"This action requires POST."});

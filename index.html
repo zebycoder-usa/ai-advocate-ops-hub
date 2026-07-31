@@ -237,6 +237,30 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     </div>
   </section>
 
+  <!-- SESSIONS: who was signed in, when -->
+  <section class="view" data-view="sessions">
+    <div class="card">
+      <div class="flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="eyebrow">Sign-in history &mdash; who held the profile, and when</div>
+        <button class="btn ghost" onclick="loadSessions(true)">Refresh</button>
+      </div>
+      <div class="flex" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+        <select id="sf-person" class="field" style="max-width:180px" onchange="renderSessions()"><option value="">Everyone</option></select>
+        <input id="sf-from" class="field" type="date" style="max-width:165px" onchange="renderSessions()" title="From date">
+        <input id="sf-to" class="field" type="date" style="max-width:165px" onchange="renderSessions()" title="To date">
+        <select id="sf-status" class="field" style="max-width:160px" onchange="renderSessions()">
+          <option value="">Any status</option><option value="ACTIVE">Still in</option>
+          <option value="CLOSED">Signed out</option><option value="TIMED OUT">Timed out</option>
+        </select>
+        <button class="btn ghost" onclick="clearSessionFilters()">Clear</button>
+      </div>
+      <div class="eyebrow" style="margin-top:14px">Time on the profile</div>
+      <div id="sessions-totals" style="margin-top:8px;overflow-x:auto"></div>
+      <div class="eyebrow" style="margin-top:16px">Every session</div>
+      <div id="sessions-out" style="margin-top:8px;overflow-x:auto"></div>
+    </div>
+  </section>
+
   <!-- ALL JOBS: the shared record, read live from the sheet -->
   <section class="view" data-view="jobs">
     <div class="card">
@@ -496,7 +520,7 @@ function tickClock(){
 function canAct(m){ return !!m; }
 
 /* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['jobs','All Jobs'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['jobs','All Jobs'],['sessions','Sign-ins'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
 function initNav(){
   var nav=document.getElementById('nav');
   VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
@@ -506,6 +530,7 @@ function go(name,btn){
   /* Fetched on first open rather than at page load: it is up to 2000 rows and
      most sessions never open this tab. */
   if(name==='jobs' && typeof loadJobs==='function') loadJobs(false);
+  if(name==='sessions' && typeof loadSessions==='function') loadSessions(false);
   document.querySelectorAll('#nav button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on');
 }
 
@@ -1862,6 +1887,118 @@ function findDuplicateJob(linkOrId, rows){
     /* Shout for a real application, murmur for one that was only evaluated. */
     applied:/^\s*yes\s*$/i.test(String(best[CLEVAL_IDX.applied]||''))
   };
+}
+
+/* ============================ SESSIONS ============================
+   Who signed in when, and when they signed out. The backend has written these
+   rows since v11 and nothing could ever read one back.
+   Columns: 0 Session ID, 1 User, 2 Login Time, 3 Logout Time, 4 Duration (min),
+   5 Duration (h:m), 6 JDs, 7 Proposals, 8 Copies, 9 Status. */
+var SESSION_IDX = {id:0, user:1, loginAt:2, logoutAt:3, minutes:4, hm:5, jds:6, proposals:7, copies:8, status:9};
+var SESSION_ROWS = [];
+var SESSIONS_LOADED = false;
+function setSessionRows(rows){ SESSION_ROWS=(rows&&rows.length)?rows:[]; return SESSION_ROWS; }
+
+function listSessions(filters, rows){
+  var f=filters||{}, list=(rows&&rows.length)?rows:SESSION_ROWS;
+  var from=f.from?jobsDayNum(f.from):NaN, to=f.to?jobsDayNum(f.to):NaN;
+  return (list||[]).filter(function(r){
+    if(!r||!r.length) return false;
+    if(f.person && String(r[SESSION_IDX.user]||'')!==f.person) return false;
+    if(f.status && String(r[SESSION_IDX.status]||'').toUpperCase()!==String(f.status).toUpperCase()) return false;
+    if(!isNaN(from)||!isNaN(to)){
+      var d=jobsDayNum(r[SESSION_IDX.loginAt]);
+      if(isNaN(d)) return false;
+      if(!isNaN(from)&&d<from) return false;
+      if(!isNaN(to)&&d>to) return false;
+    }
+    return true;
+  });
+}
+
+/* Per-person totals. A blank or non-numeric duration contributes 0 rather than
+   turning the whole total into NaN, which is what a still-open session would
+   otherwise do to somebody's timesheet. */
+function sessionTotals(rows){
+  var by={};
+  (rows||[]).forEach(function(r){
+    if(!r||!r.length) return;
+    var who=String(r[SESSION_IDX.user]||'(unknown)');
+    if(!by[who]) by[who]={person:who,sessions:0,minutes:0,open:0};
+    by[who].sessions++;
+    var m=Number(r[SESSION_IDX.minutes]);
+    if(isFinite(m)&&m>0) by[who].minutes+=m;
+    if(String(r[SESSION_IDX.status]||'').toUpperCase()==='ACTIVE') by[who].open++;
+  });
+  return Object.keys(by).map(function(k){
+    var x=by[k]; x.minutes=Math.round(x.minutes);
+    x.hm=Math.floor(x.minutes/60)+'h '+(x.minutes%60)+'m';
+    return x;
+  }).sort(function(a,b){ return b.minutes-a.minutes || a.person.localeCompare(b.person); });
+}
+
+function sessionFilters(){
+  return { person:val('sf-person'), from:val('sf-from'), to:val('sf-to'), status:val('sf-status') };
+}
+function clearSessionFilters(){
+  ['sf-person','sf-from','sf-to','sf-status'].forEach(function(id){ setVal(id,''); });
+  renderSessions();
+}
+
+async function loadSessions(force){
+  var out=document.getElementById('sessions-out'); if(!out) return;
+  if(SESSIONS_LOADED && !force){ renderSessions(); return; }
+  out.innerHTML='<div class="note">Loading sign-in history...</div>';
+  try{
+    var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'listSessions', limit:2000})});
+    var data=await r.json();
+    if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
+    setSessionRows(data.rows||[]); SESSIONS_LOADED=true;
+    var sel=document.getElementById('sf-person');
+    if(sel){
+      var ppl={}; SESSION_ROWS.forEach(function(x){ var u=String(x[SESSION_IDX.user]||'').trim(); if(u) ppl[u]=1; });
+      var cur=sel.value;
+      sel.innerHTML='<option value="">Everyone</option>'+Object.keys(ppl).sort().map(function(u){
+        return '<option value="'+esc(u)+'">'+esc(u)+'</option>'; }).join('');
+      sel.value=cur;
+    }
+    renderSessions();
+  }catch(e){
+    out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc(String(e&&e.message?e.message:e))+'</div>';
+  }
+}
+
+function fmtWhen(v){
+  if(v==null||v==='') return '-';
+  var d=new Date(v);
+  if(isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString()+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderSessions(){
+  var out=document.getElementById('sessions-out'); if(!out) return;
+  var rows=listSessions(sessionFilters());
+  var tot=document.getElementById('sessions-totals');
+  var totals=sessionTotals(rows);
+  if(tot) tot.innerHTML = totals.length
+    ? '<table><thead><tr><th>Member</th><th>Sessions</th><th>Time on the profile</th><th>Still open</th></tr></thead><tbody>'
+      +totals.map(function(x){ return '<tr><td>'+esc(x.person)+'</td><td>'+x.sessions+'</td><td>'+esc(x.hm)+'</td><td>'
+        +(x.open?'<span style="color:var(--amber)">'+x.open+'</span>':'0')+'</td></tr>'; }).join('')+'</tbody></table>'
+    : '<div class="note">Nothing in this range.</div>';
+
+  if(!rows.length){ out.innerHTML='<div class="note">No sessions match these filters.</div>'; return; }
+  out.innerHTML='<table><thead><tr><th>Member</th><th>Signed in</th><th>Signed out</th><th>Duration</th><th>Status</th></tr></thead><tbody>'
+    +rows.slice().reverse().map(function(r){
+      var st=String(r[SESSION_IDX.status]||'').toUpperCase();
+      var col=st==='ACTIVE'?'var(--green)':st==='TIMED OUT'?'var(--amber)':'var(--muted)';
+      return '<tr><td>'+esc(String(r[SESSION_IDX.user]||''))+'</td>'
+        +'<td>'+esc(fmtWhen(r[SESSION_IDX.loginAt]))+'</td>'
+        +'<td>'+esc(fmtWhen(r[SESSION_IDX.logoutAt]))+'</td>'
+        +'<td>'+esc(String(r[SESSION_IDX.hm]||'-'))+'</td>'
+        +'<td style="color:'+col+'">'+esc(st||'-')+'</td></tr>';
+    }).join('')+'</tbody></table>'
+    +'<p class="note" style="margin-top:8px">TIMED OUT means the tab closed or the laptop slept and the seat was auto-released after 12 minutes. The signed-out time on those rows is when we noticed, not when they actually left.</p>';
 }
 
 /* ============================ ALL JOBS TAB ============================
