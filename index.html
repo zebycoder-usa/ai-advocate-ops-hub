@@ -1889,6 +1889,21 @@ function findDuplicateJob(linkOrId, rows){
   };
 }
 
+/* Reads a backend reply without assuming it is JSON. Running the app locally,
+   or hitting a path with no serverless function behind it, returns a 404 with a
+   ZERO byte body, and r.json() then throws "Unexpected end of JSON input",
+   which tells the operator nothing about what is actually wrong. */
+async function readJson(r, what){
+  var text='';
+  try{ text=await r.text(); }catch(e){ text=''; }
+  if(!text.trim()){
+    if(r.status===404) throw new Error(what+' is not available here. The serverless function is missing, which is normal when running the app locally.');
+    throw new Error(what+' returned an empty response (HTTP '+r.status+').');
+  }
+  try{ return JSON.parse(text); }
+  catch(e){ throw new Error(what+' returned something that is not JSON (HTTP '+r.status+'): '+text.slice(0,120)); }
+}
+
 /* ============================ SESSIONS ============================
    Who signed in when, and when they signed out. The backend has written these
    rows since v11 and nothing could ever read one back.
@@ -1952,7 +1967,7 @@ async function loadSessions(force){
   try{
     var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'listSessions', limit:2000})});
-    var data=await r.json();
+    var data=await readJson(r,'The sign-in history');
     if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
     setSessionRows(data.rows||[]); SESSIONS_LOADED=true;
     var sel=document.getElementById('sf-person');
@@ -2066,7 +2081,7 @@ async function loadJobs(force){
   try{
     var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'listCLEval', limit:2000})});
-    var data=await r.json();
+    var data=await readJson(r,'The job list');
     if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
     setCLEvalRows(data.rows||[]);
     JOBS_LOADED=true;
@@ -2161,7 +2176,7 @@ async function setJobStatus(sel){
   try{
     var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'updateCLEvalStatus', evaluationId:evId, status:status, name:(ME?ME.name:'')})});
-    var data=await r.json();
+    var data=await readJson(r,'The status update');
     /* Say so when it did NOT save. A status that silently fails to write is
        worse than no status at all, because the sheet then quietly disagrees. */
     if(data&&data.ok){ if(note){ note.textContent='Saved'; setTimeout(function(){ note.textContent=''; },1500); } }
