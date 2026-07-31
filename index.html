@@ -1737,7 +1737,9 @@ function syncManualState(){
    NOTE: gate() in this file checks if the member is excused from bidding.
    Everything here is the SEAT gate and is prefixed seat*. */
 var SEAT_BACKEND = "https://script.google.com/macros/s/AKfycbwsAdkj8XwW-x8DykVJ4mXzNp4qzFbJFx2kSm4uAor2Wi6AMm6BhuRW0P19xdIVoZFWWw/exec";
-var SEAT_ADMINS  = ['Saqib Shahzad','Jahanzaib (Zeb)'];  // must match ADMINS in Code.gs
+/* Owner decision, 31 July 2026. Must match ADMINS in Code.gs. Admins skip the
+   queue entirely and never hold the seat, because they do not bid. */
+var SEAT_ADMINS  = ['Usman Saeed','Saqib Shahzad','Waqas Riaz'];
 /* CLEval logging.
    PRODUCTION: the browser POSTs to the same-origin serverless proxy /api/cleval,
    which holds CLEVAL_BACKEND + LOG_SECRET server-side (like /api/claude holds the

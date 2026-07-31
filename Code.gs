@@ -19,13 +19,25 @@
 var TABS = {
   ActivityLog: ["Timestamp","User","Type","Decision","Client","Job","Match","Total /19","Country","Budget","Duration (min)","Detail","Summary"],
   Sessions:    ["Session ID","User","Login Time","Logout Time","Duration (min)","Duration (h:m)","JDs","Proposals","Copies","Status"],
-  Queue:       ["Holder","HolderSince","Waiting","PendingOffer","UpdatedAt","HolderHeartbeat"],
+  Queue:       ["Holder","HolderSince","Waiting","PendingOffer","UpdatedAt","HolderHeartbeat","Admins"],
   CLEval:      ["Assignee","Date","Time PKT","Job Title","Job Link","Hiring Rate","Client Ratings","Payment Method Verified?","Total Spend","Proposals","Interviewing","Invites sent","Unanswered Invites","Flag","Applied?","Fixed/ Hourly","High Bid","Avg. Bid","Low bid","No. of Connects","Bid","Reason/Remarks","Job posted","Open jobs","Ptoposal Status"],
-  _Idempotency:["evaluationId","status","rowNumber","updatedAt"]
+  _Idempotency:["evaluationId","status","rowNumber","updatedAt"],
+  /* Full history of every proposal-status change. Deliberately a separate tab:
+     CLEval must stay exactly 25 columns to match the format the team already
+     uses, and a single "updated at" cell would throw away the timeline. Keeping
+     every change is what makes time-to-reply and time-to-hire computable. */
+  _StatusLog:  ["evaluationId","status","at","by"]
 };
 
-/* Must match SEAT_ADMINS in index.html, and the names in its TEAM list. */
-var ADMINS   = ["Saqib Shahzad","Jahanzaib (Zeb)"];
+/* Owner decision, 31 July 2026: admins are Usman, Saqib and Waqas. Jahanzaib
+   (Zeb) is no longer an admin. Must match SEAT_ADMINS in index.html. */
+var ADMINS   = ["Usman Saeed","Saqib Shahzad","Waqas Riaz"];
+/* Statuses a proposal can be in. "Un Opened" is the LEGACY value sitting in 664
+   existing rows: it is accepted on read and means the same as "Not checked",
+   which is deliberately distinct from "No response". Those were the same word
+   before, so a reply rate could not be calculated at all. */
+var CLEVAL_STATUSES = ["Not checked","No response","Opened","Replied","Interview","Hired","Lost"];
+var LEGACY_STATUS   = "Un Opened";
 var STALE_MS = 12 * 60 * 1000; // 12 min without heartbeat -> auto-release
 var LOCK_MS  = 10 * 1000;      // how long to wait for the gate lock
 
@@ -49,11 +61,14 @@ function hm_(min){ min=Math.round(min||0); var h=Math.floor(min/60),m=min%60; re
    which is precisely when it matters. */
 function readQueue_(allowRelease){
   var s = sheet_("Queue");
-  if(s.getLastRow()<2){ s.appendRow(["","","","",new Date(),""]); }
-  var r = s.getRange(2,1,1,6).getValues()[0];
+  if(s.getLastRow()<2){ s.appendRow(["","","","",new Date(),"",""]); }
+  var r = s.getRange(2,1,1,7).getValues()[0];
   var waiting = r[2] ? String(r[2]).split(" || ").filter(String).map(function(x){
     var p=x.split("|"); return {name:p[0],bookedAt:p[1]||""}; }) : [];
-  var q = {holder:r[0]||null,holderSince:r[1]||null,waiting:waiting,pendingOffer:r[3]||null,holderHeartbeat:r[5]||null};
+  /* Admins present, tracked SEPARATELY from the holder. They do not bid, so they
+     never take the seat and never displace whoever is bidding. */
+  var admins = r[6] ? String(r[6]).split(" || ").filter(String) : [];
+  var q = {holder:r[0]||null,holderSince:r[1]||null,waiting:waiting,pendingOffer:r[3]||null,holderHeartbeat:r[5]||null,admins:admins};
 
   /* auto-release a holder who stopped sending heartbeats (crashed tab, closed laptop) */
   if(allowRelease && q.holder && q.holderHeartbeat){
@@ -71,14 +86,25 @@ function readQueue_(allowRelease){
 }
 function writeQueue_(q){
   var s=sheet_("Queue");
-  if(s.getLastRow()<2) s.appendRow(["","","","",new Date(),""]);
+  if(s.getLastRow()<2) s.appendRow(["","","","",new Date(),"",""]);
   var w=(q.waiting||[]).map(function(x){return x.name+"|"+(x.bookedAt||"");}).join(" || ");
-  s.getRange(2,1,1,6).setValues([[q.holder||"",q.holderSince||"",w,q.pendingOffer||"",new Date(),q.holderHeartbeat||""]]);
+  var a=(q.admins||[]).join(" || ");
+  s.getRange(2,1,1,7).setValues([[q.holder||"",q.holderSince||"",w,q.pendingOffer||"",new Date(),q.holderHeartbeat||"",a]]);
   return q;
 }
+function isAdmin_(name){ return ADMINS.indexOf(name)>=0; }
 
 /* ---- gate transitions ---- */
 function qJoin_(q,name){
+  /* Admins never queue and never wait. They also never take the seat, because
+     they do not bid: they are simply present. So an admin joining leaves the
+     holder, the pending offer and the waiting list completely untouched, and a
+     bidder can still claim an empty seat while admins are in. */
+  if(isAdmin_(name)){
+    q.admins=q.admins||[];
+    if(q.admins.indexOf(name)<0) q.admins.push(name);
+    return "ADMIN";
+  }
   if(!q.holder){
     q.holder=name; q.holderSince=new Date().toISOString(); q.holderHeartbeat=new Date().toISOString();
     /* Filling the seat cancels any outstanding offer, and the new holder must
@@ -95,6 +121,12 @@ function qJoin_(q,name){
   return "WAITING#"+q.waiting.length;
 }
 function qLeave_(q,name){
+  /* An admin leaving only removes their presence. They were never the holder and
+     were never in the waiting list, so nothing else may move. */
+  if(isAdmin_(name)){
+    q.admins=(q.admins||[]).filter(function(x){return x!==name;});
+    return null;
+  }
   /* also drop from the waiting list, so a waiter who leaves the queue is removed too */
   q.waiting = q.waiting.filter(function(x){return x.name!==name;});
   if(q.pendingOffer===name) q.pendingOffer = q.waiting.length ? q.waiting[0].name : null;
@@ -306,6 +338,60 @@ function handleLogCLEval_(data, name){
     return {ok:true,row:rowNumber,deduped:false};
   } finally { lock.releaseLock(); }
 }
+/* ---- read the job history back ----
+   The app could write CLEval rows and never read one. Without this there is no
+   filterable list, no duplicate check, and no way to record what happened after
+   a bid. READ ONLY: no lock, no writes, nothing released. */
+function handleListCLEval_(data){
+  var want=PropertiesService.getScriptProperties().getProperty('LOG_SECRET');
+  if(!want || !data || data.secret!==want) return {ok:false,error:'unauthorized'};
+  var s=resolveCLEvalSheet_(data.sheet), last=s.getLastRow();
+  if(last<2) return {ok:true,headers:TABS.CLEval.slice(),rows:[],total:0};
+
+  var limit=Math.min(Math.max(parseInt(data.limit,10)||500,1),2000);
+  var all=s.getRange(2,1,last-1,TABS.CLEval.length).getValues();
+
+  /* since filters on the Date column (2), so the client can pull just this week. */
+  if(data.since){
+    var from=new Date(data.since);
+    if(!isNaN(from.getTime())){
+      all=all.filter(function(r){ var d=new Date(r[1]); return !isNaN(d.getTime()) && d>=from; });
+    }
+  }
+  var total=all.length;
+  var rows=all.slice(Math.max(0,total-limit));   /* newest window, oldest first */
+  return {ok:true,headers:TABS.CLEval.slice(),rows:rows,total:total};
+}
+
+/* ---- record what happened after the bid ----
+   Every write until now appended. This edits column 25 of a row that already
+   exists, found through the idempotency ledger, and appends the change to
+   _StatusLog so the timeline survives. */
+function handleUpdateCLEvalStatus_(data, actor){
+  var want=PropertiesService.getScriptProperties().getProperty('LOG_SECRET');
+  if(!want || !data || data.secret!==want) return {ok:false,error:'unauthorized'};
+
+  var evId=String(data.evaluationId||'');
+  if(!evId) return {ok:false,error:'evaluationId is required'};
+
+  var status=String(data.status||'');
+  if(CLEVAL_STATUSES.indexOf(status)<0) return {ok:false,error:'unknown status: '+status};
+
+  var lock=LockService.getScriptLock();
+  try{ lock.waitLock(LOCK_MS); } catch(e){ return {ok:false,error:'CLEval busy, try again in a moment.'}; }
+  try{
+    var ex=idemFind_(evId);
+    if(!ex || !ex.rowNumber) return {ok:false,error:'unknown evaluationId'};
+    var s=resolveCLEvalSheet_(data.sheet);
+    var row=parseInt(ex.rowNumber,10);
+    if(!(row>1) || row>s.getLastRow()) return {ok:false,error:'unknown evaluationId'};
+
+    s.getRange(row, TABS.CLEval.length).setValue(status);   /* column 25 only */
+    sheet_("_StatusLog").appendRow([evId,status,new Date(),actor||'']);
+    return {ok:true,row:row,status:status};
+  } finally { lock.releaseLock(); }
+}
+
 /* On-demand 24->25 header repair. Idempotent: no-op once headers already match.
    Run on the STAGING clone first; existing rows keep their first 24 values and
    get a blank 25th column. */
@@ -338,6 +424,8 @@ function handle_(data){
   if(action==="getLogs") return {ok:true,logs:logsOut_(),gate:readQueue_()};
   if(action==="claude")  return callClaude_(data.prompt||"", data.system, data.message, data.model, data.max_tokens);
   if(action==="logCLEval") return handleLogCLEval_(data, name);
+  if(action==="listCLEval") return handleListCLEval_(data);
+  if(action==="updateCLEvalStatus") return handleUpdateCLEvalStatus_(data, name);
   if(!GATE_ACTIONS[action]) return {ok:true,note:"no-op"};
 
   var lock=LockService.getScriptLock();
@@ -385,7 +473,7 @@ function doPost(e){
    POST so a stray link or prefetch cannot release a seat, write a CLEval row, or
    spend Claude tokens (R4). Only genuinely read-only actions may run on GET. */
 var POST_ONLY = {login:1, logout:1, heartbeat:1, gateAccept:1, gateDecline:1, forceRelease:1,
-                 log:1, claude:1, logCLEval:1};
+                 log:1, claude:1, logCLEval:1, listCLEval:1, updateCLEvalStatus:1};
 function doGet(e){
   var p=(e&&e.parameter)||{};
   if(POST_ONLY[p.action]) return json_({ok:false,error:"This action requires POST."});
