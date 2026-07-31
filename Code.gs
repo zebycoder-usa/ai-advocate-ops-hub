@@ -338,6 +338,18 @@ function handleLogCLEval_(data, name){
     return {ok:true,row:rowNumber,deduped:false};
   } finally { lock.releaseLock(); }
 }
+/* Turns "2026-07-15" or "7/15/2026" or a real Date into a comparable YYYYMMDD
+   integer. Deliberately avoids Date parsing for the two string shapes, because
+   that is where the timezone skew came from. */
+function dayNum_(v){
+  if(v==null || v==='') return NaN;
+  var s=String(v).trim(), m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)))   return (+m[1])*10000+(+m[2])*100+(+m[3]);
+  if((m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s))) return (+m[3])*10000+(+m[1])*100+(+m[2]);
+  var d=new Date(s);
+  return isNaN(d.getTime()) ? NaN : d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+}
+
 /* ---- read the job history back ----
    The app could write CLEval rows and never read one. Without this there is no
    filterable list, no duplicate check, and no way to record what happened after
@@ -351,11 +363,18 @@ function handleListCLEval_(data){
   var limit=Math.min(Math.max(parseInt(data.limit,10)||500,1),2000);
   var all=s.getRange(2,1,last-1,TABS.CLEval.length).getValues();
 
-  /* since filters on the Date column (2), so the client can pull just this week. */
+  /* since filters on the Date column (2), so the client can pull just this week.
+     Compared by CALENDAR DAY, never by timestamp. data.since arrives as ISO
+     ("2026-07-15"), which Date parses as UTC midnight, while the Date column
+     holds "M/d/yyyy" written in Asia/Karachi, which Date parses as LOCAL
+     midnight. On the live script at UTC+5 that puts a same-day row five hours
+     BEFORE the cutoff, so every row dated exactly on the since day was silently
+     dropped. Invisible on a laptop with a negative UTC offset, which is exactly
+     the kind of bug that reaches production. */
   if(data.since){
-    var from=new Date(data.since);
-    if(!isNaN(from.getTime())){
-      all=all.filter(function(r){ var d=new Date(r[1]); return !isNaN(d.getTime()) && d>=from; });
+    var fromDay=dayNum_(data.since);
+    if(!isNaN(fromDay)){
+      all=all.filter(function(r){ var d=dayNum_(r[1]); return !isNaN(d) && d>=fromDay; });
     }
   }
   var total=all.length;
@@ -453,7 +472,7 @@ function handle_(data){
     if(action==="gateAccept")  {qAccept_(q,name);  writeQueue_(q); return {ok:true,gate:q};}
     if(action==="gateDecline") {qDecline_(q,name); writeQueue_(q); return {ok:true,gate:q};}
     if(action==="forceRelease"){
-      if(ADMINS.indexOf(name)===-1) return {ok:false,error:"Admin only (Saqib or Zeb)"};
+      if(ADMINS.indexOf(name)===-1) return {ok:false,error:"Admin only"};
       var released=qForceRelease_(q); writeQueue_(q);
       sheet_("ActivityLog").appendRow([new Date(),name,"FORCE_RELEASE","","","","","","","","",
         "Admin "+name+" force-released "+(released||"(nobody)"),""]);

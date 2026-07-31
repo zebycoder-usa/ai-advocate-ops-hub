@@ -898,7 +898,9 @@ function runEval(){
   if(jd!==LAST_EVAL_JD){ resetSignals(); LAST_EVAL_JD=jd; }
   var P=parseJob(jd); autofill(P);          /* pre-fill the signal boxes from the post */
   var d=evalDecision();                     /* deterministic authoritative verdict */
-  el.innerHTML=renderDecisionCard(d);       /* R12: runEval stays model-free (score is deterministic) */
+  /* Somebody else may already be on this job. Shown ABOVE the score, because the
+     decision to bid is different once you know the profile has already bid. */
+  el.innerHTML=duplicateWarningHtml(P.jobLink||val('job-text'))+renderDecisionCard(d);
   logAct('evaluate', firstLine(jd), d.total, d.banned?'HARD BAN':d.decision);
   /* CLEval: log EVERY decision. APPLY -> Green/Yes + real connects+bid;
      SKIP -> Red/No + connects blank + Bid '-'. No-op unless a staging endpoint
@@ -991,6 +993,45 @@ function echoProblem(job){
    validateProposal(text, opts) -> { ok, violations:[{rule, detail}] }
      opts = { proofBank, jobText, mode: 'proposal' | 'speed' } */
 var PROPOSAL_MIN_WORDS = 120, PROPOSAL_MAX_WORDS = 180;
+/* Per-section word budgets, signed off by the owner on 31 July 2026. They sum to
+   130-180, which sits inside the overall 120-180 rule, so both bars can be
+   enforced without contradicting each other. */
+var SECTION_BUDGETS = [
+  { key:'Hook',      min:25, max:30 },
+  { key:'Proof',     min:35, max:45 },
+  { key:'Relevance', min:25, max:35 },
+  { key:'Process',   min:30, max:40 },
+  { key:'CTA',       min:15, max:20 }
+];
+/* Labels that CLOSE the proposal. Without these the trailing intro block would
+   be counted as part of the CTA section. */
+var SECTION_STOPS = ['INTRO MESSAGE','INTRO','COVER LETTER'];
+
+/* Splits a labelled draft into { Hook: wordCount, ... }. Returns {} when the
+   draft carries no labels at all, which is how today's unlabelled drafts stay
+   exempt instead of being blocked overnight. */
+function proposalSections_(text){
+  var s=String(text||'');
+  var names=SECTION_BUDGETS.map(function(b){return b.key;}).concat(SECTION_STOPS)
+              .map(function(n){return n.replace(/ /g,'[ \\t]+');});
+  /* Match the WHOLE label line and let decoration fall where it likes. The model
+     writes HOOK:, **HOOK**, **HOOK:**, ## Hook and HOOK - and the colon lands
+     inside the asterisks as often as outside, so anchoring the punctuation in a
+     fixed order simply misses. A body line cannot match because it has other
+     words before the end of the line. */
+  var re=new RegExp('^[ \\t#*]*('+names.join('|')+')[ \\t:*\\-]*$','gim');
+  var hits=[],m;
+  while((m=re.exec(s))){ hits.push({raw:m[1],start:m.index,after:m.index+m[0].length}); }
+  var out={};
+  for(var i=0;i<hits.length;i++){
+    var canon=null, flat=hits[i].raw.replace(/\s+/g,' ').toUpperCase();
+    SECTION_BUDGETS.forEach(function(b){ if(b.key.toUpperCase()===flat) canon=b.key; });
+    if(!canon) continue;                                  /* a stop label, not a section */
+    var end = (i+1<hits.length) ? hits[i+1].start : s.length;
+    out[canon]=wordCount_(s.slice(hits[i].after, end));   /* the label is not a word */
+  }
+  return out;
+}
 var BADGE_RE = /\b(top\s+rated(\s+plus)?|job\s+success\s+score|jss|rising\s+talent)\b/i;
 
 /* The PROPOSAL block only. The draft also carries an INTRO MESSAGE block and may
@@ -1057,6 +1098,15 @@ function validateProposal(text, opts){
     var wc=wordCount_(proposalBlock_(s));
     if(wc<PROPOSAL_MIN_WORDS||wc>PROPOSAL_MAX_WORDS)
       v.push({rule:'length', detail:'The PROPOSAL block is '+wc+' words. It must be '+PROPOSAL_MIN_WORDS+' to '+PROPOSAL_MAX_WORDS+'.'});
+    /* Per-section budgets, judged only on the sections actually present. An
+       unlabelled draft reports nothing here and is governed by 'length' alone. */
+    var secs=proposalSections_(s);
+    SECTION_BUDGETS.forEach(function(b){
+      if(!Object.prototype.hasOwnProperty.call(secs,b.key)) return;
+      var n=secs[b.key];
+      if(n<b.min||n>b.max)
+        v.push({rule:'section', detail:b.key+' is '+n+' words. It must be '+b.min+' to '+b.max+'.'});
+    });
   }
 
   var src=numbersIn_(String(opts.proofBank||'')+'\n'+String(opts.jobText||'')).map(function(x){return x.replace(/,/g,'');});
@@ -1599,6 +1649,79 @@ var CLEVAL_COLUMNS=[
   ['No. of Connects','connects'],['Bid','bid'],['Reason/Remarks','reason'],
   ['Job posted','jobPosted'],['Open jobs','openJobs'],['Ptoposal Status','proposalStatus']
 ];
+/* ============================ JOB HISTORY (loaded from the sheet) ============
+   Twenty people share one Upwork profile. If Fiza sent a proposal this morning
+   and Hamza pastes the same job this afternoon, the profile bids twice on one
+   post: wasted Connects, and it looks careless to the client. Nobody can see the
+   other nineteen people's rows today, so this is invisible. */
+var CLEVAL_IDX = (function(){ var o={}; CLEVAL_COLUMNS.forEach(function(c,i){ o[c[1]]=i; }); return o; })();
+var CLEVAL_ROWS = [];
+function setCLEvalRows(rows){ CLEVAL_ROWS = (rows&&rows.length)?rows:[]; return CLEVAL_ROWS; }
+
+/* Match on the Upwork job id INSIDE the url, never the url string, so www,
+   query strings, trailing slashes, http and casing all still match. */
+function jobIdOf(linkOrId){
+  var s=String(linkOrId==null?'':linkOrId);
+  var m=/~(\d{8,})/.exec(s);
+  if(m) return m[1];
+  m=/^\s*(\d{8,})\s*$/.exec(s);
+  return m?m[1]:'';
+}
+/* Sortable YYYYMMDDhhmm from the row's own Date + Time PKT cells, so "most
+   recent" means what the row says, not where it happens to sit in the array. */
+function rowMoment_(dateCell,timeCell){
+  var s=String(dateCell==null?'':dateCell).trim(), day=NaN, m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)))       day=(+m[1])*10000+(+m[2])*100+(+m[3]);
+  else if((m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s))) day=(+m[3])*10000+(+m[1])*100+(+m[2]);
+  else { var d=new Date(s); if(!isNaN(d.getTime())) day=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+  if(isNaN(day)) return -1;
+  var t=0, tm=/(\d{1,2}):(\d{2})/.exec(String(timeCell||''));
+  if(tm) t=(+tm[1])*60+(+tm[2]);
+  return day*10000+t;
+}
+function findDuplicateJob(linkOrId, rows){
+  var id=jobIdOf(linkOrId);
+  if(!id) return null;
+  var list=(rows&&rows.length)?rows:CLEVAL_ROWS;
+  if(!list||!list.length) return null;
+  var best=null,bestAt=-2;
+  for(var i=0;i<list.length;i++){
+    var r=list[i]; if(!r||!r.length) continue;
+    if(jobIdOf(r[CLEVAL_IDX.jobLink])!==id) continue;
+    var at=rowMoment_(r[CLEVAL_IDX.date], r[CLEVAL_IDX.timePkt]);
+    if(at>=bestAt){ bestAt=at; best=r; }
+  }
+  if(!best) return null;
+  return {
+    assignee:String(best[CLEVAL_IDX.assignee]||''),
+    date:String(best[CLEVAL_IDX.date]||''),
+    time:String(best[CLEVAL_IDX.timePkt]||''),
+    /* Shout for a real application, murmur for one that was only evaluated. */
+    applied:/^\s*yes\s*$/i.test(String(best[CLEVAL_IDX.applied]||''))
+  };
+}
+
+/* The warning itself. Red and unmissable when the profile has ALREADY BID,
+   amber and quieter when someone only looked at it and moved on. */
+function duplicateWarningHtml(linkOrId){
+  var dup=null;
+  try{ dup=findDuplicateJob(linkOrId, CLEVAL_ROWS); }catch(e){ dup=null; }
+  if(!dup) return '';
+  var who=esc(dup.assignee||'someone on the team');
+  var when=esc([dup.date,dup.time].filter(Boolean).join(' at '));
+  if(dup.applied){
+    return '<div class="card" data-duplicate style="border-color:var(--red);margin-bottom:10px">'
+      +'<div class="eyebrow" style="color:var(--red)">Already applied</div>'
+      +'<p class="note" style="margin-top:6px">This job was <b>already applied to by '+who+'</b>'
+      +(when?' on '+when:'')+'. Bidding again puts two proposals from the same profile on one post. '
+      +'Check with them before spending Connects.</p></div>';
+  }
+  return '<div class="card" data-duplicate style="border-color:var(--amber);margin-bottom:10px">'
+    +'<div class="eyebrow" style="color:var(--amber)">Already reviewed</div>'
+    +'<p class="note" style="margin-top:6px">'+who+' already evaluated this job'
+    +(when?' on '+when:'')+' and did not apply. Worth asking why before you spend Connects.</p></div>';
+}
+
 function buildCLEvalRow(d){
   d=d||{};
   return CLEVAL_COLUMNS.map(function(c){
