@@ -233,6 +233,41 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     </div>
   </section>
 
+  <!-- ALL JOBS: the shared record, read live from the sheet -->
+  <section class="view" data-view="jobs">
+    <div class="card">
+      <div class="flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="eyebrow">All jobs &mdash; everyone, live from the Ops DB</div>
+        <div class="flex" style="gap:8px">
+          <button class="btn ghost" onclick="loadJobs(true)">Refresh</button>
+          <button class="btn ghost" onclick="exportJobsCsv()">Export CSV</button>
+        </div>
+      </div>
+      <p class="note" style="margin-top:6px">Every job anyone evaluated. Set the status on a row as you hear back, the same way you would in the sheet. It saves straight to the Ops DB.</p>
+
+      <div class="flex" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+        <select id="jf-person" class="field" style="max-width:180px" onchange="renderJobs()"><option value="">Everyone</option></select>
+        <input id="jf-from" class="field" type="date" style="max-width:165px" onchange="renderJobs()" title="From date">
+        <input id="jf-to" class="field" type="date" style="max-width:165px" onchange="renderJobs()" title="To date">
+        <select id="jf-applied" class="field" style="max-width:150px" onchange="renderJobs()">
+          <option value="">Applied or not</option><option value="yes">Applied</option><option value="no">Not applied</option>
+        </select>
+        <select id="jf-status" class="field" style="max-width:170px" onchange="renderJobs()"><option value="">Any status</option></select>
+        <input id="jf-q" class="field" style="max-width:230px" placeholder="Search title or reason" oninput="renderJobs()">
+        <button class="btn ghost" onclick="clearJobFilters()">Clear</button>
+      </div>
+
+      <div id="jobs-summary" style="margin-top:12px"></div>
+      <div id="jobs-out" style="margin-top:10px;overflow-x:auto"></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="eyebrow">Team effort by day</div>
+      <p class="note" style="margin-top:6px">Same filters as above. Reviewed is every job looked at, applied is every proposal sent.</p>
+      <div id="jobs-daily" style="margin-top:10px;overflow-x:auto"></div>
+    </div>
+  </section>
+
   <!-- DAILY REPORT -->
   <section class="view" data-view="report">
     <div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">Auto daily report — <span id="rep-date"></span></div><button class="btn ghost" onclick="copyReport()">Copy report</button></div>
@@ -457,13 +492,16 @@ function tickClock(){
 function canAct(m){ return !!m; }
 
 /* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['jobs','All Jobs'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
 function initNav(){
   var nav=document.getElementById('nav');
   VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
 }
 function go(name,btn){
   document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-view')===name);});
+  /* Fetched on first open rather than at page load: it is up to 2000 rows and
+     most sessions never open this tab. */
+  if(name==='jobs' && typeof loadJobs==='function') loadJobs(false);
   document.querySelectorAll('#nav button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on');
 }
 
@@ -1699,6 +1737,186 @@ function findDuplicateJob(linkOrId, rows){
     /* Shout for a real application, murmur for one that was only evaluated. */
     applied:/^\s*yes\s*$/i.test(String(best[CLEVAL_IDX.applied]||''))
   };
+}
+
+/* ============================ ALL JOBS TAB ============================
+   The shared record every bidder can finally see. Before this, each person could
+   only see their own rows in their own browser, so nobody could tell whether a
+   job was already taken, and outcomes were recorded on 7% of applications. */
+var CLEVAL_STATUS_OPTIONS = ['Not checked','No response','Opened','Replied','Interview','Hired','Lost'];
+var LEGACY_STATUS_VALUE   = 'Un Opened';        /* what 664 existing rows hold */
+var JOBS_LOADED = false;
+
+function normStatus(v){
+  var s=String(v==null?'':v).trim();
+  if(!s || s===LEGACY_STATUS_VALUE) return 'Not checked';
+  return s;
+}
+function jobsDayNum(v){
+  var s=String(v==null?'':v).trim(), m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)))       return (+m[1])*10000+(+m[2])*100+(+m[3]);
+  if((m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s)))     return (+m[3])*10000+(+m[1])*100+(+m[2]);
+  var d=new Date(s);
+  return isNaN(d.getTime())?NaN:d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+}
+
+/* Pure, so it is testable without a DOM. */
+function listJobs(filters, rows){
+  var f=filters||{}, list=(rows&&rows.length)?rows:CLEVAL_ROWS;
+  var from=f.from?jobsDayNum(f.from):NaN, to=f.to?jobsDayNum(f.to):NaN;
+  var q=String(f.q||'').trim().toLowerCase();
+  return (list||[]).filter(function(r){
+    if(!r||!r.length) return false;
+    if(f.person && String(r[CLEVAL_IDX.assignee]||'')!==f.person) return false;
+    if(!isNaN(from)||!isNaN(to)){
+      var d=jobsDayNum(r[CLEVAL_IDX.date]);
+      if(isNaN(d)) return false;
+      if(!isNaN(from)&&d<from) return false;
+      if(!isNaN(to)&&d>to) return false;
+    }
+    if(f.applied){
+      var yes=/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''));
+      if(f.applied==='yes'&&!yes) return false;
+      if(f.applied==='no'&&yes) return false;
+    }
+    if(f.status && normStatus(r[CLEVAL_IDX.proposalStatus])!==f.status) return false;
+    if(q){
+      var hay=(String(r[CLEVAL_IDX.jobTitle]||'')+' '+String(r[CLEVAL_IDX.reason]||'')).toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  });
+}
+
+function jobFilters(){
+  return { person:val('jf-person'), from:val('jf-from'), to:val('jf-to'),
+           applied:val('jf-applied'), status:val('jf-status'), q:val('jf-q') };
+}
+function clearJobFilters(){
+  ['jf-person','jf-from','jf-to','jf-applied','jf-status','jf-q'].forEach(function(id){ setVal(id,''); });
+  renderJobs();
+}
+
+async function loadJobs(force){
+  var out=document.getElementById('jobs-out'); if(!out) return;
+  if(JOBS_LOADED && !force){ renderJobs(); return; }
+  out.innerHTML='<div class="note">Loading jobs from the Ops DB...</div>';
+  try{
+    var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'listCLEval', limit:2000})});
+    var data=await r.json();
+    if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
+    setCLEvalRows(data.rows||[]);
+    JOBS_LOADED=true;
+    fillJobFilterOptions();
+    renderJobs();
+  }catch(e){
+    out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc(String(e&&e.message?e.message:e))+'</div>';
+  }
+}
+
+function fillJobFilterOptions(){
+  var ppl={}, sel=document.getElementById('jf-person');
+  CLEVAL_ROWS.forEach(function(r){ var a=String(r[CLEVAL_IDX.assignee]||'').trim(); if(a) ppl[a]=1; });
+  if(sel){
+    var cur=sel.value;
+    sel.innerHTML='<option value="">Everyone</option>'+Object.keys(ppl).sort().map(function(a){
+      return '<option value="'+esc(a)+'">'+esc(a)+'</option>'; }).join('');
+    sel.value=cur;
+  }
+  var ss=document.getElementById('jf-status');
+  if(ss){ var cs=ss.value;
+    ss.innerHTML='<option value="">Any status</option>'+CLEVAL_STATUS_OPTIONS.map(function(s){
+      return '<option value="'+esc(s)+'">'+esc(s)+'</option>'; }).join('');
+    ss.value=cs; }
+}
+
+function renderJobs(){
+  var out=document.getElementById('jobs-out'); if(!out) return;
+  var rows=listJobs(jobFilters());
+  var applied=rows.filter(function(r){return /^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''));});
+  var known=applied.filter(function(r){return normStatus(r[CLEVAL_IDX.proposalStatus])!=='Not checked';});
+  var won=applied.filter(function(r){return normStatus(r[CLEVAL_IDX.proposalStatus])==='Hired';});
+
+  var sum=document.getElementById('jobs-summary');
+  if(sum) sum.innerHTML='<div class="flex" style="gap:18px;flex-wrap:wrap">'
+    +'<span class="note"><b>'+rows.length+'</b> jobs</span>'
+    +'<span class="note"><b>'+applied.length+'</b> applied</span>'
+    +'<span class="note"><b>'+won.length+'</b> hired</span>'
+    +'<span class="note" style="color:'+(known.length<applied.length?'var(--amber)':'var(--muted)')+'"><b>'
+      +(applied.length?Math.round(100*known.length/applied.length):0)+'%</b> of applications have an outcome recorded</span></div>';
+
+  if(!rows.length){ out.innerHTML='<div class="note">No jobs match these filters.</div>'; renderJobsDaily(rows); return; }
+
+  var body=rows.slice().reverse().map(function(r){
+    var link=String(r[CLEVAL_IDX.jobLink]||'');
+    var evId=clevalId([ String(r[CLEVAL_IDX.assignee]||''), link, String(r[CLEVAL_IDX.jobTitle]||''),
+                        String(r[CLEVAL_IDX.date]||''), (/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''))?'APPLY':'SKIP') ]);
+    var st=normStatus(r[CLEVAL_IDX.proposalStatus]);
+    return '<tr>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.date]||''))+'<div class="note">'+esc(String(r[CLEVAL_IDX.timePkt]||''))+'</div></td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.assignee]||''))+'</td>'
+      +'<td style="max-width:320px">'+(link?'<a href="'+esc(link)+'" target="_blank" rel="noopener">'+esc(String(r[CLEVAL_IDX.jobTitle]||'(untitled)'))+'</a>':esc(String(r[CLEVAL_IDX.jobTitle]||'(untitled)')))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.hiringRate]||'-'))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.applied]||'-'))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.connects]||'-'))+'</td>'
+      +'<td><select class="field" style="min-width:150px" data-evid="'+esc(evId)+'" onchange="setJobStatus(this)">'
+        +CLEVAL_STATUS_OPTIONS.map(function(s){ return '<option value="'+esc(s)+'"'+(s===st?' selected':'')+'>'+esc(s)+'</option>'; }).join('')
+        +'</select><div class="note" data-status-note></div></td>'
+      +'<td style="max-width:260px">'+esc(String(r[CLEVAL_IDX.reason]||''))+'</td>'
+      +'</tr>';
+  }).join('');
+
+  out.innerHTML='<table><thead><tr><th>Date</th><th>Who</th><th>Job</th><th>Rate</th><th>Applied</th><th>Connects</th><th>Status</th><th>Reason</th></tr></thead><tbody>'+body+'</tbody></table>';
+  renderJobsDaily(rows);
+}
+
+/* Team effort by day: what each person reviewed and applied to, per date. */
+function renderJobsDaily(rows){
+  var box=document.getElementById('jobs-daily'); if(!box) return;
+  var byDay={};
+  (rows||[]).forEach(function(r){
+    var d=String(r[CLEVAL_IDX.date]||'(no date)'), who=String(r[CLEVAL_IDX.assignee]||'(unknown)');
+    var k=d+'||'+who;
+    if(!byDay[k]) byDay[k]={date:d,who:who,reviewed:0,applied:0,day:jobsDayNum(d)};
+    byDay[k].reviewed++;
+    if(/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''))) byDay[k].applied++;
+  });
+  var list=Object.keys(byDay).map(function(k){return byDay[k];})
+    .sort(function(a,b){ return (b.day||0)-(a.day||0) || a.who.localeCompare(b.who); });
+  if(!list.length){ box.innerHTML='<div class="note">Nothing in this range.</div>'; return; }
+  box.innerHTML='<table><thead><tr><th>Date</th><th>Who</th><th>Reviewed</th><th>Applied</th><th>Apply rate</th></tr></thead><tbody>'
+    +list.map(function(x){
+      return '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.who)+'</td><td>'+x.reviewed+'</td><td>'+x.applied+'</td>'
+        +'<td>'+(x.reviewed?Math.round(100*x.applied/x.reviewed):0)+'%</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+async function setJobStatus(sel){
+  var evId=sel.getAttribute('data-evid'), status=sel.value;
+  var note=sel.parentNode.querySelector('[data-status-note]');
+  if(note) note.textContent='Saving...';
+  try{
+    var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'updateCLEvalStatus', evaluationId:evId, status:status, name:(ME?ME.name:'')})});
+    var data=await r.json();
+    /* Say so when it did NOT save. A status that silently fails to write is
+       worse than no status at all, because the sheet then quietly disagrees. */
+    if(data&&data.ok){ if(note){ note.textContent='Saved'; setTimeout(function(){ note.textContent=''; },1500); } }
+    else if(note) note.textContent='Not saved: '+((data&&data.error)||'unknown error');
+  }catch(e){ if(note) note.textContent='Not saved: '+String(e&&e.message?e.message:e); }
+}
+
+function exportJobsCsv(){
+  var rows=listJobs(jobFilters());
+  var head=CLEVAL_COLUMNS.map(function(c){return c[0];});
+  function cell(v){ var s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  var csv=[head.map(cell).join(',')].concat(rows.map(function(r){
+    return CLEVAL_COLUMNS.map(function(_,i){ return cell(r[i]); }).join(',');
+  })).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='ops-hub-jobs.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* The warning itself. Red and unmissable when the profile has ALREADY BID,
