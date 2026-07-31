@@ -1684,22 +1684,32 @@ async function applyScoreGate(txt, jd, vr, mode){
   var vio=card.querySelector('[data-violations]');
   if(vio) card.insertBefore(slot, vio); else card.appendChild(slot);
 
-  var sc=(mode==='speed')?null:await scoreDraft(txt, jd);
-  var verdict=sendVerdict(vr, sc);
+  var sc=await scoreDraft(txt, jd);
+  /* A speed bid is deliberately ~50 words, and the rubric's length dimension is
+     calibrated for 120 to 180, so a speed bid can never reach 9.0 however good
+     it is. Blocking on that would make the button useless. It is scored and the
+     number is shown, but only the mechanical checks gate it. The speed-bid bar
+     is an open question for the owner. */
+  var verdict = (mode==='speed')
+    ? {canSend:!!vr.ok, scored:!!sc, reason: vr.ok?'Speed bid. Scored for information, not held to the '+CL_SEND_THRESHOLD.toFixed(1)+' bar.':'Fix the listed problems first.'}
+    : sendVerdict(vr, sc);
   var btn=Array.prototype.slice.call(card.querySelectorAll('button'))
     .filter(function(b){ return /copy/i.test(b.textContent); })[0];
 
   if(sc){
-    var col=sc.total>=CL_SEND_THRESHOLD?'var(--green)':sc.total>=8?'var(--amber)':'var(--red)';
+    var col=(mode!=='speed'&&sc.total>=CL_SEND_THRESHOLD)?'var(--green)':sc.total>=8?'var(--amber)':'var(--red)';
     slot.innerHTML='<div class="flex" style="gap:14px;align-items:center;flex-wrap:wrap">'
       +'<div class="scorebig" style="color:'+col+';font-size:28px">'+sc.total.toFixed(1)
       +' <span style="font-size:14px;font-weight:400;color:var(--muted)">/ 10</span></div>'
       +'<div class="note" style="flex:1">'+esc(verdict.reason)+'</div></div>'
       +(sc.summary?'<div class="note" style="margin-top:6px">'+esc(sc.summary)+'</div>':'');
-  } else if(mode==='speed'){
-    slot.innerHTML='<div class="note">Speed bids are not scored against the '+CL_SEND_THRESHOLD.toFixed(1)+'/10 bar.</div>';
   } else {
-    slot.innerHTML='<div class="note" style="color:var(--amber)">'+esc(verdict.reason)+'</div>';
+    /* Unscored blocks, so give the operator a way out that does not cost another
+       proposal call and does not change the words they already have. */
+    slot.innerHTML='<div class="note" style="color:var(--red)">'+esc(verdict.reason)+'</div>'
+      +'<button class="btn ghost" style="margin-top:8px" data-rescore>Score again</button>';
+    var again=slot.querySelector('[data-rescore]');
+    if(again) again.onclick=function(){ slot.parentNode.removeChild(slot); applyScoreGate(txt, jd, vr, mode); };
   }
 
   /* A separate marker from [data-violations] so copyText can tell "the writing
@@ -1718,15 +1728,16 @@ async function applyScoreGate(txt, jd, vr, mode){
 }
 
 /* The gate. Mechanics and judgement are different failures and both must pass.
-   When the scorer could not run at all we allow the send and SAY SO, because
-   blocking there would brick the tool the moment Anthropic billing lapses,
-   which is exactly what happened this week. */
+   STRICT, by owner decision on 1 Aug 2026: an unscored draft has not cleared the
+   bar, so it does not go out. The cost is accepted and it is real: while the
+   scorer is unavailable, no proposal can be sent at all. The reason is worded so
+   a bidder reads "this was never scored" rather than "my writing is bad". */
 function sendVerdict(validation, score){
   var mechOk = !!(validation && validation.ok);
   var scored = !!(score && !score.parseFailed && isFinite(Number(score.total)));
   if(!mechOk) return {canSend:false, scored:scored, reason:'Fix the listed problems first.'};
-  if(!scored) return {canSend:true, scored:false,
-    reason:'Not scored: the scorer was unavailable, so the '+CL_SEND_THRESHOLD.toFixed(1)+'/10 rule was not applied to this draft.'};
+  if(!scored) return {canSend:false, scored:false,
+    reason:'Not scored. The scorer could not run, so this draft has not cleared the '+CL_SEND_THRESHOLD.toFixed(1)+'/10 bar and cannot be sent. Try scoring again.'};
   if(Number(score.total) < CL_SEND_THRESHOLD)
     return {canSend:false, scored:true, reason:'Scored '+Number(score.total).toFixed(1)+'/10. It must reach '+CL_SEND_THRESHOLD.toFixed(1)+' before it goes out.'};
   return {canSend:true, scored:true, reason:'Scored '+Number(score.total).toFixed(1)+'/10.'};

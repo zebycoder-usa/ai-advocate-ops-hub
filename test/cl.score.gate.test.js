@@ -125,23 +125,30 @@ describe('sendVerdict: what the gate decides', () => {
     expect(w.sendVerdict(clean, { total: 9.6 }).canSend).toBe(true);
   });
 
-  it('when the scorer could not run, it allows but says the draft was not scored', () => {
-    // Blocking here would brick the whole tool the moment Anthropic billing
-    // lapses, which is exactly what happened this week. The operator is told
-    // instead, so they know they are sending unscored work.
+  // Owner decision, 1 Aug 2026: STRICT. An unscored draft is not a passing
+  // draft. The rule is "nothing goes out below 9", and a proposal nobody scored
+  // has not cleared 9. The cost is real and accepted: while the scorer is down,
+  // no proposal can be sent at all.
+  it('BLOCKS when the scorer could not run, because unscored is not passed', () => {
     const v = w.sendVerdict(clean, null);
-    expect(v.canSend).toBe(true);
+    expect(v.canSend).toBe(false);
     expect(v.scored).toBe(false);
-    expect(String(v.reason || '')).toMatch(/not scored|unavailable/i);
+    expect(String(v.reason || '')).toMatch(/not scored|unavailable|could not/i);
   });
 
   it('still blocks on failed mechanics even when the scorer could not run', () => {
     expect(w.sendVerdict(dirty, null).canSend).toBe(false);
   });
 
-  it('a parse failure counts as not scored rather than as a zero', () => {
+  it('a parse failure is treated as unscored, and unscored blocks', () => {
     const v = w.sendVerdict(clean, { total: 0, parseFailed: true });
     expect(v.scored).toBe(false);
-    expect(v.canSend).toBe(true);
+    expect(v.canSend).toBe(false);
+  });
+
+  it('the reason tells the operator the draft was never scored, not that it failed', () => {
+    // A bidder must not read "blocked" as "my writing is bad" when the real
+    // cause is that the scorer never ran.
+    expect(String(w.sendVerdict(clean, null).reason || '')).not.toMatch(/must reach/i);
   });
 });
