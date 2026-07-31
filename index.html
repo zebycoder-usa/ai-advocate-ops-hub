@@ -42,6 +42,10 @@ textarea{width:100%;min-height:90px;resize:vertical}
 .field{width:100%}
 .btn{background:linear-gradient(135deg,var(--green2),var(--green));color:#06120d;border:none;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;font-size:14px}
 .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+/* A blocked Copy button looked identical to a working one, so a bidder would
+   click it repeatedly and conclude the app was broken. Opacity only, so it
+   inherits whichever theme is active rather than hardcoding a colour. */
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.6)}
 .btn.gold{background:linear-gradient(135deg,#d8b25a,var(--gold));color:#1a1405}
 .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
 .pill.ok{color:var(--green);border-color:#1f5a45;background:#0f2a20}.pill.no{color:var(--red);border-color:#5a2020;background:#2a0f0f}.pill.warn{color:var(--amber);border-color:#5a4a1f;background:#2a230f}.pill.anytime{color:var(--gold);border-color:#5a4a1f;background:#221c0c}
@@ -1204,6 +1208,10 @@ async function genProposal(mode){
        enforcement of the house rules that exists; up to here they were a request
        to the model. */
     var vr=validateProposal(txt,{proofBank:AGENCY_PROOF_BANK, jobText:jd, mode:(mode==="speed"?"speed":"proposal")});
+    /* The draft is rendered first, then scored, then the gate is applied. The
+       bidder sees their proposal immediately instead of staring at a spinner
+       while a second model call runs. */
+    setTimeout(function(){ applyScoreGate(txt, jd, vr, mode); }, 0);
     var vHtml=vr.ok?'':'<div class="card" data-violations style="margin-top:10px;border-color:var(--red)">'
       +'<div class="eyebrow" style="color:var(--red)">Not ready to send. Fix these first.</div>'
       +'<ul class="note" style="margin-top:6px">'
@@ -1237,6 +1245,7 @@ function copyText(btn){
      cannot reach the clipboard via a direct call, a keyboard activation, or a
      re-enabled button. */
   if(card.querySelector('[data-violations]')) return;
+  if(card.querySelector('[data-score-block]')) return;   /* clean writing, but under the send bar */
   var c=card.querySelector('[data-copy]'); if(!c) return;
   navigator.clipboard.writeText(c.innerText);
   btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);
@@ -1607,15 +1616,120 @@ function renderCLScore(result){
       +'<button class="btn ghost" style="margin-top:8px" onclick="copyRewritten(this)">Copy</button></div>':'');
 }
 
-var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency, a full-service tech firm. Principal: Saqib Shahzad, senior AI/ML/LLM engineer. Agency rate floor is $40/hr, set per job. He is Rising Talent with 100% Job Success, he is NOT Top Rated, never let a proposal claim otherwise. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.0/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks. IMPORTANT: platform credentials (Job Success Score, Rising Talent badge, star ratings, Upwork badges) are NOT proof points and must not be scored as results — they are badges, not deliverables.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.0"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.';
+var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency, a full-service tech firm. Principal: Saqib Shahzad, senior AI/ML/LLM engineer. Agency rate floor is $40/hr, set per job. He is Rising Talent with 100% Job Success, he is NOT Top Rated, never let a proposal claim otherwise. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.0/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks. IMPORTANT: platform credentials (Job Success Score, Rising Talent badge, star ratings, Upwork badges) are NOT proof points and must not be scored as results — they are badges, not deliverables.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.0"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.'
++"\n\n"+AGENCY_PROOF_BANK+"\n\n"
++'VERIFYING PROOF: the AGENCY PROOF BANK above is the ONLY source of true figures. A number in the letter that is not in that bank and not in the job post is a FABRICATION: score Proof 0 and say which number is unbacked. Do not reward a figure for sounding plausible.';
 
 var CL_REWRITE_SYSTEM='You are a world-class Upwork proposal writer for AI Advocate Agency, a full-service tech team of experienced specialists (10+ years each). You rewrite proposals to score 9.0/10 or higher on the scoring rubric.\n\n'+AGENCY_PROOF_BANK+'\n\n'+PROOF_VOICE_RULES+'\n\nRULES you must follow exactly:\n- Open with the client\'s exact problem in their own words (never with credentials); no invented scenarios\n- Include 1–2 true proof points: the single AGENCY PROOF BANK entry whose domain matches the job, or facts present in the user\'s own letter. Use ONLY those sources. NEVER invent metrics, results, employers, or numbers. If no true metric is available, use the strongest TRUE qualitative proof. Do NOT pad with platform badges (Job Success Score, Rising Talent, star ratings) — badges are not deliverables and score zero on the proof dimension.\n- One consistent voice throughout: "we", the agency team. Never mix "Saqib" and "we". Never claim Top Rated or Top Rated Plus or any badge the profile does not have. Agency rate floor is $40/hr; the bid is set per job, never state a specific rate unless the job post or user provides it.\n- NEVER mention the agency\'s Upwork job count, tenure, account age, or newness anywhere. Lead with portfolio results and team expertise only.\n- Include a 2–3 step numbered plan specific to this brief\n- End with one sharp question relevant to this exact job\n- Natural, spoken English. No em dashes. No en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders. No confidence claims like "that is exactly what we build" without a specific proof.\n- Proposal length: 120–180 words exactly.\n\nINTERNAL PROCESS: After writing your draft, score it mentally against the 6-dimension rubric (hook 2.0, proof 2.0, plan 2.0, close 1.5, style 1.5, len 1.0). If it scores below 9.0, revise it once. If still below 9.0, revise a second time. Return the best honest version — the one that scores highest while remaining 100% truthful.\n\nReturn ONLY the rewritten proposal text. No preamble, no explanation, no score label.';
+
+/* The one place the send bar is written down. It used to be a 9.0 literal
+   repeated across scoring, rendering, verdict text and four prompt strings. */
+var CL_SEND_THRESHOLD = 9.0;
 
 function parseScoreJson(raw){
   var s=(raw||'').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
   var start=s.indexOf('{'), end=s.lastIndexOf('}');
   if(start!==-1&&end>start) s=s.slice(start,end+1);
-  try{ return JSON.parse(s); }catch(e){ return {_raw:s,hook:0,proof:0,plan:0,close:0,style:0,len:0,summary:'Could not parse AI response. Raw: '+s.slice(0,300)}; }
+  try{ return JSON.parse(s); }
+  catch(e){
+    /* A parse failure is NOT a score of zero. Returning zeros made "the model
+       returned prose" indistinguishable from "this letter is genuinely awful",
+       and the zeros were written to the sheet as a real result. */
+    return {parseFailed:true,_raw:s,hook:0,proof:0,plan:0,close:0,style:0,len:0,
+            summary:'Could not read the scorer response. Raw: '+s.slice(0,300)};
+  }
+}
+
+/* Coerce and bound every dimension. Nothing capped these, so a reply scoring
+   each one out of 10 totalled 57 and rendered a green PASS at 570% width on a
+   letter that should have been rewritten. */
+function clampScore(result){
+  var r=result||{}, out={}, total=0;
+  CL_RUBRIC.forEach(function(d){
+    var n=Number(r[d.id]);
+    if(!isFinite(n)||n<0) n=0;
+    if(n>d.max) n=d.max;
+    out[d.id]=n; total+=n;
+    if(r[d.id+'_note']!=null && r[d.id+'_note']!=='') out[d.id+'_note']=String(r[d.id+'_note']);
+  });
+  out.total=Math.round(total*10)/10;
+  out.summary=r.summary?String(r.summary):'';
+  out.parseFailed=!!r.parseFailed;
+  return out;
+}
+
+/* Scores a generated draft against the job post. Returns a clamped score, or
+   null when the scorer could not run at all. Never throws: a scoring outage
+   must not take the proposal with it. */
+async function scoreDraft(txt, jd){
+  try{
+    var msg='COVER LETTER / PROPOSAL ('+clWordCount(txt)+' words):\n'+txt
+           +(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
+    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:msg,model:'claude-sonnet-4-6',max_tokens:1600});
+    var sc=clampScore(parseScoreJson(raw));
+    return sc.parseFailed?null:sc;
+  }catch(e){ return null; }
+}
+
+/* Runs the scorer on a rendered draft and applies meeting rule 2.3: nothing
+   goes out below the threshold. Until now the 10-point score lived in a separate
+   tab that the proposal flow never called, so the rule gated nothing. */
+async function applyScoreGate(txt, jd, vr, mode){
+  var el=document.getElementById('prop-out'); if(!el) return;
+  var card=el.querySelector('.card'); if(!card) return;
+  var slot=document.createElement('div');
+  slot.setAttribute('data-score','');
+  slot.style.marginTop='10px';
+  slot.innerHTML='<div class="note">Scoring against the job post...</div>';
+  var vio=card.querySelector('[data-violations]');
+  if(vio) card.insertBefore(slot, vio); else card.appendChild(slot);
+
+  var sc=(mode==='speed')?null:await scoreDraft(txt, jd);
+  var verdict=sendVerdict(vr, sc);
+  var btn=Array.prototype.slice.call(card.querySelectorAll('button'))
+    .filter(function(b){ return /copy/i.test(b.textContent); })[0];
+
+  if(sc){
+    var col=sc.total>=CL_SEND_THRESHOLD?'var(--green)':sc.total>=8?'var(--amber)':'var(--red)';
+    slot.innerHTML='<div class="flex" style="gap:14px;align-items:center;flex-wrap:wrap">'
+      +'<div class="scorebig" style="color:'+col+';font-size:28px">'+sc.total.toFixed(1)
+      +' <span style="font-size:14px;font-weight:400;color:var(--muted)">/ 10</span></div>'
+      +'<div class="note" style="flex:1">'+esc(verdict.reason)+'</div></div>'
+      +(sc.summary?'<div class="note" style="margin-top:6px">'+esc(sc.summary)+'</div>':'');
+  } else if(mode==='speed'){
+    slot.innerHTML='<div class="note">Speed bids are not scored against the '+CL_SEND_THRESHOLD.toFixed(1)+'/10 bar.</div>';
+  } else {
+    slot.innerHTML='<div class="note" style="color:var(--amber)">'+esc(verdict.reason)+'</div>';
+  }
+
+  /* A separate marker from [data-violations] so copyText can tell "the writing
+     is wrong" apart from "it did not clear the bar". */
+  var old=card.querySelector('[data-score-block]'); if(old) old.parentNode.removeChild(old);
+  if(!verdict.canSend && vr.ok){
+    var blk=document.createElement('div');
+    blk.setAttribute('data-score-block','');
+    blk.className='note';
+    blk.style.color='var(--red)';
+    blk.style.marginTop='6px';
+    blk.textContent='Below the send bar. Regenerate or rewrite before sending.';
+    slot.appendChild(blk);
+  }
+  if(btn) btn.disabled=!verdict.canSend;
+}
+
+/* The gate. Mechanics and judgement are different failures and both must pass.
+   When the scorer could not run at all we allow the send and SAY SO, because
+   blocking there would brick the tool the moment Anthropic billing lapses,
+   which is exactly what happened this week. */
+function sendVerdict(validation, score){
+  var mechOk = !!(validation && validation.ok);
+  var scored = !!(score && !score.parseFailed && isFinite(Number(score.total)));
+  if(!mechOk) return {canSend:false, scored:scored, reason:'Fix the listed problems first.'};
+  if(!scored) return {canSend:true, scored:false,
+    reason:'Not scored: the scorer was unavailable, so the '+CL_SEND_THRESHOLD.toFixed(1)+'/10 rule was not applied to this draft.'};
+  if(Number(score.total) < CL_SEND_THRESHOLD)
+    return {canSend:false, scored:true, reason:'Scored '+Number(score.total).toFixed(1)+'/10. It must reach '+CL_SEND_THRESHOLD.toFixed(1)+' before it goes out.'};
+  return {canSend:true, scored:true, reason:'Scored '+Number(score.total).toFixed(1)+'/10.'};
 }
 
 async function scoreCL(){
