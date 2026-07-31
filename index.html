@@ -25,20 +25,21 @@ a{color:var(--green)}
 /* Two columns: navigation down the left, one view at a time on the right. The
    header and the access banner span both. Every .view sits in the SAME grid cell
    and only the active one is displayed, so no row juggling is needed. */
-.wrap{max-width:1240px;margin:0 auto;padding:16px;
-  display:grid;grid-template-columns:214px minmax(0,1fr);column-gap:24px;align-items:start}
+.wrap{max-width:1240px;margin:0 auto;padding:22px 22px 56px;
+  display:grid;grid-template-columns:214px minmax(0,1fr);
+  column-gap:24px;row-gap:20px;align-items:start}
 .wrap>.top{grid-column:1/-1;grid-row:1}
 .wrap>#access{grid-column:1/-1;grid-row:2}
 .wrap>.nav{grid-column:1;grid-row:3}
 .wrap>.view{grid-column:2;grid-row:3;min-width:0}
-.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}
+.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;padding:6px 0 18px;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px}.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--gold));display:grid;place-items:center;font-weight:800;color:#06120d}
 .brand b{font-size:16px}.brand .s{font-size:11px;color:var(--muted)}
 .clock{font-size:12px;color:var(--muted);text-align:right;line-height:1.5;white-space:nowrap}
 .who{display:flex;gap:8px;align-items:center;flex-wrap:wrap}select,input,textarea{background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 10px;font-size:14px;font-family:inherit}
 textarea{width:100%;min-height:90px;resize:vertical}
-.nav{margin:0;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;
-  position:sticky;top:16px}
+.nav{margin:0;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  position:sticky;top:22px}
 .nav .side-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
   padding:10px 10px 5px}
 .nav .side-head:not(:first-child){border-top:1px solid var(--line);margin-top:6px}
@@ -181,7 +182,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     <div id="seat-bar"></div>
   </div>
 
-  <div id="access" class="banner" style="margin-top:12px"></div>
+  <div id="access" class="banner"></div>
 
   <div class="nav" id="nav"></div>
 
