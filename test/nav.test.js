@@ -1,9 +1,9 @@
-// The navigation bar.
+// The left sidebar.
 //
 // It used to render all thirteen views as identical pills over two rows, giving
-// a reference table the same weight as the screen people use fifty times a day.
-// Four stay on the bar; the nine you look up rather than work in moved into
-// "More". These tests exist so nothing silently becomes unreachable.
+// a reference table the same visual weight as the screen people use fifty times
+// a day. The sidebar keeps every screen visible but groups them by what they are
+// for, so a new starter can see the whole app without opening a menu.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadApp } from './loadApp.js';
 
@@ -11,25 +11,33 @@ let app, doc, w;
 beforeEach(() => {
   app = loadApp(); doc = app.doc; w = app.window;
   // boot() only runs once the seat gate is passed, so a test window never has a
-  // nav unless we build it. That is also why no earlier test ever exercised it.
+  // nav unless we build it. That is also why no earlier test exercised it.
   w.initNav();
 });
 
-const barButtons = () => Array.from(doc.querySelectorAll('#nav > button[data-nav]'));
-const panelItems = () => Array.from(doc.querySelectorAll('#nav-more-panel .more-item'));
+const items = () => Array.from(doc.querySelectorAll('#nav button[data-nav]'));
+const heads = () => Array.from(doc.querySelectorAll('#nav .side-head'));
+const names = () => items().map((b) => b.getAttribute('data-nav'));
 const activeView = () =>
   (Array.from(doc.querySelectorAll('.view')).find((v) => v.classList.contains('on')) || {})
     .getAttribute?.('data-view');
 
-describe('the bar is short', () => {
-  it('shows four primary items plus More, not thirteen', () => {
-    expect(barButtons()).toHaveLength(4);
-    expect(doc.getElementById('nav-more')).not.toBeNull();
+describe('every screen is visible at once', () => {
+  it('shows all thirteen views, none hidden behind a menu', () => {
+    expect(items()).toHaveLength(w.VIEWS.length);
   });
 
-  it('the four are the things people actually do', () => {
-    expect(barButtons().map((b) => b.getAttribute('data-nav')))
-      .toEqual(['command', 'evaluate', 'jobs', 'clscore']);
+  it('every view in VIEWS has a button', () => {
+    const have = new Set(names());
+    w.VIEWS.forEach(([name]) => expect(have.has(name)).toBe(true));
+  });
+
+  it('no button points at a view that does not exist', () => {
+    names().forEach((n) => expect(doc.querySelector(`.view[data-view="${n}"]`)).not.toBeNull());
+  });
+
+  it('every button has a readable label', () => {
+    items().forEach((b) => expect(b.textContent.trim().length).toBeGreaterThan(0));
   });
 
   it('opens on Home', () => {
@@ -37,106 +45,93 @@ describe('the bar is short', () => {
   });
 });
 
-describe('nothing became unreachable', () => {
-  it('every view is on the bar or in the More panel', () => {
-    const reachable = new Set(
-      barButtons().concat(panelItems()).map((b) => b.getAttribute('data-nav'))
-    );
-    w.VIEWS.forEach(([name]) => expect(reachable.has(name)).toBe(true));
+describe('grouped by what each screen is for', () => {
+  it('has a heading for every section', () => {
+    expect(heads()).toHaveLength(w.NAV_SECTIONS.length);
   });
 
-  it('the panel holds the other nine', () => {
-    expect(panelItems()).toHaveLength(9);
+  it('the headings read as plain English, not as jargon', () => {
+    expect(heads().map((h) => h.textContent)).toEqual(['Work', 'The record', 'How we work', 'Help']);
   });
 
-  it('the panel is grouped rather than one long list', () => {
-    expect(doc.querySelectorAll('#nav-more-panel .more-head').length).toBeGreaterThanOrEqual(2);
+  it('the daily loop comes first', () => {
+    expect(names().slice(0, 4)).toEqual(['command', 'evaluate', 'jobs', 'clscore']);
   });
 
-  it('every panel item has a readable label', () => {
-    panelItems().forEach((b) => expect(b.textContent.trim().length).toBeGreaterThan(0));
+  it('reference material is grouped away from the work', () => {
+    const howWeWork = w.NAV_SECTIONS.find((s) => s.label === 'How we work').items;
+    expect(howWeWork).toContain('scoring');
+    expect(howWeWork).toContain('rules');
+    expect(howWeWork).toContain('guide');
+  });
+
+  it('lists no screen twice', () => {
+    expect(new Set(names()).size).toBe(names().length);
   });
 });
 
 describe('you can always tell where you are', () => {
-  it('a primary view highlights its own button', () => {
+  it('highlights the screen you are on', () => {
     w.go('jobs');
-    const on = barButtons().filter((b) => b.classList.contains('on'));
+    const on = items().filter((b) => b.classList.contains('on'));
     expect(on).toHaveLength(1);
     expect(on[0].getAttribute('data-nav')).toBe('jobs');
   });
 
-  it('a view inside More renames the More button to that view', () => {
-    // Otherwise the bar says "More" and the operator has lost track of the page
-    // they are looking at.
-    w.go('sessions');
-    const more = doc.getElementById('nav-more');
-    expect(more.textContent).toBe('Sign-ins');
-    expect(more.classList.contains('on')).toBe(true);
-  });
-
-  it('going back to a primary view resets the More label', () => {
-    w.go('sessions');
-    w.go('evaluate');
-    const more = doc.getElementById('nav-more');
-    expect(more.textContent).toBe('More');
-    expect(more.classList.contains('on')).toBe(false);
-  });
-
   it('only ever one thing looks selected', () => {
+    ['sessions', 'rules', 'evaluate', 'ai'].forEach((v) => {
+      w.go(v);
+      expect(items().filter((b) => b.classList.contains('on'))).toHaveLength(1);
+    });
+  });
+
+  it('moving between screens clears the previous highlight', () => {
     w.go('rules');
-    const onCount = barButtons().filter((b) => b.classList.contains('on')).length
-      + (doc.getElementById('nav-more').classList.contains('on') ? 1 : 0);
-    expect(onCount).toBe(1);
+    w.go('evaluate');
+    const on = items().filter((b) => b.classList.contains('on'));
+    expect(on[0].getAttribute('data-nav')).toBe('evaluate');
+  });
+});
+
+describe('clicking a sidebar item switches the screen', () => {
+  it('shows the view it names', () => {
+    doc.querySelector('#nav button[data-nav="scoring"]').click();
+    expect(activeView()).toBe('scoring');
+  });
+
+  it('shows exactly one view at a time', () => {
+    doc.querySelector('#nav button[data-nav="rules"]').click();
+    expect(doc.querySelectorAll('.view.on')).toHaveLength(1);
+  });
+
+  it('every single item actually opens its screen', () => {
+    // The check that would have caught a renamed or mistyped data-view.
+    names().forEach((n) => {
+      doc.querySelector(`#nav button[data-nav="${n}"]`).click();
+      expect(activeView()).toBe(n);
+    });
   });
 });
 
 describe('go() works however it is called', () => {
   it('switches the view from a bare name, with no button argument', () => {
-    w.go('scoring');
-    expect(activeView()).toBe('scoring');
+    w.go('guide');
+    expect(activeView()).toBe('guide');
   });
 
   it('still accepts a second argument, so older call sites do not break', () => {
-    expect(() => w.go('rules', doc.getElementById('nav-more'))).not.toThrow();
+    expect(() => w.go('rules', doc.querySelector('#nav button'))).not.toThrow();
     expect(activeView()).toBe('rules');
   });
 
-  it('an unknown view name does not throw or blank the bar', () => {
+  it('an unknown view name does not throw or empty the sidebar', () => {
     expect(() => w.go('does-not-exist')).not.toThrow();
-    expect(barButtons()).toHaveLength(4);
-  });
-});
-
-describe('the More panel opens and closes', () => {
-  it('starts closed', () => {
-    expect(doc.getElementById('nav-more-panel').hidden).toBe(true);
+    expect(items()).toHaveLength(w.VIEWS.length);
   });
 
-  it('opens on click and closes on a second click', () => {
-    const more = doc.getElementById('nav-more');
-    more.click();
-    expect(doc.getElementById('nav-more-panel').hidden).toBe(false);
-    more.click();
-    expect(doc.getElementById('nav-more-panel').hidden).toBe(true);
-  });
-
-  it('closes when you pick something from it', () => {
-    doc.getElementById('nav-more').click();
-    panelItems()[0].click();
-    expect(doc.getElementById('nav-more-panel').hidden).toBe(true);
-  });
-
-  it('closes on Escape, so it never strands the operator', () => {
-    doc.getElementById('nav-more').click();
-    doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(doc.getElementById('nav-more-panel').hidden).toBe(true);
-  });
-
-  it('reports its open state to screen readers', () => {
-    const more = doc.getElementById('nav-more');
-    expect(more.getAttribute('aria-expanded')).toBe('false');
-    more.click();
-    expect(more.getAttribute('aria-expanded')).toBe('true');
+  it('rebuilding the nav does not duplicate it', () => {
+    w.initNav();
+    w.initNav();
+    expect(items()).toHaveLength(w.VIEWS.length);
   });
 });
