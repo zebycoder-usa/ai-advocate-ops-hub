@@ -32,6 +32,22 @@ textarea{width:100%;min-height:90px;resize:vertical}
 .nav{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
 .nav button{background:var(--bg2);border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:999px;font-size:13px;cursor:pointer}
 .nav button.on{background:linear-gradient(135deg,var(--green2),var(--green));color:#06120d;border-color:transparent;font-weight:700}
+.nav button:hover{border-color:var(--green2);color:var(--text)}
+.nav button.on:hover{color:#06120d}
+/* "More" holds the nine screens people look up rather than work in. Keeping them
+   off the bar takes it from thirteen pills over two rows down to five. */
+.more-wrap{position:relative;display:inline-block}
+#nav-more::after{content:" ▾";opacity:.7}
+.more-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:210px;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;
+  box-shadow:0 12px 28px rgba(0,0,0,.45)}
+.more-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  padding:8px 10px 4px}
+.more-head:not(:first-child){border-top:1px solid var(--line);margin-top:4px}
+.more-item{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;
+  color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px;cursor:pointer}
+.more-item:hover{background:var(--sunken);border-color:var(--line)}
+.more-item.on{color:var(--green);font-weight:700}
 .view{display:none}.view.on{display:block;animation:f .2s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .grid{display:grid;gap:12px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
@@ -520,10 +536,65 @@ function tickClock(){
 function canAct(m){ return !!m; }
 
 /* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['jobs','All Jobs'],['sessions','Sign-ins'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+var VIEWS=[['command','Home'],['evaluate','Evaluate & Propose'],['jobs','All Jobs'],['sessions','Sign-ins'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+/* Thirteen identical pills over two rows gave a reference table the same weight
+   as the screen people use fifty times a day. There are really four things you
+   DO and nine you LOOK UP, so only the four stay on the bar. */
+var NAV_PRIMARY = ['command','evaluate','jobs','clscore'];
+var NAV_GROUPS = [
+  { label:'The record',  items:['sessions','pipeline','report'] },
+  { label:'How we work', items:['scoring','rules','guide','templates','profiles'] },
+  { label:'Help',        items:['ai'] }
+];
+function viewLabel(name){
+  for(var i=0;i<VIEWS.length;i++) if(VIEWS[i][0]===name) return VIEWS[i][1];
+  return name;
+}
 function initNav(){
   var nav=document.getElementById('nav');
-  VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
+  nav.innerHTML='';
+  NAV_PRIMARY.forEach(function(name){
+    var b=document.createElement('button');
+    b.textContent=viewLabel(name);
+    b.setAttribute('data-nav',name);
+    b.onclick=function(){ go(name); };
+    nav.appendChild(b);
+  });
+
+  var wrap=document.createElement('div');
+  wrap.className='more-wrap';
+  var mb=document.createElement('button');
+  mb.id='nav-more'; mb.type='button';
+  mb.setAttribute('aria-haspopup','true'); mb.setAttribute('aria-expanded','false');
+  mb.textContent='More';
+  var panel=document.createElement('div');
+  panel.className='more-panel'; panel.id='nav-more-panel'; panel.hidden=true;
+  NAV_GROUPS.forEach(function(g){
+    var h=document.createElement('div'); h.className='more-head'; h.textContent=g.label; panel.appendChild(h);
+    g.items.forEach(function(name){
+      var a=document.createElement('button');
+      a.className='more-item'; a.setAttribute('data-nav',name);
+      a.textContent=viewLabel(name);
+      a.onclick=function(){ closeMore(); go(name); };
+      panel.appendChild(a);
+    });
+  });
+  mb.onclick=function(e){ e.stopPropagation(); panel.hidden?openMore():closeMore(); };
+  wrap.appendChild(mb); wrap.appendChild(panel); nav.appendChild(wrap);
+
+  /* Click-away and Escape, so the panel never strands the operator. */
+  document.addEventListener('click',function(e){ if(!wrap.contains(e.target)) closeMore(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeMore(); });
+
+  go('command');
+}
+function openMore(){
+  var p=document.getElementById('nav-more-panel'), b=document.getElementById('nav-more');
+  if(p){ p.hidden=false; } if(b){ b.setAttribute('aria-expanded','true'); b.classList.add('open'); }
+}
+function closeMore(){
+  var p=document.getElementById('nav-more-panel'), b=document.getElementById('nav-more');
+  if(p){ p.hidden=true; } if(b){ b.setAttribute('aria-expanded','false'); b.classList.remove('open'); }
 }
 function go(name,btn){
   document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-view')===name);});
@@ -531,7 +602,25 @@ function go(name,btn){
      most sessions never open this tab. */
   if(name==='jobs' && typeof loadJobs==='function') loadJobs(false);
   if(name==='sessions' && typeof loadSessions==='function') loadSessions(false);
-  document.querySelectorAll('#nav button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on');
+
+  /* Highlight is derived from the view name, not from whichever element was
+     clicked, so go() works from the bar, from the More panel, or called
+     directly in a test. */
+  document.querySelectorAll('#nav button').forEach(function(b){ b.classList.remove('on'); });
+  var direct=document.querySelector('#nav > button[data-nav="'+name+'"]');
+  var more=document.getElementById('nav-more');
+  if(direct){
+    direct.classList.add('on');
+    if(more) more.textContent='More';
+  } else if(more){
+    /* A view living under More still has to look selected, and the bar has to
+       say WHICH one, or the operator loses track of where they are. */
+    more.classList.add('on');
+    more.textContent=viewLabel(name);
+  }
+  var panelBtn=document.querySelector('#nav-more-panel [data-nav="'+name+'"]');
+  document.querySelectorAll('#nav-more-panel .more-item').forEach(function(b){ b.classList.remove('on'); });
+  if(panelBtn) panelBtn.classList.add('on');
 }
 
 /* ============================ ACCESS BANNER + ROSTER ============================ */
