@@ -2196,10 +2196,12 @@ async function loadSessions(force){
     var data=await readJson(r,'The sign-in history');
     if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
     if(backendStale_(data)){
+      SESSIONS_BACKEND_STALE=true;
       out.innerHTML=backendStaleHtml_('Sign-in history');
       var tot=document.getElementById('sessions-totals'); if(tot) tot.innerHTML='';
       return;
     }
+    SESSIONS_BACKEND_STALE=false;
     setSessionRows(data.rows||[]); SESSIONS_LOADED=true;
     var sel=document.getElementById('sf-person');
     if(sel){
@@ -2238,6 +2240,11 @@ function fmtWhen(v){
 
 function renderSessions(){
   var out=document.getElementById('sessions-out'); if(!out) return;
+  if(SESSIONS_BACKEND_STALE){
+    out.innerHTML=backendStaleHtml_('Sign-in history');
+    var st0=document.getElementById('sessions-totals'); if(st0) st0.innerHTML='';
+    return;
+  }
   var rows=listSessions(sessionFilters());
   var tot=document.getElementById('sessions-totals');
   var totals=sessionTotals(rows);
@@ -2383,6 +2390,15 @@ function applyJobsSort(rows){
    rows that were never coming. An ABSENT rows key is a deployment problem. An
    EMPTY array is genuinely no data. They must not look the same on screen. */
 function backendStale_(data){ return !data || !Object.prototype.hasOwnProperty.call(data,'rows'); }
+
+/* Remembered, not just rendered once.
+   loadJobs wrote the warning into #jobs-out and then ANY later renderJobs, from
+   touching a filter, clearing one, or sorting, replaced it with "No jobs match
+   these filters". So the app told the truth once and then talked over itself,
+   and the reader was left believing their filters were the problem. The flag
+   makes the state survive every re-render until a load actually succeeds. */
+var JOBS_BACKEND_STALE=false;
+var SESSIONS_BACKEND_STALE=false;
 function backendStaleHtml_(what){
   return '<div class="note" style="color:var(--amber)"><b>'+esc(what)+' cannot load yet.</b> '
     +'The Apps Script backend is older than this app: it answered without recognising the request, '
@@ -2400,7 +2416,8 @@ async function loadJobs(force){
       body:JSON.stringify({action:'listCLEval', limit:2000})});
     var data=await readJson(r,'The job list');
     if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
-    if(backendStale_(data)){ out.innerHTML=backendStaleHtml_('The job list'); return; }
+    if(backendStale_(data)){ JOBS_BACKEND_STALE=true; out.innerHTML=backendStaleHtml_('The job list'); return; }
+    JOBS_BACKEND_STALE=false;
     setCLEvalRows(data.rows||[]);
     JOBS_LOADED=true;
     fillJobFilterOptions();
@@ -2428,6 +2445,14 @@ function fillJobFilterOptions(){
 
 function renderJobs(){
   var out=document.getElementById('jobs-out'); if(!out) return;
+  /* A filter change must not overwrite the reason there is no data. */
+  if(JOBS_BACKEND_STALE){
+    out.innerHTML=backendStaleHtml_('The job list');
+    var fs0=document.getElementById('jobs-filter-state'); if(fs0) fs0.innerHTML='';
+    var sum0=document.getElementById('jobs-summary'); if(sum0) sum0.innerHTML='';
+    var jd0=document.getElementById('jobs-daily'); if(jd0) jd0.innerHTML='';
+    return;
+  }
   var rows=listJobs(jobFilters());
   var applied=rows.filter(function(r){return /^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''));});
   var known=applied.filter(function(r){return normStatus(r[CLEVAL_IDX.proposalStatus])!=='Not checked';});
