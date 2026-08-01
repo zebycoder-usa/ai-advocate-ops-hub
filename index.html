@@ -2192,6 +2192,11 @@ async function loadSessions(force){
       body:JSON.stringify({action:'listSessions', limit:2000})});
     var data=await readJson(r,'The sign-in history');
     if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
+    if(backendStale_(data)){
+      out.innerHTML=backendStaleHtml_('Sign-in history');
+      var tot=document.getElementById('sessions-totals'); if(tot) tot.innerHTML='';
+      return;
+    }
     setSessionRows(data.rows||[]); SESSIONS_LOADED=true;
     var sel=document.getElementById('sf-person');
     if(sel){
@@ -2297,6 +2302,21 @@ function clearJobFilters(){
   renderJobs();
 }
 
+/* An Apps Script deployment that predates an action does not fail: it answers
+   {ok:true,note:'no-op'} with NO rows key at all. Reading that as `data.rows||[]`
+   turned "this backend is older than this app" into "there is no data", which is
+   the one message guaranteed to send someone hunting through their filters for
+   rows that were never coming. An ABSENT rows key is a deployment problem. An
+   EMPTY array is genuinely no data. They must not look the same on screen. */
+function backendStale_(data){ return !data || !Object.prototype.hasOwnProperty.call(data,'rows'); }
+function backendStaleHtml_(what){
+  return '<div class="note" style="color:var(--amber)"><b>'+esc(what)+' cannot load yet.</b> '
+    +'The Apps Script backend is older than this app: it answered without recognising the request, '
+    +'so Code.gs has not been redeployed since this screen shipped. '
+    +'Paste Code.gs into the Apps Script editor, then Deploy, Manage deployments, edit the existing deployment, New version. '
+    +'Your filters are fine and no data has been lost.</div>';
+}
+
 async function loadJobs(force){
   var out=document.getElementById('jobs-out'); if(!out) return;
   if(JOBS_LOADED && !force){ renderJobs(); return; }
@@ -2306,6 +2326,7 @@ async function loadJobs(force){
       body:JSON.stringify({action:'listCLEval', limit:2000})});
     var data=await readJson(r,'The job list');
     if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
+    if(backendStale_(data)){ out.innerHTML=backendStaleHtml_('The job list'); return; }
     setCLEvalRows(data.rows||[]);
     JOBS_LOADED=true;
     fillJobFilterOptions();
