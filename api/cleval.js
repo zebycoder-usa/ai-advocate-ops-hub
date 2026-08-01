@@ -25,17 +25,28 @@ export default async function handler(req, res) {
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};
 
-    // Idempotency in Code.gs is keyed on evaluationId and is skipped entirely
-    // when it is absent, so a request without one can append unbounded rows.
-    // Require it here rather than letting a malformed caller duplicate.
-    if (!body.evaluationId || typeof body.evaluationId !== 'string') {
-      return res.status(400).json({ ok: false, error: 'evaluationId is required.' });
-    }
+    // This proxy used to force action:'logCLEval' on every request, which meant
+    // the read endpoints could never be reached through it: the browser asked
+    // for listCLEval and the backend was handed logCLEval instead. Only these
+    // actions are forwarded, so the caller still cannot invoke anything else on
+    // the backend, but the ones the app needs now work.
+    const ALLOWED_ACTIONS = new Set(['logCLEval', 'listCLEval', 'updateCLEvalStatus', 'listSessions']);
+    const action = ALLOWED_ACTIONS.has(body.action) ? body.action : 'logCLEval';
 
-    // A row is the only thing worth writing. An empty body used to produce a
+    // These two guards belong to the WRITE path only. Idempotency in Code.gs is
+    // keyed on evaluationId and skipped entirely when it is absent, so a write
+    // without one can append unbounded rows, and an empty body used to produce a
     // row of blank cells.
-    if (!body.row || typeof body.row !== 'object' || !Object.keys(body.row).length) {
-      return res.status(400).json({ ok: false, error: 'row is required.' });
+    if (action === 'logCLEval') {
+      if (!body.evaluationId || typeof body.evaluationId !== 'string') {
+        return res.status(400).json({ ok: false, error: 'evaluationId is required.' });
+      }
+      if (!body.row || typeof body.row !== 'object' || !Object.keys(body.row).length) {
+        return res.status(400).json({ ok: false, error: 'row is required.' });
+      }
+    }
+    if (action === 'updateCLEvalStatus' && (!body.evaluationId || typeof body.evaluationId !== 'string')) {
+      return res.status(400).json({ ok: false, error: 'evaluationId is required.' });
     }
 
     // The destination tab is the server's decision, not the browser's. Code.gs
@@ -46,7 +57,7 @@ export default async function handler(req, res) {
     const r = await fetch(backend, {
       method: 'POST',
       headers: { 'content-type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ ...rest, action: 'logCLEval', secret }),
+      body: JSON.stringify({ ...rest, action, secret }),
     });
 
     const text = await r.text();

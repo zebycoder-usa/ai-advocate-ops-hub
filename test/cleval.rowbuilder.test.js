@@ -91,7 +91,8 @@ describe('CLEval clevalRowFrom() decision mapping', () => {
 describe('CLEval full Upwork-page parse -> exact row (3 REAL fixtures, Usman format)', () => {
   const rowObjFor = (file) => {
     app.doc.getElementById('job-text').value = fixture(file);
-    app.doc.getElementById('cl-job-link').value = '';
+    // cl-job-link went with the CL Score tab. evalCtx now takes the job link
+    // from the parsed post alone, which is what wins for all three fixtures.
     const d = app.window.evalDecision();
     const ctx = app.window.evalCtx();
     return app.window.clevalRowFrom(d, ctx);

@@ -18,20 +18,51 @@ html[data-theme="emerald"]{--bg:#0c1410;--bg2:#11201a;--card:#13241d;--line:#244
 html[data-theme="sapphire"]{--bg:#0b1220;--bg2:#131f33;--card:#131f33;--line:#24344f;--green:#4C8DFF;--green2:#4C8DFF;--text:#e8eef7;--muted:#8ea3c0;--bubble:#172a45;--sunken:#0c1626}
 html[data-theme="violet"]{--bg:#140f1e;--bg2:#201830;--card:#201830;--line:#352a4a;--green:#a78bfa;--green2:#a78bfa;--text:#ece7f7;--muted:#a596c0;--bubble:#2a1f42;--sunken:#17102a}
 html[data-theme="amber"]{--bg:#14100a;--bg2:#211a10;--card:#211a10;--line:#3a2f1c;--green:#f5b544;--green2:#f5b544;--text:#f4eee0;--muted:#c3b088;--bubble:#33260f;--sunken:#17110a}
-html[data-theme="daylight"]{--bg:#f6f8f7;--bg2:#ffffff;--card:#ffffff;--line:#dbe4df;--green:#0f9d74;--green2:#0f9d74;--text:#14201b;--muted:#5b6b64;--bubble:#dff1ea;--sunken:#eef2f0}
+/* Daylight already darkened --green because the dark-theme value is unreadable on
+   white. --red and --amber were left at their dark-theme values, so the hard-ban
+   card, .btn.danger and the locked Copy button all sat at roughly 2.5:1 against
+   #ffffff. The locked button states a rule people must be able to read, so these
+   two are darkened on the same principle as --green. */
+html[data-theme="daylight"]{--bg:#f6f8f7;--bg2:#ffffff;--card:#ffffff;--line:#dbe4df;--green:#0f9d74;--green2:#0f9d74;--text:#14201b;--muted:#5b6b64;--bubble:#dff1ea;--sunken:#eef2f0;--red:#b3261e;--amber:#8a5a00}
 .manual-dim{opacity:.5;pointer-events:none}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;background:radial-gradient(1200px 600px at 80% -10%,#16302600,#0c1410),var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
 a{color:var(--green)}
-.wrap{max-width:1060px;margin:0 auto;padding:16px}
-.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}
+/* Two columns: navigation down the left, one view at a time on the right. The
+   header and the access banner span both. Every .view sits in the SAME grid cell
+   and only the active one is displayed, so no row juggling is needed. */
+.wrap{max-width:1240px;margin:0 auto;padding:22px 22px 56px;
+  display:grid;grid-template-columns:214px minmax(0,1fr);
+  column-gap:24px;row-gap:20px;align-items:start}
+.wrap>.top{grid-column:1/-1;grid-row:1}
+.wrap>#access{grid-column:1/-1;grid-row:2}
+.wrap>.nav{grid-column:1;grid-row:3}
+.wrap>.view{grid-column:2;grid-row:3;min-width:0}
+.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;padding:6px 0 18px;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px}.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--gold));display:grid;place-items:center;font-weight:800;color:#06120d}
 .brand b{font-size:16px}.brand .s{font-size:11px;color:var(--muted)}
-.clock{font-size:12px;color:var(--muted);text-align:right;line-height:1.5}
-.who{display:flex;gap:8px;align-items:center}select,input,textarea{background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 10px;font-size:14px;font-family:inherit}
+.clock{font-size:12px;color:var(--muted);text-align:right;line-height:1.5;white-space:nowrap}
+.who{display:flex;gap:8px;align-items:center;flex-wrap:wrap}select,input,textarea{background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 10px;font-size:14px;font-family:inherit}
 textarea{width:100%;min-height:90px;resize:vertical}
-.nav{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
-.nav button{background:var(--bg2);border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:999px;font-size:13px;cursor:pointer}
+.nav{margin:0;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  position:sticky;top:22px}
+.nav .side-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  padding:10px 10px 5px}
+.nav .side-head:not(:first-child){border-top:1px solid var(--line);margin-top:6px}
+.nav button{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;
+  color:var(--muted);padding:8px 10px;border-radius:9px;font-size:13px;cursor:pointer;line-height:1.3}
 .nav button.on{background:linear-gradient(135deg,var(--green2),var(--green));color:#06120d;border-color:transparent;font-weight:700}
+.nav button:hover{background:var(--sunken);color:var(--text);border-color:var(--line)}
+.nav button.on:hover{color:#06120d;background:linear-gradient(135deg,var(--green2),var(--green))}
+/* Narrow screens: the sidebar folds back into a wrapping strip above the
+   content, because 214px of nav on a phone leaves nothing for the job. */
+@media (max-width:900px){
+  .wrap{grid-template-columns:minmax(0,1fr)}
+  .wrap>.top,.wrap>#access{grid-column:1}
+  .wrap>.nav{grid-column:1;grid-row:3;position:static;display:flex;flex-wrap:wrap;gap:6px;background:transparent;border:none;padding:0;margin:14px 0}
+  .wrap>.view{grid-column:1;grid-row:4}
+  .nav .side-head{display:none}
+  .nav button{display:inline-block;width:auto;border-color:var(--line);border-radius:999px;background:var(--bg2)}
+}
 .view{display:none}.view.on{display:block;animation:f .2s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .grid{display:grid;gap:12px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
@@ -42,9 +73,24 @@ textarea{width:100%;min-height:90px;resize:vertical}
 .field{width:100%}
 .btn{background:linear-gradient(135deg,var(--green2),var(--green));color:#06120d;border:none;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;font-size:14px}
 .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+/* A blocked Copy button looked identical to a working one, so a bidder would
+   click it repeatedly and conclude the app was broken. Opacity only, so it
+   inherits whichever theme is active rather than hardcoding a colour. */
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.6)}
+/* A locked Copy button must read as a deliberate rule, not a dead control, so it
+   keeps full contrast and states the reason. Specificity 0,3,0 beats .btn:disabled
+   at 0,2,0, so every other disabled button in the app is unaffected. */
+.btn.ghost.locked{opacity:1;filter:none;border-color:var(--red);color:var(--red);cursor:not-allowed}
 .btn.gold{background:linear-gradient(135deg,#d8b25a,var(--gold));color:#1a1405}
 .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
 .pill.ok{color:var(--green);border-color:#1f5a45;background:#0f2a20}.pill.no{color:var(--red);border-color:#5a2020;background:#2a0f0f}.pill.warn{color:var(--amber);border-color:#5a4a1f;background:#2a230f}.pill.anytime{color:var(--gold);border-color:#5a4a1f;background:#221c0c}
+/* The pill backgrounds above are hardcoded dark, so they only ever worked with the
+   dark-theme accent values. Daylight now darkens --red and --amber for legibility
+   on white, which would have left dark text on those dark chips. Light chips keep
+   both readable. */
+html[data-theme="daylight"] .pill.ok{color:#0b7a5a;border-color:#a7d8c6;background:#e8f7f1}
+html[data-theme="daylight"] .pill.no{border-color:#f0b4b0;background:#fdeceb}
+html[data-theme="daylight"] .pill.warn,html[data-theme="daylight"] .pill.anytime{border-color:#e8cf94;background:#fdf5e3}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .bar{height:8px;border-radius:6px;background:var(--sunken);overflow:hidden;border:1px solid var(--line)}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--green2),var(--green))}
 .scorebig{font-size:40px;font-weight:800;line-height:1}
@@ -152,7 +198,7 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     <div id="seat-bar"></div>
   </div>
 
-  <div id="access" class="banner" style="margin-top:12px"></div>
+  <div id="access" class="banner"></div>
 
   <div class="nav" id="nav"></div>
 
@@ -221,6 +267,14 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
       <button class="btn gold" onclick="genProposal('priority')">Generate proposal (120–160w)</button>
       <button class="btn ghost" onclick="genProposal('speed')">Speed bid (&lt;50w)</button>
     </div>
+    <div class="card tight" style="margin-top:12px;border-color:var(--gold)">
+      <div class="flex" style="justify-content:space-between">
+        <div class="eyebrow">3 · The send bar is always on</div>
+        <span class="pill warn" id="send-bar-pill">9.0 / 10 minimum</span>
+      </div>
+      <p class="note" style="margin-top:6px">Every proposal this app writes is scored out of 10 against the job post before you can touch it. Under the bar the Copy button stays locked and the text does not leave this screen. Nobody edits the words by hand: if a draft misses the bar, use Rewrite or generate a new one.</p>
+      <p class="note" style="margin-top:4px">Speed bids are deliberately under 50 words, so the rubric's length dimension can never reach the bar. They are scored for information and the lock does not apply to them.</p>
+    </div>
     <div id="eval-out" style="margin-top:12px"></div>
     <div id="prop-out" style="margin-top:12px"></div>
   </section>
@@ -230,6 +284,65 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     <div class="card"><div class="eyebrow">Pipeline</div>
       <p class="note" style="margin-top:6px">Owners (Saqib, Waqas) and Usman approve anytime. Every action auto-logs to the Daily Report — no manual sheet entry.</p>
       <table style="margin-top:8px"><thead><tr><th>Job</th><th>Score</th><th>Stage</th><th>By</th><th>Action</th></tr></thead><tbody id="pipe"></tbody></table>
+    </div>
+  </section>
+
+  <!-- SESSIONS: who was signed in, when -->
+  <section class="view" data-view="sessions">
+    <div class="card">
+      <div class="flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="eyebrow">Sign-in history &mdash; who held the profile, and when</div>
+        <button class="btn ghost" onclick="loadSessions(true)">Refresh</button>
+      </div>
+      <div class="flex" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+        <select id="sf-person" class="field" style="max-width:180px" onchange="renderSessions()"><option value="">Everyone</option></select>
+        <input id="sf-from" class="field" type="date" style="max-width:165px" onchange="renderSessions()" title="From date">
+        <input id="sf-to" class="field" type="date" style="max-width:165px" onchange="renderSessions()" title="To date">
+        <select id="sf-status" class="field" style="max-width:160px" onchange="renderSessions()">
+          <option value="">Any status</option><option value="ACTIVE">Still in</option>
+          <option value="CLOSED">Signed out</option><option value="TIMED OUT">Timed out</option>
+        </select>
+        <button class="btn ghost" onclick="clearSessionFilters()">Clear</button>
+      </div>
+      <div class="eyebrow" style="margin-top:14px">Time on the profile</div>
+      <div id="sessions-totals" style="margin-top:8px;overflow-x:auto"></div>
+      <div class="eyebrow" style="margin-top:16px">Every session</div>
+      <div id="sessions-out" style="margin-top:8px;overflow-x:auto"></div>
+    </div>
+  </section>
+
+  <!-- ALL JOBS: the shared record, read live from the sheet -->
+  <section class="view" data-view="jobs">
+    <div class="card">
+      <div class="flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="eyebrow">All jobs &mdash; everyone, live from the Ops DB</div>
+        <div class="flex" style="gap:8px">
+          <button class="btn ghost" onclick="loadJobs(true)">Refresh</button>
+          <button class="btn ghost" onclick="exportJobsCsv()">Export CSV</button>
+        </div>
+      </div>
+      <p class="note" style="margin-top:6px">Every job anyone evaluated. Set the status on a row as you hear back, the same way you would in the sheet. It saves straight to the Ops DB.</p>
+
+      <div class="flex" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+        <select id="jf-person" class="field" style="max-width:180px" onchange="renderJobs()"><option value="">Everyone</option></select>
+        <input id="jf-from" class="field" type="date" style="max-width:165px" onchange="renderJobs()" title="From date">
+        <input id="jf-to" class="field" type="date" style="max-width:165px" onchange="renderJobs()" title="To date">
+        <select id="jf-applied" class="field" style="max-width:150px" onchange="renderJobs()">
+          <option value="">Applied or not</option><option value="yes">Applied</option><option value="no">Not applied</option>
+        </select>
+        <select id="jf-status" class="field" style="max-width:170px" onchange="renderJobs()"><option value="">Any status</option></select>
+        <input id="jf-q" class="field" style="max-width:230px" placeholder="Search title or reason" oninput="renderJobs()">
+        <button class="btn ghost" onclick="clearJobFilters()">Clear</button>
+      </div>
+
+      <div id="jobs-summary" style="margin-top:12px"></div>
+      <div id="jobs-out" style="margin-top:10px;overflow-x:auto"></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="eyebrow">Team effort by day</div>
+      <p class="note" style="margin-top:6px">Same filters as above. Reviewed is every job looked at, applied is every proposal sent.</p>
+      <div id="jobs-daily" style="margin-top:10px;overflow-x:auto"></div>
     </div>
   </section>
 
@@ -279,40 +392,6 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
     </div>
   </section>
 
-  <!-- CL SCORE -->
-  <section class="view" data-view="clscore">
-    <div class="grid g2" style="margin-bottom:12px">
-      <div class="card">
-        <div class="eyebrow">1 · Paste your cover letter / proposal</div>
-        <textarea id="cl-text" style="min-height:180px;margin-top:8px" placeholder="Paste the full cover letter or proposal here. Include every word you plan to send."></textarea>
-        <label class="lbl">Original job description (paste for better context — optional but recommended)</label>
-        <textarea id="cl-jd" style="min-height:80px" placeholder="Paste the Upwork job post here so the AI can check relevance, echo, and specificity…"></textarea>
-        <label class="lbl">Job link (logged to sheet — optional)</label>
-        <input class="field" id="cl-job-link" placeholder="https://www.upwork.com/jobs/~…">
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" onclick="scoreCL()">Score it (AI · 10-point)</button>
-          <button class="btn ghost" onclick="improveCL()">Rewrite to 9.0+</button>
-          <button class="btn ghost" onclick="document.getElementById('cl-text').value='';document.getElementById('cl-jd').value='';document.getElementById('cl-job-link').value='';document.getElementById('cl-score-out').innerHTML=''">Clear</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="eyebrow">Scoring rubric — 10 points</div>
-        <table style="margin-top:8px;font-size:12px">
-          <thead><tr><th>#</th><th>Dimension</th><th>Max</th><th>What earns full marks</th></tr></thead>
-          <tbody>
-            <tr><td>1</td><td><b>Opening hook</b></td><td>2.0</td><td>First sentence names the client's exact problem in their own words — not Saqib's credentials</td></tr>
-            <tr><td>2</td><td><b>Proof points</b></td><td>2.0</td><td>1–2 specific, verifiable, true results from real past work — no invented metrics</td></tr>
-            <tr><td>3</td><td><b>Concrete plan</b></td><td>2.0</td><td>2–3 numbered steps that are specific and actionable for this exact job</td></tr>
-            <tr><td>4</td><td><b>Closing question</b></td><td>1.5</td><td>One sharp, relevant question that shows deep reading of the brief</td></tr>
-            <tr><td>5</td><td><b>Style and tone</b></td><td>1.5</td><td>Natural spoken English, no em/en dashes, no "Dear Hiring Manager", no "I am the perfect fit", no bracket placeholders</td></tr>
-            <tr><td>6</td><td><b>Length and format</b></td><td>1.0</td><td>Proposal 120–180 words; cover letter 2–4 sentences. Right length = right discipline</td></tr>
-          </tbody>
-        </table>
-        <div class="note" style="margin-top:10px">Target: <b>9.0 / 10 minimum</b> before sending. Below 9.0 means rewrite, not send.</div>
-      </div>
-    </div>
-    <div id="cl-score-out"></div>
-  </section>
 </div>
 
 <script>
@@ -457,14 +536,55 @@ function tickClock(){
 function canAct(m){ return !!m; }
 
 /* ============================ NAV ============================ */
-var VIEWS=[['command','Command'],['evaluate','Evaluate & Propose'],['clscore','CL Score'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+/* CL Score was removed once the 10-point score became part of Propose. Scoring a
+   letter in a second tab that the proposal flow never called meant the 9.0 rule
+   gated nothing, and two rubrics in two places drift apart. */
+var VIEWS=[['command','Home'],['evaluate','Evaluate & Propose'],['jobs','All Jobs'],['sessions','Sign-ins'],['pipeline','Pipeline'],['report','Daily Report'],['templates','Templates'],['profiles','Profiles'],['scoring','19-Point Score'],['rules','Rules & Fees'],['guide','Upwork Guide'],['ai','Ask AI']];
+/* A left sidebar, grouped by what each screen is FOR. Thirteen identical pills
+   over two rows gave a reference table the same weight as the screen people use
+   fifty times a day. Vertically there is room to show all of them at once, so
+   nothing is hidden behind a menu and a new starter can see the whole app. */
+var NAV_SECTIONS = [
+  { label:'Work',        items:['command','evaluate','jobs'] },
+  { label:'The record',  items:['sessions','pipeline','report'] },
+  { label:'How we work', items:['scoring','rules','guide','templates','profiles'] },
+  { label:'Help',        items:['ai'] }
+];
+function viewLabel(name){
+  for(var i=0;i<VIEWS.length;i++) if(VIEWS[i][0]===name) return VIEWS[i][1];
+  return name;
+}
 function initNav(){
-  var nav=document.getElementById('nav');
-  VIEWS.forEach(function(v,i){var b=document.createElement('button');b.textContent=v[1];if(i===0)b.className='on';b.onclick=function(){go(v[0],b);};nav.appendChild(b);});
+  var nav=document.getElementById('nav'); if(!nav) return;
+  nav.innerHTML='';
+  NAV_SECTIONS.forEach(function(sec){
+    var h=document.createElement('div');
+    h.className='side-head'; h.textContent=sec.label;
+    nav.appendChild(h);
+    sec.items.forEach(function(name){
+      var b=document.createElement('button');
+      b.type='button';
+      b.textContent=viewLabel(name);
+      b.setAttribute('data-nav',name);
+      b.onclick=function(){ go(name); };
+      nav.appendChild(b);
+    });
+  });
+  go('command');
 }
 function go(name,btn){
   document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-view')===name);});
-  document.querySelectorAll('#nav button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on');
+  /* Fetched on first open rather than at page load: it is up to 2000 rows and
+     most sessions never open this tab. */
+  if(name==='jobs' && typeof loadJobs==='function') loadJobs(false);
+  if(name==='sessions' && typeof loadSessions==='function') loadSessions(false);
+
+  /* Highlight is derived from the view name, not from whichever element was
+     clicked, so go() works from the bar, from the More panel, or called
+     directly in a test. */
+  document.querySelectorAll('#nav button').forEach(function(b){ b.classList.remove('on'); });
+  var btnFor=document.querySelector('#nav button[data-nav="'+name+'"]');
+  if(btnFor) btnFor.classList.add('on');
 }
 
 /* ============================ ACCESS BANNER + ROSTER ============================ */
@@ -544,6 +664,42 @@ function pageSections_(t){
   if (actAt >= 0)    { activity = clientAt >= 0 ? head.slice(actAt, clientAt) : head.slice(actAt); job = head.slice(0, actAt); }
 
   return { job: job, activity: activity, client: client, noise: noise, head: head, all: t };
+}
+
+/* The MODEL payload only, never the parser's input. Roughly a third to two
+   thirds of a pasted Upwork page is the client's past reviews, their other open
+   jobs and the footer navigation, none of which a proposal or an analysis is
+   allowed to use anyway. head is exactly job + activity + client, so it still
+   carries budget, budget type, posted date, skills, proposal count, connects
+   cost, client country, total spend, hire rate and payment verified. Measured on
+   the fixtures: 2979 -> 1321, 4339 -> 1451, 3882 -> 2644 characters.
+
+   NEVER send S.job alone, and NEVER send S.job + S.activity + S.client.
+   pageSections_ initialises all three to head, so with no Upwork markers that
+   join emits the paste THREE TIMES; and when a standalone "About the client" or
+   "Activity on this job" line is the first content in the paste, S.job is the
+   EMPTY STRING and the model would be asked to write a proposal for nothing.
+
+   Both fallbacks return the untouched paste, which is exactly today's behaviour,
+   so a bad split costs the saving and never the job. */
+function modelJobText_(t){
+  var raw = String(t == null ? '' : t);
+  var S;
+  try { S = pageSections_(raw); } catch(_e){ return raw; }
+  /* Nothing was cut, so head is at best the paste minus the site chrome. */
+  if (!S || !S.noise) return raw;
+  var head = String(S.head || '')
+    .replace(/^[ \t]*account settings[ \t]*\r?\n/i, '')
+    .trim();
+  /* A real page's activity and client panels alone measure 458 to 600 chars on
+     the fixtures, so under 400 means the split went wrong. Two known ways:
+     "Account Settings" pasted near the END truncates head to a stub because the
+     FIRST match wins and everything before it is discarded, and a noise marker on
+     line 1 truncates it to nothing because the sanity guard above compares
+     against Math.max(-1,-1) and does not fire. Do NOT weaken this to > 0 or to a
+     trim check: both let the stub through and the model gets nothing. */
+  if (head.length < 400) return raw;
+  return head;
 }
 
 /* A nice-to-have skill tag describes what would be handy, not what the job IS.
@@ -866,11 +1022,15 @@ async function aiAnalyzeJob(jd, d){
   var box=document.getElementById('eval-ai'); if(!box) return;
   var verdict=d.banned ? ('SKIP — HARD BAN ('+((d.bans||[]).join('; ')||'ban rule')+')')
                        : (d.total+'/'+(d.max||19)+' -> '+d.decision);
-  var sys=AGENCY_CONTEXT+'\n\nYou are analysing ONE Upwork job post for the agency. The 19-point score and decision are computed deterministically in-app; do NOT produce, restate, or change a numeric score. Write a short, honest analysis in natural spoken English. No em dashes, no en dashes. Cover three labelled parts: FIT (why this job does or does not match our full-service agency and skills), RISKS (client red flags, scope, budget, timeline, or anything in the post that could waste connects), and RECOMMENDATION (one line, consistent with the in-app decision). Be specific to THIS post. Never invent client facts, metrics, employers, or numbers that are not in the post.';
-  var ask='IN-APP DECISION (authoritative, do not restate as a score): '+verdict+'\n\nJOB POST:\n'+jd+'\n\nWrite the FIT / RISKS / RECOMMENDATION analysis now.';
+  var ask='IN-APP DECISION (authoritative, do not restate as a score): '+verdict+'\n\nJOB POST:\n'+modelJobText_(jd)+'\n\nWrite the FIT / RISKS / RECOMMENDATION analysis now.';
   try{
     var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,system:sys,messages:[{role:'user',content:ask}]})});
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,
+      system:[
+        {type:'text',text:AGENCY_CONTEXT,cache_control:{type:'ephemeral'}},
+        {type:'text',text:ANALYZE_TASK}
+      ],
+      messages:[{role:'user',content:ask}]})});
     if(!resp.ok){ var errt=''; try{errt=await resp.text();}catch(_e){} box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis failed (HTTP '+resp.status+')</b>'+(errt?': '+esc(errt.slice(0,200)):'')+'</div>'; return; }
     var data=await resp.json();
     if(data.error){ box.innerHTML='<div class="card note" style="border-color:var(--red)"><b>AI analysis error:</b> '+esc(data.error.message||String(data.error))+'</div>'; return; }
@@ -898,7 +1058,9 @@ function runEval(){
   if(jd!==LAST_EVAL_JD){ resetSignals(); LAST_EVAL_JD=jd; }
   var P=parseJob(jd); autofill(P);          /* pre-fill the signal boxes from the post */
   var d=evalDecision();                     /* deterministic authoritative verdict */
-  el.innerHTML=renderDecisionCard(d);       /* R12: runEval stays model-free (score is deterministic) */
+  /* Somebody else may already be on this job. Shown ABOVE the score, because the
+     decision to bid is different once you know the profile has already bid. */
+  el.innerHTML=duplicateWarningHtml(P.jobLink||val('job-text'))+renderDecisionCard(d);
   logAct('evaluate', firstLine(jd), d.total, d.banned?'HARD BAN':d.decision);
   /* CLEval: log EVERY decision. APPLY -> Green/Yes + real connects+bid;
      SKIP -> Red/No + connects blank + Bid '-'. No-op unless a staging endpoint
@@ -915,8 +1077,16 @@ function evaluateJob(){
   var el=document.getElementById('eval-out'); var jd=val('job-text');
   if(!el || !jd || !jd.trim()) return;
   if(!/deterministic/.test(el.innerHTML)) return;   /* card did not render (gate blocked) */
+  /* A banned job is decided before the model is ever consulted, so consulting it
+     is pure spend on a job we will never bid. genProposal has short-circuited on
+     bans since it was written; this path never did. */
+  var d=evalDecision();
+  if(d.banned){
+    el.insertAdjacentHTML('beforeend','<div id="eval-ai" style="margin-top:12px"><div class="card note" style="border-color:var(--red)"><b>Hard ban, so no AI analysis was requested.</b> This job hits a skip rule ('+((d.bans||[]).map(esc).join('; ')||'ban rule')+'). Banned jobs get 0 connects, no proposal, and no model call.</div></div>');
+    return;
+  }
   el.insertAdjacentHTML('beforeend','<div id="eval-ai" style="margin-top:12px"><div class="card note">Writing AI analysis (fit and risks)...</div></div>');
-  aiAnalyzeJob(jd, evalDecision());
+  aiAnalyzeJob(jd, d);
 }
 
 /* ============================ PROPOSAL + COVER LETTER (local, works with no key) ============================ */
@@ -991,6 +1161,45 @@ function echoProblem(job){
    validateProposal(text, opts) -> { ok, violations:[{rule, detail}] }
      opts = { proofBank, jobText, mode: 'proposal' | 'speed' } */
 var PROPOSAL_MIN_WORDS = 120, PROPOSAL_MAX_WORDS = 180;
+/* Per-section word budgets, signed off by the owner on 31 July 2026. They sum to
+   130-180, which sits inside the overall 120-180 rule, so both bars can be
+   enforced without contradicting each other. */
+var SECTION_BUDGETS = [
+  { key:'Hook',      min:25, max:30 },
+  { key:'Proof',     min:35, max:45 },
+  { key:'Relevance', min:25, max:35 },
+  { key:'Process',   min:30, max:40 },
+  { key:'CTA',       min:15, max:20 }
+];
+/* Labels that CLOSE the proposal. Without these the trailing intro block would
+   be counted as part of the CTA section. */
+var SECTION_STOPS = ['INTRO MESSAGE','INTRO','COVER LETTER'];
+
+/* Splits a labelled draft into { Hook: wordCount, ... }. Returns {} when the
+   draft carries no labels at all, which is how today's unlabelled drafts stay
+   exempt instead of being blocked overnight. */
+function proposalSections_(text){
+  var s=String(text||'');
+  var names=SECTION_BUDGETS.map(function(b){return b.key;}).concat(SECTION_STOPS)
+              .map(function(n){return n.replace(/ /g,'[ \\t]+');});
+  /* Match the WHOLE label line and let decoration fall where it likes. The model
+     writes HOOK:, **HOOK**, **HOOK:**, ## Hook and HOOK - and the colon lands
+     inside the asterisks as often as outside, so anchoring the punctuation in a
+     fixed order simply misses. A body line cannot match because it has other
+     words before the end of the line. */
+  var re=new RegExp('^[ \\t#*]*('+names.join('|')+')[ \\t:*\\-]*$','gim');
+  var hits=[],m;
+  while((m=re.exec(s))){ hits.push({raw:m[1],start:m.index,after:m.index+m[0].length}); }
+  var out={};
+  for(var i=0;i<hits.length;i++){
+    var canon=null, flat=hits[i].raw.replace(/\s+/g,' ').toUpperCase();
+    SECTION_BUDGETS.forEach(function(b){ if(b.key.toUpperCase()===flat) canon=b.key; });
+    if(!canon) continue;                                  /* a stop label, not a section */
+    var end = (i+1<hits.length) ? hits[i+1].start : s.length;
+    out[canon]=wordCount_(s.slice(hits[i].after, end));   /* the label is not a word */
+  }
+  return out;
+}
 var BADGE_RE = /\b(top\s+rated(\s+plus)?|job\s+success\s+score|jss|rising\s+talent)\b/i;
 
 /* The PROPOSAL block only. The draft also carries an INTRO MESSAGE block and may
@@ -1057,6 +1266,15 @@ function validateProposal(text, opts){
     var wc=wordCount_(proposalBlock_(s));
     if(wc<PROPOSAL_MIN_WORDS||wc>PROPOSAL_MAX_WORDS)
       v.push({rule:'length', detail:'The PROPOSAL block is '+wc+' words. It must be '+PROPOSAL_MIN_WORDS+' to '+PROPOSAL_MAX_WORDS+'.'});
+    /* Per-section budgets, judged only on the sections actually present. An
+       unlabelled draft reports nothing here and is governed by 'length' alone. */
+    var secs=proposalSections_(s);
+    SECTION_BUDGETS.forEach(function(b){
+      if(!Object.prototype.hasOwnProperty.call(secs,b.key)) return;
+      var n=secs[b.key];
+      if(n<b.min||n>b.max)
+        v.push({rule:'section', detail:b.key+' is '+n+' words. It must be '+b.min+' to '+b.max+'.'});
+    });
   }
 
   var src=numbersIn_(String(opts.proofBank||'')+'\n'+String(opts.jobText||'')).map(function(x){return x.replace(/,/g,'');});
@@ -1102,33 +1320,61 @@ async function genProposal(mode){
   el.innerHTML='<div class="card note">Generating proposal...</div>';
   var ask='Write a winning Upwork proposal and intro message for this job, following your PROPOSAL '
     +'OUTPUT RULES exactly. Output ONLY the two labelled blocks (PROPOSAL and INTRO MESSAGE), '
-    +'no score, no preamble.\n\nJOB:\n'+jd;
+    +'no score, no preamble.\n\nJOB:\n'+modelJobText_(jd);
   if(mode==="speed") ask+=' Keep the proposal on the shorter side, about 120 words.';
   try{
     var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,
+      system:[{type:'text',text:AGENCY_CONTEXT,cache_control:{type:'ephemeral'}}],
       messages:[{role:'user',content:ask}]})});
     if(!resp.ok){ var errt=await resp.text(); el.innerHTML='<div class="card note">Proposal generation failed ('+resp.status+'): '+esc(errt)+'</div>'; return; }
     var data=await resp.json();
     var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
     if(!txt){ el.innerHTML='<div class="card note">The model returned no text. Try again.</div>'; return; }
-    /* Check the draft BEFORE it can be copied. This is the only deterministic
-       enforcement of the house rules that exists; up to here they were a request
-       to the model. */
-    var vr=validateProposal(txt,{proofBank:AGENCY_PROOF_BANK, jobText:jd, mode:(mode==="speed"?"speed":"proposal")});
-    var vHtml=vr.ok?'':'<div class="card" data-violations style="margin-top:10px;border-color:var(--red)">'
-      +'<div class="eyebrow" style="color:var(--red)">Not ready to send. Fix these first.</div>'
-      +'<ul class="note" style="margin-top:6px">'
-      +vr.violations.map(function(x){return '<li><b>'+esc(x.rule)+'</b>: '+esc(x.detail)+'</li>';}).join('')
-      +'</ul><div class="src" style="margin-top:8px">Regenerate, or edit the draft in Upwork after copying the corrected text by hand.</div></div>';
-    el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'+(mode==="speed"?"Speed bid":"Proposal")+'</div><button class="btn ghost" onclick="copyText(this)"'+(vr.ok?'':' disabled')+'>Copy proposal</button></div>'
-      +'<div class="md" data-copy>'+mdToHtml(txt)+'</div>'
-      +vHtml
-      +'<div class="src" style="margin-top:10px">Generated live by Claude from the job post and the agency brief. Review before sending.</div></div>';
+    renderProposalCard(txt, jd, mode, false);
     logAct("proposal", firstLine(jd), 0, mode==="speed"?"speed draft":"proposal draft");
   }catch(e){
     el.innerHTML='<div class="card note">Proposal generation error: '+esc(String(e&&e.message?e.message:e))+'</div>';
   }
+}
+
+/* The last rendered draft, so the rewrite path can reach the exact source text
+   rather than scraping it back out of rendered markdown. */
+var LAST_DRAFT=null;
+
+/* One renderer for both a first draft and a rewrite, so a rewritten proposal is
+   put through the identical validate-and-score gate and can fail the bar exactly
+   like a first draft can. jd here is ALWAYS the untrimmed paste: validateProposal
+   uses it as the whitelist of numbers a proposal is allowed to state, so a
+   trimmed copy would manufacture false unbacked-number violations. */
+function renderProposalCard(txt, jd, mode, isRewrite){
+  var el=document.getElementById('prop-out'); if(!el) return;
+  LAST_DRAFT={txt:txt, jd:jd, mode:mode};
+  /* Check the draft BEFORE it can be copied. This is the only deterministic
+     enforcement of the house rules that exists; up to here they were a request
+     to the model. */
+  var vr=validateProposal(txt,{proofBank:AGENCY_PROOF_BANK, jobText:jd, mode:(mode==="speed"?"speed":"proposal")});
+  /* The draft is rendered first, then scored, then the gate is applied. The
+     bidder sees their proposal immediately instead of staring at a spinner
+     while a second model call runs. */
+  setTimeout(function(){ applyScoreGate(txt, jd, vr, mode); }, 0);
+  var vHtml=vr.ok?'':'<div class="card" data-violations style="margin-top:10px;border-color:var(--red)">'
+    +'<div class="eyebrow" style="color:var(--red)">Copy is locked. This draft breaks house rules.</div>'
+    +'<ul class="note" style="margin-top:6px">'
+    +vr.violations.map(function(x){return '<li><b>'+esc(x.rule)+'</b>: '+esc(x.detail)+'</li>';}).join('')
+    +'</ul><div class="src" style="margin-top:8px">Copy stays off until these are gone. Generate a new draft, or use Rewrite. Nobody retypes or patches the wording by hand.</div></div>';
+  /* The button starts disabled and the card is marked [data-scoring] SYNCHRONOUSLY
+     here, not when the gate's timer fires. applyScoreGate is the only thing that
+     clears either. Marking it inside the gate left a window between render and
+     the first tick in which an unscored draft was copyable by a direct call. */
+  el.innerHTML='<div class="card"><div class="flex" style="justify-content:space-between"><div class="eyebrow">'
+    +(mode==="speed"?"Speed bid":"Proposal")+(isRewrite?" (rewritten)":"")+'</div>'
+    +'<button class="btn ghost locked" data-copy-btn onclick="copyText(this)" disabled aria-disabled="true">Copy unlocks at '+CL_SEND_THRESHOLD.toFixed(1)+'</button></div>'
+    +'<div data-score data-scoring role="status" aria-live="polite" style="margin-top:10px">'
+    +'<div class="note">Scoring against the job post. Copy stays locked until it clears '+CL_SEND_THRESHOLD.toFixed(1)+'.</div></div>'
+    +'<div class="md" data-copy>'+mdToHtml(txt)+'</div>'
+    +vHtml
+    +'<div class="src" style="margin-top:10px">Generated live by Claude from the job post and the agency brief. Review before sending.</div></div>';
 }
 function shortProof(t){return t.proof.split('.')[0].replace(/^Saqib[: ]*/,'').toLowerCase().replace(/^[a-z]/,function(x){return x.toUpperCase();});}
 function step1(t){return 'Confirm scope and success criteria, then set up the core ('+oneWord(t.t)+') with your real data/stack.';}
@@ -1149,6 +1395,8 @@ function copyText(btn){
      cannot reach the clipboard via a direct call, a keyboard activation, or a
      re-enabled button. */
   if(card.querySelector('[data-violations]')) return;
+  if(card.querySelector('[data-score-block]')) return;   /* clean writing, but under the send bar */
+  if(card.querySelector('[data-scoring]')) return;       /* scorer still running, so not cleared yet */
   var c=card.querySelector('[data-copy]'); if(!c) return;
   navigator.clipboard.writeText(c.innerText);
   btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy proposal';},1200);
@@ -1266,7 +1514,23 @@ function renderScoring(){
     +'<div class="card"><div class="eyebrow">Match · /5</div>'+tbl(SCORING.match)+'</div></div>'
     +'<div class="card" style="margin-top:12px"><div class="eyebrow">Evidence & sources</div>'
     + SOURCES.map(function(s){return '<div class="src"><b>'+s[0]+'</b> — '+s[1]+'<br><a href="'+s[2]+'" target="_blank" rel="noopener">'+s[2]+'</a></div>';}).join('')
-    +'<p class="note" style="margin-top:8px">Two evidence-based tweaks baked in: (1) mid-tier $1k–$50k clients score highest (whales reply ~3.85% vs ~8% mid-tier, GigRadar); (2) every generated proposal leads with the client\u2019s own problem in sentence one (Upwork 2026; SnipeWork 500+ sample).</p></div>';
+    +'<p class="note" style="margin-top:8px">Two evidence-based tweaks baked in: (1) mid-tier $1k–$50k clients score highest (whales reply ~3.85% vs ~8% mid-tier, GigRadar); (2) every generated proposal leads with the client\u2019s own problem in sentence one (Upwork 2026; SnipeWork 500+ sample).</p></div>'
+    /* The 10-point rubric moved here when the CL Score tab was removed. Without
+       it the send bar is a number nobody can interpret: this is now the only
+       place that says what actually earns the marks. Built from CL_RUBRIC so the
+       documentation cannot drift away from the scorer itself. */
+    +'<div class="card" style="margin-top:12px"><div class="flex" style="justify-content:space-between">'
+    +'<div class="eyebrow">The 10-point proposal score, and what earns the marks</div>'
+    +'<span class="pill warn">'+CL_SEND_THRESHOLD.toFixed(1)+' / 10 minimum</span></div>'
+    +'<p class="note" style="margin-top:6px">Applied automatically to every proposal on the Evaluate and Propose screen. Under '+CL_SEND_THRESHOLD.toFixed(1)+' the Copy button stays locked. There is no separate tab to run this in and nothing to remember to click.</p>'
+    +'<table style="margin-top:8px;font-size:12px"><thead><tr><th>Dimension</th><th style="text-align:right">Max</th><th>What earns full marks</th></tr></thead><tbody>'
+    + CL_RUBRIC.map(function(r){
+        return '<tr><td><b>'+esc(r.label)+'</b></td>'
+          +'<td style="text-align:right;white-space:nowrap">'+r.max.toFixed(1)+'</td>'
+          +'<td>'+esc(r.tip)+'</td></tr>';
+      }).join('')
+    +'</tbody></table>'
+    +'<p class="note" style="margin-top:8px">A speed bid is deliberately under 50 words, so its length dimension can never reach the bar. Speed bids are scored for information only and the lock does not apply to them.</p></div>';
 }
 function renderRules(){
   document.getElementById('rules').innerHTML=
@@ -1397,9 +1661,20 @@ var PROOF_VOICE_RULES =
  +'5) Never state a number that is not in the AGENCY PROOF BANK or the user\'s own letter.\n'
  +'6) NEVER mention the agency\'s Upwork job count, tenure, account age, or newness anywhere. Lead with portfolio results and team expertise only.';
 var AGENCY_CONTEXT = buildContext();
+/* buildContext() MUST stay a pure function of frozen string constants. A prompt
+   cache breakpoint now sits on its output at all three call sites, and the match
+   is on exact bytes: interpolating a date, a user name, or mem.pipeline in here
+   would drop the hit rate to zero with no error and no visible symptom. */
 function buildContext(){
   return "You are the AI Advocate Upwork Operations Co-Pilot for AI Advocate Agency, a FULL-SERVICE tech firm. We advertise and deliver ALL of: front-end development, back-end development, full-stack, AI/ML, LLM, RAG, agentic AI, computer vision, NLP, data science, MLOps, QA, UX design, UI, CI/CD, DevOps. We have specialists for every one of these roles. Computer vision counts as data science. AI Advocate is a full-service team of experienced specialists (10+ years each) across front-end, back-end, AI/ML, computer vision, NLP, data science, QA, UX/UI, CI/CD, DevOps, and mobile. The team currently delivers under Saqib's Upwork profile during onboarding; the agency's own profile goes live afterward. Principal: Saqib Shahzad, US Citizen, Sugar Land TX, MS in Data Science, senior AI/ML/LLM engineer, Rising Talent with 100% Job Success (NOT Top Rated). Agency: AI ADVOCATE HOLDING LLC. RATE FLOOR is $40/hr and above, set per job. IMPORTANT: a rate below $40/hr is a FLAG FOR REVIEW, never a hard ban and never a disqualifier - still score the job on the /19 and state the score. Hourly $40+/hr earns the budget point; $30-39/hr is borderline (1 point, review before bidding); below $30/hr is flagged 'below rate floor, review before bidding' but is still scored, never auto-skipped. Only the HARD BANS listed below (never the hourly rate) disqualify a job outright. APPLY TO THE MAXIMUM number of jobs across all these skills; skip as little as possible. HARD BANS (0 connects, check before scoring): banking ops/trading/forex/crypto, weapons/defense; confirmed India/Bangladesh/Pakistan clients (unknown region is NOT a ban); Umbrage/Stewart/CVS Health/Lynx; fixed-price under $200; survey/test jobs; pure no-code-only or purely non-technical work (VA, admin, copywriting). Government AI/voice/automation work is ALLOWED. PROPOSAL COUNT = SCORE PENALTY not a ban: under 20 = 0, 20-50 = 0, 50+ = -2; let the /19 decide. SCORING (19-point): Client/7 (fixed-price /6) + Job/7 + Match/5. Match never fails just because the domain differs from AI/ML, because we do full-service. DECISION (recovery-review): 16-19 with Match 4+ = APPLY WITH BOOST; 14-15 = APPLY STANDARD; 12 to under 14 = honestly re-score and justify to 14 if legitimate, do not default to skip; 10 to under 12 = recover 1-2 points only if legitimate else skip; under 10 = skip. Recovery = honest re-scoring, never inflation. NEW-CLIENT FAIRNESS: when the client is new to Upwork (new account, little history), do NOT deduct for $0 spent, 0 hires, or few/no reviews. Score those history dimensions as N/A (neutral), not 0, and award the points the client does qualify for (payment verified, allowed region). A verified new client with a strong Job and Match must still be able to reach APPLY. Client newness is never a red flag by itself. INTEGRITY CHECK: if a client's signals are internally inconsistent (a very recently joined account also showing large spend, many hires, or many 5-star reviews), flag 'verify client authenticity: inconsistent history' and do NOT award those history points at face value. All hard bans and the honesty gate stay exactly as they are. HONESTY GATE: never state a credential or metric not backed by the live Upwork profile or live website; only cite genuinely delivered work; never claim Top Rated; no fabrication. Generate bespoke proposals live (no fixed templates): a full PROPOSAL (goes in Upwork Cover Letter box) plus a short INTRO MESSAGE. Proposal 120 to 180 words. No placeholders, no em dashes, natural spoken English.\n\n"+AGENCY_PROOF_BANK+"\n\n"+PROOF_VOICE_RULES+"\n\nWhen writing any proposal or cover letter: use ONLY the AGENCY PROOF BANK or facts in the user's own text for proof; NEVER invent new numbers.";
 }
+
+/* aiAnalyzeJob's task instruction, deliberately kept OUT of AGENCY_CONTEXT and
+   sent as a SECOND, uncached system block. It used to be concatenated onto
+   AGENCY_CONTEXT into one string, which would have keyed its own cache entry:
+   the cached prefix has to end at the same byte offset at every call site or the
+   three of them share nothing. */
+var ANALYZE_TASK='\n\nYou are analysing ONE Upwork job post for the agency. The 19-point score and decision are computed deterministically in-app; do NOT produce, restate, or change a numeric score. Write a short, honest analysis in natural spoken English. No em dashes, no en dashes. Cover three labelled parts: FIT (why this job does or does not match our full-service agency and skills), RISKS (client red flags, scope, budget, timeline, or anything in the post that could waste connects), and RECOMMENDATION (one line, consistent with the in-app decision). Be specific to THIS post. Never invent client facts, metrics, employers, or numbers that are not in the post.';
 
 var chat=[];
 function mdToHtml(src){
@@ -1452,7 +1727,9 @@ async function askAI(){
   var live=false, failReason='';
   try{
     var resp=await apiFetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,system:AGENCY_CONTEXT,messages:chat})});
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2200,
+      system:[{type:'text',text:AGENCY_CONTEXT,cache_control:{type:'ephemeral'}}],
+      messages:chat})});
     if(resp.ok){var data=await resp.json();
       if(data.error){ failReason='API error: '+(data.error.message||data.error); }
       else{var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
@@ -1467,6 +1744,9 @@ async function askAI(){
     var a=demoAnswer(q);pushMsg('ai','[Demo mode] '+a);chat.push({role:'assistant',content:a});
   }
 }
+/* Display copy only. The alias claude-haiku-4-5 below is NOT a valid request
+   model for this app: api/claude.js accepts only claude-haiku-4-5-20251001 and
+   silently downgrades anything else to Sonnet. Send CL_SCORE_MODEL. */
 function renderAiMode(){
   document.getElementById('ai-mode').innerHTML='<span>\u2726</span><div><b>Works now in Demo mode everywhere; fully live inside Claude or with a key.</b> Open this app as an artifact in Claude and the bot answers live for free. On a plain URL it answers from Demo mode until Saqib\u2019s Anthropic API key (separate from Claude Max) is added as a server env var. Models: <b>claude-sonnet-4-6</b> proposals, <b>claude-haiku-4-5</b> cheap scoring.</div>';
 }
@@ -1483,89 +1763,270 @@ var CL_RUBRIC=[
 
 function clWordCount(t){return (t||'').trim().split(/\s+/).filter(Boolean).length;}
 
-/* Read the text back out of the DOM. The old version inlined JSON.stringify()
-   into an onclick="" attribute, which broke on any quote in the AI output. */
-function copyRewritten(btn){
-  var p=document.getElementById('cl-rewritten'); if(!p)return;
-  navigator.clipboard.writeText(p.innerText);
-  btn.textContent='Copied'; setTimeout(function(){btn.textContent='Copy';},1500);
-}
-
-
-function renderCLScore(result){
-  var out=document.getElementById('cl-score-out'); if(!out)return;
-  var total=0; CL_RUBRIC.forEach(function(r){total+=result[r.id]||0;});
-  var pct=Math.round((total/10)*100);
-  var verdict=total>=9.0?'<span class="pill ok">PASS — READY TO SEND</span>':total>=8.0?'<span class="pill warn">ALMOST — REWRITE</span>':'<span class="pill no">NEEDS REWRITE</span>';
+/* Which dimensions actually lost the marks. clampScore has always captured the
+   scorer's per-dimension notes and nothing on the proposal path ever rendered
+   them, so the one piece of actionable feedback in the whole reply was computed
+   and thrown away. Shown only when a draft is blocked, because that is the only
+   moment the breakdown changes what anyone does next. */
+function scoreBreakdownHtml(sc){
+  if(!sc) return '';
   var rows='';
   CL_RUBRIC.forEach(function(r){
-    var s=result[r.id]||0; var fill=Math.round((s/r.max)*100);
-    var col=s>=r.max*0.9?'var(--green)':s>=r.max*0.6?'var(--amber)':'var(--red)';
-    rows+='<tr><td><b>'+r.label+'</b><br><span class="muted" style="font-size:11px">'+r.tip+'</span></td>'
-      +'<td style="text-align:right;white-space:nowrap"><span style="color:'+col+';font-weight:800">'+s.toFixed(1)+'</span> / '+r.max.toFixed(1)+'</td>'
-      +'<td style="width:120px"><div class="bar"><i style="width:'+fill+'%;background:'+col+'"></i></div></td></tr>';
-    if(result[r.id+'_note']) rows+='<tr><td colspan="3" style="padding-top:2px;padding-bottom:8px;font-size:12px;color:var(--amber)">↳ '+esc(result[r.id+'_note'])+'</td></tr>';
+    var s=Number(sc[r.id])||0;
+    if(s>=r.max) return;                       /* full marks, nothing to say */
+    var col=s>=r.max*0.6?'var(--amber)':'var(--red)';
+    rows+='<tr><td style="white-space:nowrap"><b>'+esc(r.label)+'</b></td>'
+      +'<td style="text-align:right;white-space:nowrap;color:'+col+';font-weight:800">'+s.toFixed(1)+'</td>'
+      +'<td style="color:var(--muted)">/ '+r.max.toFixed(1)+'</td>'
+      +'<td>'+esc(sc[r.id+'_note']||r.tip)+'</td></tr>';
   });
-  out.innerHTML='<div class="card" style="margin-bottom:12px">'
-    +'<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
-    +'<div><div class="eyebrow">Cover Letter / Proposal Score</div>'
-    +'<div class="scorebig" style="color:'+(total>=9.0?'var(--green)':total>=8.0?'var(--amber)':'var(--red)')+'">'+total.toFixed(1)+' <span style="font-size:18px;font-weight:400;color:var(--muted)">/ 10</span></div></div>'
-    +'<div style="flex:1"><div class="bar" style="height:14px"><i style="width:'+pct+'%;background:'+(total>=9.0?'var(--green)':total>=8.0?'var(--amber)':'var(--red)')+'"></i></div>'
-    +'<div class="note" style="margin-top:4px">'+pct+'% · '+verdict+'</div></div></div>'
-    +'<table style="margin-top:12px">'+rows+'</table>'
-    +(result.summary?'<div class="note" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+esc(result.summary)+'</div>':'')
-    +'</div>'
-    +(result.rewritten?'<div class="card"><div class="eyebrow">Rewritten (real score: '+total.toFixed(1)+'/10)</div><pre id="cl-rewritten" style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;margin:10px 0 0">'+esc(result.rewritten)+'</pre>'
-      +'<button class="btn ghost" style="margin-top:8px" onclick="copyRewritten(this)">Copy</button></div>':'');
+  if(!rows) return '';
+  return '<div style="margin-top:10px"><div class="eyebrow">Where it lost the marks</div>'
+    +'<table style="margin-top:6px;font-size:12px">'+rows+'</table></div>';
 }
 
-var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency, a full-service tech firm. Principal: Saqib Shahzad, senior AI/ML/LLM engineer. Agency rate floor is $40/hr, set per job. He is Rising Talent with 100% Job Success, he is NOT Top Rated, never let a proposal claim otherwise. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.0/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks. IMPORTANT: platform credentials (Job Success Score, Rising Talent badge, star ratings, Upwork badges) are NOT proof points and must not be scored as results — they are badges, not deliverables.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.0"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.';
+var CL_SCORE_SYSTEM='You are a ruthless Upwork proposal coach for AI Advocate Agency, a full-service tech firm. Principal: Saqib Shahzad, senior AI/ML/LLM engineer. Agency rate floor is $40/hr, set per job. He is Rising Talent with 100% Job Success, he is NOT Top Rated, never let a proposal claim otherwise. You score cover letters and proposals on a strict 10-point rubric and give actionable per-dimension feedback. Your job is to push every proposal to 9.0/10 minimum before it gets sent.\n\nScoring rubric (10 points total):\n1. Opening hook (2.0 pts): Does the first sentence mirror the client\'s exact problem in their own words? Opening with credentials, "I am", or a generic intro = 0. A perfect hook names the client\'s specific pain immediately.\n2. Proof points (2.0 pts): Are there 1–2 specific, verifiable, true results from real past work? Vague claims ("extensive experience") = 0. Invented metrics = disqualify. Specific named outcomes = full marks. IMPORTANT: platform credentials (Job Success Score, Rising Talent badge, star ratings, Upwork badges) are NOT proof points and must not be scored as results — they are badges, not deliverables.\n3. Concrete plan (2.0 pts): Does it include 2–3 numbered steps specific to this exact brief? Generic steps = 0.5. Steps tailored to the client\'s brief = full marks.\n4. Closing question (1.5 pts): Is there one sharp, relevant question showing deep reading? No question = 0. Generic question = 0.5. Specific insightful question = full marks.\n5. Style and tone (1.5 pts): Natural spoken English? No em/en dashes? No "Dear Hiring Manager"? No "I am the perfect fit"? No bracket placeholders? Each violation = -0.25.\n6. Length and format (1.0 pt): Proposal 120–180 words OR cover letter 2–4 sentences? Over or under = deduct proportionally.\n\nReturn ONLY valid JSON in this exact shape — no markdown, no extra keys:\n{\n  "hook": 0.0,\n  "hook_note": "one sentence on what is missing or wrong",\n  "proof": 0.0,\n  "proof_note": "...",\n  "plan": 0.0,\n  "plan_note": "...",\n  "close": 0.0,\n  "close_note": "...",\n  "style": 0.0,\n  "style_note": "...",\n  "len": 0.0,\n  "len_note": "...",\n  "summary": "one paragraph: what is strongest, what must change to hit 9.0"\n}\nOmit a _note key if that dimension is perfect (full marks). Never fabricate proof points. Never invent client details not in the text.'
++"\n\n"+AGENCY_PROOF_BANK+"\n\n"
++'VERIFYING PROOF: the AGENCY PROOF BANK above is the ONLY source of true figures. A number in the letter that is not in that bank and not in the job post is a FABRICATION: score Proof 0 and say which number is unbacked. Do not reward a figure for sounding plausible.';
 
 var CL_REWRITE_SYSTEM='You are a world-class Upwork proposal writer for AI Advocate Agency, a full-service tech team of experienced specialists (10+ years each). You rewrite proposals to score 9.0/10 or higher on the scoring rubric.\n\n'+AGENCY_PROOF_BANK+'\n\n'+PROOF_VOICE_RULES+'\n\nRULES you must follow exactly:\n- Open with the client\'s exact problem in their own words (never with credentials); no invented scenarios\n- Include 1–2 true proof points: the single AGENCY PROOF BANK entry whose domain matches the job, or facts present in the user\'s own letter. Use ONLY those sources. NEVER invent metrics, results, employers, or numbers. If no true metric is available, use the strongest TRUE qualitative proof. Do NOT pad with platform badges (Job Success Score, Rising Talent, star ratings) — badges are not deliverables and score zero on the proof dimension.\n- One consistent voice throughout: "we", the agency team. Never mix "Saqib" and "we". Never claim Top Rated or Top Rated Plus or any badge the profile does not have. Agency rate floor is $40/hr; the bid is set per job, never state a specific rate unless the job post or user provides it.\n- NEVER mention the agency\'s Upwork job count, tenure, account age, or newness anywhere. Lead with portfolio results and team expertise only.\n- Include a 2–3 step numbered plan specific to this brief\n- End with one sharp question relevant to this exact job\n- Natural, spoken English. No em dashes. No en dashes. No "Dear Hiring Manager". No "I am the perfect fit". No bracket placeholders. No confidence claims like "that is exactly what we build" without a specific proof.\n- Proposal length: 120–180 words exactly.\n\nINTERNAL PROCESS: After writing your draft, score it mentally against the 6-dimension rubric (hook 2.0, proof 2.0, plan 2.0, close 1.5, style 1.5, len 1.0). If it scores below 9.0, revise it once. If still below 9.0, revise a second time. Return the best honest version — the one that scores highest while remaining 100% truthful.\n\nReturn ONLY the rewritten proposal text. No preamble, no explanation, no score label.';
+
+/* The one place the send bar is written down. It used to be a 9.0 literal
+   repeated across scoring, rendering, verdict text and four prompt strings. */
+var CL_SEND_THRESHOLD = 9.0;
+
+/* The scorer returns JSON against a fixed rubric, so it does not need the model
+   that writes client-facing prose.
+   THIS EXACT DATED STRING IS LOAD BEARING: api/claude.js allows
+   'claude-haiku-4-5-20251001' and nothing else Haiku. The bare alias
+   'claude-haiku-4-5' is NOT rejected, it is silently rewritten to
+   claude-sonnet-4-6 by the proxy, and nothing here reads the model back off the
+   response, so the saving would look shipped and never happen. */
+var CL_SCORE_MODEL = 'claude-haiku-4-5-20251001';
 
 function parseScoreJson(raw){
   var s=(raw||'').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
   var start=s.indexOf('{'), end=s.lastIndexOf('}');
   if(start!==-1&&end>start) s=s.slice(start,end+1);
-  try{ return JSON.parse(s); }catch(e){ return {_raw:s,hook:0,proof:0,plan:0,close:0,style:0,len:0,summary:'Could not parse AI response. Raw: '+s.slice(0,300)}; }
-}
-
-async function scoreCL(){
-  var cl=document.getElementById('cl-text').value.trim();
-  var jd=document.getElementById('cl-jd').value.trim();
-  if(!cl){alert('Paste your cover letter or proposal first.');return;}
-  var out=document.getElementById('cl-score-out');
-  out.innerHTML='<div class="card"><div class="muted">Scoring with AI…</div></div>';
-  var wc=clWordCount(cl);
-  var userMsg='COVER LETTER / PROPOSAL ('+wc+' words):\n'+cl+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
-  try{
-    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:1600});
-    var json=parseScoreJson(raw);
-    renderCLScore(json);
-    logCLEvalToSheet(json, cl, jd);
-  }catch(e){
-    out.innerHTML='<div class="card"><div class="muted">Score failed: '+esc(String(e))+'</div></div>';
+  /* The one JSON defect small models actually emit. Fences and surrounding
+     prose are already handled above. */
+  s=s.replace(/,(\s*[}\]])/g,'$1');
+  try{ return JSON.parse(s); }
+  catch(e){
+    /* A parse failure is NOT a score of zero. Returning zeros made "the model
+       returned prose" indistinguishable from "this letter is genuinely awful",
+       and the zeros were written to the sheet as a real result. */
+    return {parseFailed:true,_raw:s,hook:0,proof:0,plan:0,close:0,style:0,len:0,
+            summary:'Could not read the scorer response. Raw: '+s.slice(0,300)};
   }
 }
 
-async function improveCL(){
-  var cl=document.getElementById('cl-text').value.trim();
-  var jd=document.getElementById('cl-jd').value.trim();
-  if(!cl){alert('Paste your cover letter or proposal first, then click Score to see the breakdown before rewriting.');return;}
-  var out=document.getElementById('cl-score-out');
-  out.innerHTML='<div class="card"><div class="muted">Rewriting to 9.0+… this takes ~10 seconds.</div></div>';
-  var userMsg='Rewrite this proposal to 9.0/10 minimum.\n\nORIGINAL PROPOSAL:\n'+cl+(jd?'\n\nJOB DESCRIPTION (for context):\n'+jd:'');
+/* Coerce and bound every dimension. Nothing capped these, so a reply scoring
+   each one out of 10 totalled 57 and rendered a green PASS at 570% width on a
+   letter that should have been rewritten. */
+function clampScore(result){
+  var r=result||{}, out={}, total=0, missing=0;
+  CL_RUBRIC.forEach(function(d){
+    if(r[d.id]==null) missing++;
+    var n=Number(r[d.id]);
+    if(!isFinite(n)||n<0) n=0;
+    if(n>d.max) n=d.max;
+    out[d.id]=n; total+=n;
+    if(r[d.id+'_note']!=null && r[d.id+'_note']!=='') out[d.id+'_note']=String(r[d.id+'_note']);
+  });
+  out.total=Math.round(total*10)/10;
+  out.summary=r.summary?String(r.summary):'';
+  /* A structurally incomplete reply is UNSCORED, not a low score. Dropping one
+     key silently cost up to 2.0 points and told the bidder "Scored 7.5, it must
+     reach 9.0", which is indistinguishable from genuinely weak writing. The
+     prompt permits omitting a _note key, never a dimension key. This is the
+     specific defence against a smaller scorer model dropping a field. */
+  out.parseFailed=!!r.parseFailed || missing>0;
+  return out;
+}
+
+/* Scores a generated draft against the job post. Returns a clamped score, or
+   null when the scorer could not run at all. Never throws: a scoring outage
+   must not take the proposal with it. */
+async function scoreDraft(txt, jd){
+  /* jd is deliberately NOT trimmed here. CL_SCORE_SYSTEM treats a number that is
+     not in the proof bank and not in the job post as a fabrication scoring Proof
+     0, so shrinking the job text shrinks the set of numbers a proposal is allowed
+     to state. Trimming here could only push scores down and block more drafts. */
+  var msg='COVER LETTER / PROPOSAL ('+clWordCount(txt)+' words):\n'+txt
+         +(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
+  /* Two attempts on the same prompt. A smaller model is likelier to answer with
+     prose or a trailing comma, and an unparseable reply BLOCKS the proposal
+     outright, so a second call is far cheaper than a stuck bidder. */
+  for(var i=0;i<2;i++){
+    try{
+      var raw=await callBackend({system:CL_SCORE_SYSTEM,message:msg,model:CL_SCORE_MODEL,max_tokens:1600});
+      var sc=clampScore(parseScoreJson(raw));
+      if(!sc.parseFailed) return sc;
+    }catch(e){ /* fall through to the retry, then to null */ }
+  }
+  return null;
+}
+
+/* Runs the scorer on a rendered draft and applies meeting rule 2.3: nothing
+   goes out below the threshold. Until now the 10-point score lived in a separate
+   tab that the proposal flow never called, so the rule gated nothing. */
+async function applyScoreGate(txt, jd, vr, mode){
+  var el=document.getElementById('prop-out'); if(!el) return;
+  var card=el.querySelector('.card'); if(!card) return;
+  /* renderProposalCard already emitted the pending slot, marked [data-scoring],
+     directly above the draft so the verdict sits with the button it governs.
+     Appended at the bottom it sat a full 120 to 180 word proposal below the Copy
+     button and under the grey source note, and nobody scrolled to it. Re-entry
+     from "Score again" has no slot, so build one. */
+  var slot=card.querySelector('[data-score]');
+  if(!slot){
+    slot=document.createElement('div');
+    slot.setAttribute('data-score','');
+    slot.setAttribute('data-scoring','');
+    slot.setAttribute('role','status');
+    slot.setAttribute('aria-live','polite');
+    slot.style.marginTop='10px';
+    slot.innerHTML='<div class="note">Scoring against the job post. Copy stays locked until it clears '+CL_SEND_THRESHOLD.toFixed(1)+'.</div>';
+    var draftEl=card.querySelector('[data-copy]');
+    if(draftEl) card.insertBefore(slot, draftEl); else card.appendChild(slot);
+  }
+
+  var sc=await scoreDraft(txt, jd);
+  slot.removeAttribute('data-scoring');
+  /* A speed bid is deliberately ~50 words, and the rubric's length dimension is
+     calibrated for 120 to 180, so a speed bid can never reach 9.0 however good
+     it is. Blocking on that would make the button useless. It is scored and the
+     number is shown, but only the mechanical checks gate it. The speed-bid bar
+     is an open question for the owner. */
+  var verdict = (mode==='speed')
+    ? {canSend:!!vr.ok, scored:!!sc, reason: vr.ok?'Speed bid. Scored for information, not held to the '+CL_SEND_THRESHOLD.toFixed(1)+' bar.':'Fix the listed problems first.'}
+    : sendVerdict(vr, sc);
+  var btn=card.querySelector('[data-copy-btn]');
+
+  if(sc){
+    var cleared=(mode!=='speed'&&sc.total>=CL_SEND_THRESHOLD);
+    var col=cleared?'var(--green)':sc.total>=8?'var(--amber)':'var(--red)';
+    var chip=(mode==='speed')
+      ? '<span class="pill warn">Speed bid. Not held to the '+CL_SEND_THRESHOLD.toFixed(1)+' bar.</span>'
+      : (cleared ? '<span class="pill ok">Cleared '+CL_SEND_THRESHOLD.toFixed(1)+'. Copy unlocked.</span>'
+                 : '<span class="pill no">Under '+CL_SEND_THRESHOLD.toFixed(1)+'. Copy locked.</span>');
+    /* .bar>i defaults to a green gradient, so a failing score would draw a green
+       bar. The inline background is required, not decoration. */
+    slot.innerHTML='<div class="flex" style="gap:14px;align-items:center;flex-wrap:wrap;border-left:3px solid '+col+';padding-left:12px">'
+      +'<div class="scorebig" style="color:'+col+'">'+sc.total.toFixed(1)
+      +' <span style="font-size:16px;font-weight:400;color:var(--muted)">/ 10</span></div>'
+      +'<div style="flex:1;min-width:210px">'+chip
+      +'<div class="bar" style="margin-top:6px"><i style="width:'+Math.round(sc.total*10)+'%;background:'+col+'"></i></div>'
+      +'<div class="note" style="margin-top:4px">'+esc(verdict.reason)+'</div></div></div>'
+      +(sc.summary?'<div class="note" style="margin-top:6px">'+esc(sc.summary)+'</div>':'');
+  } else {
+    /* Unscored blocks, so give the operator a way out that does not cost another
+       proposal call and does not change the words they already have. */
+    slot.innerHTML='<div class="note" style="color:var(--red)">'+esc(verdict.reason)+'</div>'
+      +'<button class="btn ghost" style="margin-top:8px" data-rescore>Score again</button>';
+    var again=slot.querySelector('[data-rescore]');
+    if(again) again.onclick=function(){ slot.parentNode.removeChild(slot); applyScoreGate(txt, jd, vr, mode); };
+  }
+
+  /* A separate marker from [data-violations] so copyText can tell "the writing
+     is wrong" apart from "it did not clear the bar". */
+  var old=card.querySelector('[data-score-block]'); if(old) old.parentNode.removeChild(old);
+  var oldAct=card.querySelector('[data-blocked-actions]'); if(oldAct) oldAct.parentNode.removeChild(oldAct);
+  /* The way out of a block. Rewrite is offered only when a real score came back:
+     with the scorer down a rewrite would be unscoreable and therefore blocked
+     too, so "Score again" is the honest option there and it costs nothing.
+     CL_REWRITE_SYSTEM enforces the mechanical rules as well as the rubric, so a
+     rewrite is the right answer to a length or dash violation, not just to a low
+     score. */
+  var actionsHtml='<div class="flex" data-blocked-actions style="margin-top:10px">'
+    +(sc?'<button class="btn" data-rewrite>Rewrite to clear the bar</button>':'')
+    +'<button class="btn ghost" data-regen>Generate a new draft</button></div>';
+  function wireActions(host){
+    if(!host) return;
+    var rw=host.querySelector('[data-rewrite]');
+    if(rw) rw.onclick=function(){ rewriteToClear(mode); };
+    var rg=host.querySelector('[data-regen]');
+    if(rg) rg.onclick=function(){ genProposal(mode==='speed'?'speed':'priority'); };
+  }
+  if(!verdict.canSend && !vr.ok){
+    /* The violations card already names the problems, so the actions go INTO it
+       rather than stacking a second red card underneath saying the same thing.
+       Without this the card's own footer offered a Rewrite button that was never
+       rendered on this path. */
+    var vioCard=card.querySelector('[data-violations]');
+    if(vioCard){ vioCard.insertAdjacentHTML('beforeend', actionsHtml); wireActions(vioCard); }
+  } else if(!verdict.canSend){
+    var blk=document.createElement('div');
+    blk.setAttribute('data-score-block','');
+    blk.className='card tight';
+    blk.style.marginTop='10px';
+    blk.style.borderColor='var(--red)';
+    blk.innerHTML='<div class="eyebrow" style="color:var(--red)">Copy is locked. This is the rule, not a broken button.</div>'
+      +'<p class="note" style="margin-top:6px">'
+      +(sc?('This draft scored '+sc.total.toFixed(1)+' out of 10 and the bar is '+CL_SEND_THRESHOLD.toFixed(1)+'.')
+          :('This draft was never scored, so it has not cleared the '+CL_SEND_THRESHOLD.toFixed(1)+' bar.'))
+      +' Nothing under the bar goes to a client, so Copy stays off.</p>'
+      +scoreBreakdownHtml(sc)
+      +(sc?'<div class="src" style="margin-top:8px">Rewrite feeds this draft back through the rubric and scores it again, which is cheaper and better aimed than starting over. Either way the words stay written by the model. Nobody retypes or patches them by hand.</div>':'')
+      +actionsHtml;
+    slot.appendChild(blk);
+    wireActions(blk);
+  }
+  if(btn){
+    btn.disabled=!verdict.canSend;
+    btn.classList.toggle('locked', !verdict.canSend);
+    btn.setAttribute('aria-disabled', String(!verdict.canSend));
+    btn.title=verdict.reason;
+    /* Every label still contains the word "Copy" so the older /copy/i lookups in
+       the tests keep resolving this button. */
+    btn.textContent = verdict.canSend ? 'Copy proposal'
+      : (vr.ok ? 'Copy locked under '+CL_SEND_THRESHOLD.toFixed(1)
+               : 'Copy locked. Fix the list below.');
+  }
+}
+
+/* The gate. Mechanics and judgement are different failures and both must pass.
+   STRICT, by owner decision on 1 Aug 2026: an unscored draft has not cleared the
+   bar, so it does not go out. The cost is accepted and it is real: while the
+   scorer is unavailable, no proposal can be sent at all. The reason is worded so
+   a bidder reads "this was never scored" rather than "my writing is bad". */
+function sendVerdict(validation, score){
+  var mechOk = !!(validation && validation.ok);
+  var scored = !!(score && !score.parseFailed && isFinite(Number(score.total)));
+  if(!mechOk) return {canSend:false, scored:scored, reason:'Fix the listed problems first.'};
+  if(!scored) return {canSend:false, scored:false,
+    reason:'Not scored. The scorer could not run, so this draft has not cleared the '+CL_SEND_THRESHOLD.toFixed(1)+'/10 bar and cannot be sent. Try scoring again.'};
+  if(Number(score.total) < CL_SEND_THRESHOLD)
+    return {canSend:false, scored:true, reason:'Scored '+Number(score.total).toFixed(1)+'/10. It must reach '+CL_SEND_THRESHOLD.toFixed(1)+' before it goes out.'};
+  return {canSend:true, scored:true, reason:'Scored '+Number(score.total).toFixed(1)+'/10.'};
+}
+
+/* The way out of a blocked draft, and the only surviving piece of the old CL
+   Score tab. A draft that scores 8.2 with clean mechanics used to be a dead end
+   in this tab: the bidder's only move was another full-price generation that had
+   no memory of what scored 8.2 and no idea which dimension it lost. This feeds
+   the draft back with the rewrite rules, then puts the result through the SAME
+   validate-and-score gate, so a rewrite can fail the bar exactly like a first
+   draft can. No human retypes anything; the words stay model-authored. */
+async function rewriteToClear(mode){
+  var el=document.getElementById('prop-out'); if(!el) return;
+  var draft=el.querySelector('[data-copy]');
+  var txt=(LAST_DRAFT&&LAST_DRAFT.txt)||(draft?draft.textContent:'');
+  var jd=(LAST_DRAFT&&LAST_DRAFT.jd)||val('job-text');
+  if(!txt.trim()){ return; }
+  var blk=el.querySelector('[data-score-block]');
+  if(blk) blk.innerHTML='<div class="note">Rewriting against the rubric, then scoring it again...</div>';
+  var userMsg='Rewrite this proposal to '+CL_SEND_THRESHOLD.toFixed(1)+'/10 minimum.\n\nORIGINAL PROPOSAL:\n'+txt
+             +(jd?'\n\nJOB DESCRIPTION (for context):\n'+modelJobText_(jd):'');
   try{
     var rewritten=await callBackend({system:CL_REWRITE_SYSTEM,message:userMsg,model:'claude-sonnet-4-6',max_tokens:900});
-    // Now score the rewritten version
-    var scoreMsg='COVER LETTER / PROPOSAL ('+clWordCount(rewritten)+' words):\n'+rewritten+(jd?'\n\n---\nORIGINAL JOB DESCRIPTION:\n'+jd:'');
-    var raw=await callBackend({system:CL_SCORE_SYSTEM,message:scoreMsg,model:'claude-sonnet-4-6',max_tokens:1600});
-    var json=parseScoreJson(raw);
-    json.rewritten=rewritten;
-    renderCLScore(json);
-    logCLEvalToSheet(json, rewritten, jd);
+    if(!rewritten||!rewritten.trim()) throw new Error('The model returned no text.');
+    renderProposalCard(rewritten, jd, mode, true);
+    logAct('proposal', firstLine(jd), 0, 'rewrite to clear the bar');
   }catch(e){
-    out.innerHTML='<div class="card"><div class="muted">Rewrite failed: '+esc(String(e))+'</div></div>';
+    if(blk) blk.innerHTML='<div class="note" style="color:var(--red)">Rewrite failed: '+esc(String(e&&e.message?e.message:e))
+      +'. Generate a new draft instead.</div>';
   }
 }
 
@@ -1599,6 +2060,386 @@ var CLEVAL_COLUMNS=[
   ['No. of Connects','connects'],['Bid','bid'],['Reason/Remarks','reason'],
   ['Job posted','jobPosted'],['Open jobs','openJobs'],['Ptoposal Status','proposalStatus']
 ];
+/* ============================ JOB HISTORY (loaded from the sheet) ============
+   Twenty people share one Upwork profile. If Fiza sent a proposal this morning
+   and Hamza pastes the same job this afternoon, the profile bids twice on one
+   post: wasted Connects, and it looks careless to the client. Nobody can see the
+   other nineteen people's rows today, so this is invisible. */
+var CLEVAL_IDX = (function(){ var o={}; CLEVAL_COLUMNS.forEach(function(c,i){ o[c[1]]=i; }); return o; })();
+var CLEVAL_ROWS = [];
+function setCLEvalRows(rows){ CLEVAL_ROWS = (rows&&rows.length)?rows:[]; return CLEVAL_ROWS; }
+
+/* Match on the Upwork job id INSIDE the url, never the url string, so www,
+   query strings, trailing slashes, http and casing all still match. */
+function jobIdOf(linkOrId){
+  var s=String(linkOrId==null?'':linkOrId);
+  var m=/~(\d{8,})/.exec(s);
+  if(m) return m[1];
+  m=/^\s*(\d{8,})\s*$/.exec(s);
+  return m?m[1]:'';
+}
+/* Sortable YYYYMMDDhhmm from the row's own Date + Time PKT cells, so "most
+   recent" means what the row says, not where it happens to sit in the array. */
+function rowMoment_(dateCell,timeCell){
+  var s=String(dateCell==null?'':dateCell).trim(), day=NaN, m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)))       day=(+m[1])*10000+(+m[2])*100+(+m[3]);
+  else if((m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s))) day=(+m[3])*10000+(+m[1])*100+(+m[2]);
+  else { var d=new Date(s); if(!isNaN(d.getTime())) day=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+  if(isNaN(day)) return -1;
+  var t=0, tm=/(\d{1,2}):(\d{2})/.exec(String(timeCell||''));
+  if(tm) t=(+tm[1])*60+(+tm[2]);
+  return day*10000+t;
+}
+function findDuplicateJob(linkOrId, rows){
+  var id=jobIdOf(linkOrId);
+  if(!id) return null;
+  var list=(rows&&rows.length)?rows:CLEVAL_ROWS;
+  if(!list||!list.length) return null;
+  var best=null,bestAt=-2;
+  for(var i=0;i<list.length;i++){
+    var r=list[i]; if(!r||!r.length) continue;
+    if(jobIdOf(r[CLEVAL_IDX.jobLink])!==id) continue;
+    var at=rowMoment_(r[CLEVAL_IDX.date], r[CLEVAL_IDX.timePkt]);
+    if(at>=bestAt){ bestAt=at; best=r; }
+  }
+  if(!best) return null;
+  return {
+    assignee:String(best[CLEVAL_IDX.assignee]||''),
+    date:String(best[CLEVAL_IDX.date]||''),
+    time:String(best[CLEVAL_IDX.timePkt]||''),
+    /* Shout for a real application, murmur for one that was only evaluated. */
+    applied:/^\s*yes\s*$/i.test(String(best[CLEVAL_IDX.applied]||''))
+  };
+}
+
+/* Reads a backend reply without assuming it is JSON. Running the app locally,
+   or hitting a path with no serverless function behind it, returns a 404 with a
+   ZERO byte body, and r.json() then throws "Unexpected end of JSON input",
+   which tells the operator nothing about what is actually wrong. */
+async function readJson(r, what){
+  var text='';
+  try{ text=await r.text(); }catch(e){ text=''; }
+  if(!text.trim()){
+    if(r.status===404) throw new Error(what+' is not available here. The serverless function is missing, which is normal when running the app locally.');
+    throw new Error(what+' returned an empty response (HTTP '+r.status+').');
+  }
+  try{ return JSON.parse(text); }
+  catch(e){ throw new Error(what+' returned something that is not JSON (HTTP '+r.status+'): '+text.slice(0,120)); }
+}
+
+/* ============================ SESSIONS ============================
+   Who signed in when, and when they signed out. The backend has written these
+   rows since v11 and nothing could ever read one back.
+   Columns: 0 Session ID, 1 User, 2 Login Time, 3 Logout Time, 4 Duration (min),
+   5 Duration (h:m), 6 JDs, 7 Proposals, 8 Copies, 9 Status. */
+var SESSION_IDX = {id:0, user:1, loginAt:2, logoutAt:3, minutes:4, hm:5, jds:6, proposals:7, copies:8, status:9};
+var SESSION_ROWS = [];
+var SESSIONS_LOADED = false;
+function setSessionRows(rows){ SESSION_ROWS=(rows&&rows.length)?rows:[]; return SESSION_ROWS; }
+
+function listSessions(filters, rows){
+  var f=filters||{}, list=(rows&&rows.length)?rows:SESSION_ROWS;
+  var from=f.from?jobsDayNum(f.from):NaN, to=f.to?jobsDayNum(f.to):NaN;
+  return (list||[]).filter(function(r){
+    if(!r||!r.length) return false;
+    if(f.person && String(r[SESSION_IDX.user]||'')!==f.person) return false;
+    if(f.status && String(r[SESSION_IDX.status]||'').toUpperCase()!==String(f.status).toUpperCase()) return false;
+    if(!isNaN(from)||!isNaN(to)){
+      var d=jobsDayNum(r[SESSION_IDX.loginAt]);
+      if(isNaN(d)) return false;
+      if(!isNaN(from)&&d<from) return false;
+      if(!isNaN(to)&&d>to) return false;
+    }
+    return true;
+  });
+}
+
+/* Per-person totals. A blank or non-numeric duration contributes 0 rather than
+   turning the whole total into NaN, which is what a still-open session would
+   otherwise do to somebody's timesheet. */
+function sessionTotals(rows){
+  var by={};
+  (rows||[]).forEach(function(r){
+    if(!r||!r.length) return;
+    var who=String(r[SESSION_IDX.user]||'(unknown)');
+    if(!by[who]) by[who]={person:who,sessions:0,minutes:0,open:0};
+    by[who].sessions++;
+    var m=Number(r[SESSION_IDX.minutes]);
+    if(isFinite(m)&&m>0) by[who].minutes+=m;
+    if(String(r[SESSION_IDX.status]||'').toUpperCase()==='ACTIVE') by[who].open++;
+  });
+  return Object.keys(by).map(function(k){
+    var x=by[k]; x.minutes=Math.round(x.minutes);
+    x.hm=Math.floor(x.minutes/60)+'h '+(x.minutes%60)+'m';
+    return x;
+  }).sort(function(a,b){ return b.minutes-a.minutes || a.person.localeCompare(b.person); });
+}
+
+function sessionFilters(){
+  return { person:val('sf-person'), from:val('sf-from'), to:val('sf-to'), status:val('sf-status') };
+}
+function clearSessionFilters(){
+  ['sf-person','sf-from','sf-to','sf-status'].forEach(function(id){ setVal(id,''); });
+  renderSessions();
+}
+
+async function loadSessions(force){
+  var out=document.getElementById('sessions-out'); if(!out) return;
+  if(SESSIONS_LOADED && !force){ renderSessions(); return; }
+  out.innerHTML='<div class="note">Loading sign-in history...</div>';
+  try{
+    var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'listSessions', limit:2000})});
+    var data=await readJson(r,'The sign-in history');
+    if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
+    setSessionRows(data.rows||[]); SESSIONS_LOADED=true;
+    var sel=document.getElementById('sf-person');
+    if(sel){
+      var ppl={}; SESSION_ROWS.forEach(function(x){ var u=String(x[SESSION_IDX.user]||'').trim(); if(u) ppl[u]=1; });
+      var cur=sel.value;
+      sel.innerHTML='<option value="">Everyone</option>'+Object.keys(ppl).sort().map(function(u){
+        return '<option value="'+esc(u)+'">'+esc(u)+'</option>'; }).join('');
+      sel.value=cur;
+    }
+    renderSessions();
+  }catch(e){
+    out.innerHTML='<div class="note" style="color:var(--red)">Could not load sessions: '+esc(String(e&&e.message?e.message:e))+'</div>';
+  }
+}
+
+function fmtWhen(v){
+  if(v==null||v==='') return '-';
+  var d=new Date(v);
+  if(isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString()+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderSessions(){
+  var out=document.getElementById('sessions-out'); if(!out) return;
+  var rows=listSessions(sessionFilters());
+  var tot=document.getElementById('sessions-totals');
+  var totals=sessionTotals(rows);
+  if(tot) tot.innerHTML = totals.length
+    ? '<table><thead><tr><th>Member</th><th>Sessions</th><th>Time on the profile</th><th>Still open</th></tr></thead><tbody>'
+      +totals.map(function(x){ return '<tr><td>'+esc(x.person)+'</td><td>'+x.sessions+'</td><td>'+esc(x.hm)+'</td><td>'
+        +(x.open?'<span style="color:var(--amber)">'+x.open+'</span>':'0')+'</td></tr>'; }).join('')+'</tbody></table>'
+    : '<div class="note">Nothing in this range.</div>';
+
+  if(!rows.length){ out.innerHTML='<div class="note">No sessions match these filters.</div>'; return; }
+  out.innerHTML='<table><thead><tr><th>Member</th><th>Signed in</th><th>Signed out</th><th>Duration</th><th>Status</th></tr></thead><tbody>'
+    +rows.slice().reverse().map(function(r){
+      var st=String(r[SESSION_IDX.status]||'').toUpperCase();
+      var col=st==='ACTIVE'?'var(--green)':st==='TIMED OUT'?'var(--amber)':'var(--muted)';
+      return '<tr><td>'+esc(String(r[SESSION_IDX.user]||''))+'</td>'
+        +'<td>'+esc(fmtWhen(r[SESSION_IDX.loginAt]))+'</td>'
+        +'<td>'+esc(fmtWhen(r[SESSION_IDX.logoutAt]))+'</td>'
+        +'<td>'+esc(String(r[SESSION_IDX.hm]||'-'))+'</td>'
+        +'<td style="color:'+col+'">'+esc(st||'-')+'</td></tr>';
+    }).join('')+'</tbody></table>'
+    +'<p class="note" style="margin-top:8px">TIMED OUT means the tab closed or the laptop slept and the seat was auto-released after 12 minutes. The signed-out time on those rows is when we noticed, not when they actually left.</p>';
+}
+
+/* ============================ ALL JOBS TAB ============================
+   The shared record every bidder can finally see. Before this, each person could
+   only see their own rows in their own browser, so nobody could tell whether a
+   job was already taken, and outcomes were recorded on 7% of applications. */
+var CLEVAL_STATUS_OPTIONS = ['Not checked','No response','Opened','Replied','Interview','Hired','Lost'];
+var LEGACY_STATUS_VALUE   = 'Un Opened';        /* what 664 existing rows hold */
+var JOBS_LOADED = false;
+
+function normStatus(v){
+  var s=String(v==null?'':v).trim();
+  if(!s || s===LEGACY_STATUS_VALUE) return 'Not checked';
+  return s;
+}
+function jobsDayNum(v){
+  var s=String(v==null?'':v).trim(), m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)))       return (+m[1])*10000+(+m[2])*100+(+m[3]);
+  if((m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s)))     return (+m[3])*10000+(+m[1])*100+(+m[2]);
+  var d=new Date(s);
+  return isNaN(d.getTime())?NaN:d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+}
+
+/* Pure, so it is testable without a DOM. */
+function listJobs(filters, rows){
+  var f=filters||{}, list=(rows&&rows.length)?rows:CLEVAL_ROWS;
+  var from=f.from?jobsDayNum(f.from):NaN, to=f.to?jobsDayNum(f.to):NaN;
+  var q=String(f.q||'').trim().toLowerCase();
+  return (list||[]).filter(function(r){
+    if(!r||!r.length) return false;
+    if(f.person && String(r[CLEVAL_IDX.assignee]||'')!==f.person) return false;
+    if(!isNaN(from)||!isNaN(to)){
+      var d=jobsDayNum(r[CLEVAL_IDX.date]);
+      if(isNaN(d)) return false;
+      if(!isNaN(from)&&d<from) return false;
+      if(!isNaN(to)&&d>to) return false;
+    }
+    if(f.applied){
+      var yes=/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''));
+      if(f.applied==='yes'&&!yes) return false;
+      if(f.applied==='no'&&yes) return false;
+    }
+    if(f.status && normStatus(r[CLEVAL_IDX.proposalStatus])!==f.status) return false;
+    if(q){
+      var hay=(String(r[CLEVAL_IDX.jobTitle]||'')+' '+String(r[CLEVAL_IDX.reason]||'')).toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  });
+}
+
+function jobFilters(){
+  return { person:val('jf-person'), from:val('jf-from'), to:val('jf-to'),
+           applied:val('jf-applied'), status:val('jf-status'), q:val('jf-q') };
+}
+function clearJobFilters(){
+  ['jf-person','jf-from','jf-to','jf-applied','jf-status','jf-q'].forEach(function(id){ setVal(id,''); });
+  renderJobs();
+}
+
+async function loadJobs(force){
+  var out=document.getElementById('jobs-out'); if(!out) return;
+  if(JOBS_LOADED && !force){ renderJobs(); return; }
+  out.innerHTML='<div class="note">Loading jobs from the Ops DB...</div>';
+  try{
+    var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'listCLEval', limit:2000})});
+    var data=await readJson(r,'The job list');
+    if(!data||!data.ok){ out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc((data&&data.error)||('HTTP '+r.status))+'</div>'; return; }
+    setCLEvalRows(data.rows||[]);
+    JOBS_LOADED=true;
+    fillJobFilterOptions();
+    renderJobs();
+  }catch(e){
+    out.innerHTML='<div class="note" style="color:var(--red)">Could not load jobs: '+esc(String(e&&e.message?e.message:e))+'</div>';
+  }
+}
+
+function fillJobFilterOptions(){
+  var ppl={}, sel=document.getElementById('jf-person');
+  CLEVAL_ROWS.forEach(function(r){ var a=String(r[CLEVAL_IDX.assignee]||'').trim(); if(a) ppl[a]=1; });
+  if(sel){
+    var cur=sel.value;
+    sel.innerHTML='<option value="">Everyone</option>'+Object.keys(ppl).sort().map(function(a){
+      return '<option value="'+esc(a)+'">'+esc(a)+'</option>'; }).join('');
+    sel.value=cur;
+  }
+  var ss=document.getElementById('jf-status');
+  if(ss){ var cs=ss.value;
+    ss.innerHTML='<option value="">Any status</option>'+CLEVAL_STATUS_OPTIONS.map(function(s){
+      return '<option value="'+esc(s)+'">'+esc(s)+'</option>'; }).join('');
+    ss.value=cs; }
+}
+
+function renderJobs(){
+  var out=document.getElementById('jobs-out'); if(!out) return;
+  var rows=listJobs(jobFilters());
+  var applied=rows.filter(function(r){return /^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''));});
+  var known=applied.filter(function(r){return normStatus(r[CLEVAL_IDX.proposalStatus])!=='Not checked';});
+  var won=applied.filter(function(r){return normStatus(r[CLEVAL_IDX.proposalStatus])==='Hired';});
+
+  var sum=document.getElementById('jobs-summary');
+  if(sum) sum.innerHTML='<div class="flex" style="gap:18px;flex-wrap:wrap">'
+    +'<span class="note"><b>'+rows.length+'</b> jobs</span>'
+    +'<span class="note"><b>'+applied.length+'</b> applied</span>'
+    +'<span class="note"><b>'+won.length+'</b> hired</span>'
+    +'<span class="note" style="color:'+(known.length<applied.length?'var(--amber)':'var(--muted)')+'"><b>'
+      +(applied.length?Math.round(100*known.length/applied.length):0)+'%</b> of applications have an outcome recorded</span></div>';
+
+  if(!rows.length){ out.innerHTML='<div class="note">No jobs match these filters.</div>'; renderJobsDaily(rows); return; }
+
+  var body=rows.slice().reverse().map(function(r){
+    var link=String(r[CLEVAL_IDX.jobLink]||'');
+    var evId=clevalId([ String(r[CLEVAL_IDX.assignee]||''), link, String(r[CLEVAL_IDX.jobTitle]||''),
+                        String(r[CLEVAL_IDX.date]||''), (/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''))?'APPLY':'SKIP') ]);
+    var st=normStatus(r[CLEVAL_IDX.proposalStatus]);
+    return '<tr>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.date]||''))+'<div class="note">'+esc(String(r[CLEVAL_IDX.timePkt]||''))+'</div></td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.assignee]||''))+'</td>'
+      +'<td style="max-width:320px">'+(link?'<a href="'+esc(link)+'" target="_blank" rel="noopener">'+esc(String(r[CLEVAL_IDX.jobTitle]||'(untitled)'))+'</a>':esc(String(r[CLEVAL_IDX.jobTitle]||'(untitled)')))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.hiringRate]||'-'))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.applied]||'-'))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.connects]||'-'))+'</td>'
+      +'<td><select class="field" style="min-width:150px" data-evid="'+esc(evId)+'" onchange="setJobStatus(this)">'
+        +CLEVAL_STATUS_OPTIONS.map(function(s){ return '<option value="'+esc(s)+'"'+(s===st?' selected':'')+'>'+esc(s)+'</option>'; }).join('')
+        +'</select><div class="note" data-status-note></div></td>'
+      +'<td style="max-width:260px">'+esc(String(r[CLEVAL_IDX.reason]||''))+'</td>'
+      +'</tr>';
+  }).join('');
+
+  out.innerHTML='<table><thead><tr><th>Date</th><th>Who</th><th>Job</th><th>Rate</th><th>Applied</th><th>Connects</th><th>Status</th><th>Reason</th></tr></thead><tbody>'+body+'</tbody></table>';
+  renderJobsDaily(rows);
+}
+
+/* Team effort by day: what each person reviewed and applied to, per date. */
+function renderJobsDaily(rows){
+  var box=document.getElementById('jobs-daily'); if(!box) return;
+  var byDay={};
+  (rows||[]).forEach(function(r){
+    var d=String(r[CLEVAL_IDX.date]||'(no date)'), who=String(r[CLEVAL_IDX.assignee]||'(unknown)');
+    var k=d+'||'+who;
+    if(!byDay[k]) byDay[k]={date:d,who:who,reviewed:0,applied:0,day:jobsDayNum(d)};
+    byDay[k].reviewed++;
+    if(/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''))) byDay[k].applied++;
+  });
+  var list=Object.keys(byDay).map(function(k){return byDay[k];})
+    .sort(function(a,b){ return (b.day||0)-(a.day||0) || a.who.localeCompare(b.who); });
+  if(!list.length){ box.innerHTML='<div class="note">Nothing in this range.</div>'; return; }
+  box.innerHTML='<table><thead><tr><th>Date</th><th>Who</th><th>Reviewed</th><th>Applied</th><th>Apply rate</th></tr></thead><tbody>'
+    +list.map(function(x){
+      return '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.who)+'</td><td>'+x.reviewed+'</td><td>'+x.applied+'</td>'
+        +'<td>'+(x.reviewed?Math.round(100*x.applied/x.reviewed):0)+'%</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+async function setJobStatus(sel){
+  var evId=sel.getAttribute('data-evid'), status=sel.value;
+  var note=sel.parentNode.querySelector('[data-status-note]');
+  if(note) note.textContent='Saving...';
+  try{
+    var r=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'updateCLEvalStatus', evaluationId:evId, status:status, name:(ME?ME.name:'')})});
+    var data=await readJson(r,'The status update');
+    /* Say so when it did NOT save. A status that silently fails to write is
+       worse than no status at all, because the sheet then quietly disagrees. */
+    if(data&&data.ok){ if(note){ note.textContent='Saved'; setTimeout(function(){ note.textContent=''; },1500); } }
+    else if(note) note.textContent='Not saved: '+((data&&data.error)||'unknown error');
+  }catch(e){ if(note) note.textContent='Not saved: '+String(e&&e.message?e.message:e); }
+}
+
+function exportJobsCsv(){
+  var rows=listJobs(jobFilters());
+  var head=CLEVAL_COLUMNS.map(function(c){return c[0];});
+  function cell(v){ var s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  var csv=[head.map(cell).join(',')].concat(rows.map(function(r){
+    return CLEVAL_COLUMNS.map(function(_,i){ return cell(r[i]); }).join(',');
+  })).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='ops-hub-jobs.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* The warning itself. Red and unmissable when the profile has ALREADY BID,
+   amber and quieter when someone only looked at it and moved on. */
+function duplicateWarningHtml(linkOrId){
+  var dup=null;
+  try{ dup=findDuplicateJob(linkOrId, CLEVAL_ROWS); }catch(e){ dup=null; }
+  if(!dup) return '';
+  var who=esc(dup.assignee||'someone on the team');
+  var when=esc([dup.date,dup.time].filter(Boolean).join(' at '));
+  if(dup.applied){
+    return '<div class="card" data-duplicate style="border-color:var(--red);margin-bottom:10px">'
+      +'<div class="eyebrow" style="color:var(--red)">Already applied</div>'
+      +'<p class="note" style="margin-top:6px">This job was <b>already applied to by '+who+'</b>'
+      +(when?' on '+when:'')+'. Bidding again puts two proposals from the same profile on one post. '
+      +'Check with them before spending Connects.</p></div>';
+  }
+  return '<div class="card" data-duplicate style="border-color:var(--amber);margin-bottom:10px">'
+    +'<div class="eyebrow" style="color:var(--amber)">Already reviewed</div>'
+    +'<p class="note" style="margin-top:6px">'+who+' already evaluated this job'
+    +(when?' on '+when:'')+' and did not apply. Worth asking why before you spend Connects.</p></div>';
+}
+
 function buildCLEvalRow(d){
   d=d||{};
   return CLEVAL_COLUMNS.map(function(c){
@@ -1647,7 +2488,7 @@ function evalCtx(){
   var fixed=P.budgetType==='fixed', hourly=P.budgetType==='hourly';
   return {
     jobTitle: P.title||firstLine(jd),
-    jobLink: P.jobLink||(document.getElementById('cl-job-link')||{}).value||'',
+    jobLink: P.jobLink||'',
     hiringRate: (P.amount!=null?String(P.amount):''),   /* Hourly rate OR Fixed amount, NOT the hire-rate % */
     clientRatings: (P.ratingPrecise?String(parseFloat(P.ratingPrecise)):''), /* 5.00->5, 4.99->4.99 */
     payVerified: P.payVerified,
@@ -1689,19 +2530,6 @@ function postCLEval(rowObj, evId){
       body:JSON.stringify(body)}).catch(function(){});
   }catch(e){ /* never break the flow */ }
 }
-/* CL Score tab: one keyed row per letter (score and rewrite share the id). */
-function logCLEvalToSheet(scoreJson, clText, jdText){
-  try{
-    var jdFirst=(jdText||'').trim().split('\n')[0].slice(0,120);
-    var total=0; CL_RUBRIC.forEach(function(r){total+=scoreJson[r.id]||0;});
-    var verdict=total>=9.0?'PASS - READY TO SEND':total>=8.0?'ALMOST - REWRITE':'NEEDS REWRITE';
-    var jobLink=(document.getElementById('cl-job-link')||{}).value||'';
-    var row={jobTitle:jdFirst, jobLink:jobLink, reason:total.toFixed(1)+'/10 '+verdict, proposalStatus:'Un Opened'};
-    var evId=clevalId([ (ME?ME.name:''), jobLink, jdFirst, todayKey(), 'CLSCORE' ]);
-    postCLEval(row, evId);
-  }catch(err){ /* silent — logging must never break the score flow */ }
-}
-
 /* ============================ THEME + MANUAL STATE ============================ */
 var THEMES=['emerald','sapphire','violet','amber','daylight'];
 function setTheme(name){
@@ -1737,7 +2565,9 @@ function syncManualState(){
    NOTE: gate() in this file checks if the member is excused from bidding.
    Everything here is the SEAT gate and is prefixed seat*. */
 var SEAT_BACKEND = "https://script.google.com/macros/s/AKfycbwsAdkj8XwW-x8DykVJ4mXzNp4qzFbJFx2kSm4uAor2Wi6AMm6BhuRW0P19xdIVoZFWWw/exec";
-var SEAT_ADMINS  = ['Saqib Shahzad','Jahanzaib (Zeb)'];  // must match ADMINS in Code.gs
+/* Owner decision, 31 July 2026. Must match ADMINS in Code.gs. Admins skip the
+   queue entirely and never hold the seat, because they do not bid. */
+var SEAT_ADMINS  = ['Usman Saeed','Saqib Shahzad','Waqas Riaz'];
 /* CLEval logging.
    PRODUCTION: the browser POSTs to the same-origin serverless proxy /api/cleval,
    which holds CLEVAL_BACKEND + LOG_SECRET server-side (like /api/claude holds the
@@ -1973,7 +2803,13 @@ async function boot(){
   initTheme();
   initRole(); initNav(); renderTemplates(); renderProfiles(); renderScoring(); renderRules(); renderGuide(); renderAiMode();
   mem.pipeline=await load('pipeline',[]); mem.activity=await load('activity',[]);
-  AGENCY_CONTEXT=buildContext();
+  /* buildContext() is pure, so line 1581 already produced this exact string at
+     parse time and reassigning it here was a no-op. It is deleted because a
+     prompt cache breakpoint now sits on AGENCY_CONTEXT: the moment anyone folds
+     session state into buildContext, this line would silently drop the hit rate
+     to zero with no error anywhere. */
+  var _sbp=document.getElementById('send-bar-pill');
+  if(_sbp) _sbp.textContent=CL_SEND_THRESHOLD.toFixed(1)+' / 10 minimum';
   renderAll(); syncManualState();
   pushMsg('sys','Ask anything about bans, scoring, fees, templates, the flow, or a specific job.');
   setInterval(function(){tickClock();renderAccess();renderRoster();},20000);

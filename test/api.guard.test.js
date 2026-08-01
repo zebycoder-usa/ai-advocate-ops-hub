@@ -196,6 +196,46 @@ describe('/api/cleval', () => {
     expect(sent.secret).toBe('test-log-secret');
   });
 
+  it('forwards a listCLEval read instead of rewriting it as a write', async () => {
+    // The proxy used to force action:'logCLEval' on every request, so the read
+    // endpoints were unreachable through it and the All Jobs tab could never
+    // load. It answered "evaluationId is required" to a list request.
+    let sent;
+    vi.stubGlobal('fetch', (_u, o) => { sent = JSON.parse(o.body); return Promise.resolve(new Response('{"ok":true,"rows":[]}')); });
+    const s = await call({ action: 'listCLEval', limit: 10 });
+    expect(sent.action).toBe('listCLEval');
+    expect(s.code).toBe(200);
+  });
+
+  it('does not demand evaluationId or row on a read', async () => {
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response('{"ok":true,"rows":[]}')));
+    const s = await call({ action: 'listCLEval' });
+    expect(s.code).toBe(200);
+  });
+
+  it('forwards a listSessions read', async () => {
+    let sent;
+    vi.stubGlobal('fetch', (_u, o) => { sent = JSON.parse(o.body); return Promise.resolve(new Response('{"ok":true,"rows":[]}')); });
+    await call({ action: 'listSessions' });
+    expect(sent.action).toBe('listSessions');
+  });
+
+  it('forwards a status update, and still requires the id it needs', async () => {
+    let sent;
+    vi.stubGlobal('fetch', (_u, o) => { sent = JSON.parse(o.body); return Promise.resolve(new Response('{"ok":true}')); });
+    await call({ action: 'updateCLEvalStatus', evaluationId: 'ev_1', status: 'Hired' });
+    expect(sent.action).toBe('updateCLEvalStatus');
+    const bad = await call({ action: 'updateCLEvalStatus', status: 'Hired' });
+    expect(bad.code).toBe(400);
+  });
+
+  it('refuses an action that is not on the allowlist by falling back to the write path', async () => {
+    // A caller must not be able to invoke arbitrary backend actions through here.
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response('{"ok":true}')));
+    const s = await call({ action: 'forceRelease', name: 'Saqib Shahzad' });
+    expect(s.code).toBe(400);   // treated as a write, which needs an evaluationId
+  });
+
   it('forwards a well formed row from the app', async () => {
     let sent;
     vi.stubGlobal('fetch', (_u, o) => { sent = JSON.parse(o.body); return Promise.resolve(new Response('{"ok":true,"row":7}')); });
