@@ -18,7 +18,12 @@ html[data-theme="emerald"]{--bg:#0c1410;--bg2:#11201a;--card:#13241d;--line:#244
 html[data-theme="sapphire"]{--bg:#0b1220;--bg2:#131f33;--card:#131f33;--line:#24344f;--green:#4C8DFF;--green2:#4C8DFF;--text:#e8eef7;--muted:#8ea3c0;--bubble:#172a45;--sunken:#0c1626}
 html[data-theme="violet"]{--bg:#140f1e;--bg2:#201830;--card:#201830;--line:#352a4a;--green:#a78bfa;--green2:#a78bfa;--text:#ece7f7;--muted:#a596c0;--bubble:#2a1f42;--sunken:#17102a}
 html[data-theme="amber"]{--bg:#14100a;--bg2:#211a10;--card:#211a10;--line:#3a2f1c;--green:#f5b544;--green2:#f5b544;--text:#f4eee0;--muted:#c3b088;--bubble:#33260f;--sunken:#17110a}
-html[data-theme="daylight"]{--bg:#f6f8f7;--bg2:#ffffff;--card:#ffffff;--line:#dbe4df;--green:#0f9d74;--green2:#0f9d74;--text:#14201b;--muted:#5b6b64;--bubble:#dff1ea;--sunken:#eef2f0}
+/* Daylight already darkened --green because the dark-theme value is unreadable on
+   white. --red and --amber were left at their dark-theme values, so the hard-ban
+   card, .btn.danger and the locked Copy button all sat at roughly 2.5:1 against
+   #ffffff. The locked button states a rule people must be able to read, so these
+   two are darkened on the same principle as --green. */
+html[data-theme="daylight"]{--bg:#f6f8f7;--bg2:#ffffff;--card:#ffffff;--line:#dbe4df;--green:#0f9d74;--green2:#0f9d74;--text:#14201b;--muted:#5b6b64;--bubble:#dff1ea;--sunken:#eef2f0;--red:#b3261e;--amber:#8a5a00}
 .manual-dim{opacity:.5;pointer-events:none}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;background:radial-gradient(1200px 600px at 80% -10%,#16302600,#0c1410),var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
 a{color:var(--green)}
@@ -79,6 +84,13 @@ textarea{width:100%;min-height:90px;resize:vertical}
 .btn.gold{background:linear-gradient(135deg,#d8b25a,var(--gold));color:#1a1405}
 .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
 .pill.ok{color:var(--green);border-color:#1f5a45;background:#0f2a20}.pill.no{color:var(--red);border-color:#5a2020;background:#2a0f0f}.pill.warn{color:var(--amber);border-color:#5a4a1f;background:#2a230f}.pill.anytime{color:var(--gold);border-color:#5a4a1f;background:#221c0c}
+/* The pill backgrounds above are hardcoded dark, so they only ever worked with the
+   dark-theme accent values. Daylight now darkens --red and --amber for legibility
+   on white, which would have left dark text on those dark chips. Light chips keep
+   both readable. */
+html[data-theme="daylight"] .pill.ok{color:#0b7a5a;border-color:#a7d8c6;background:#e8f7f1}
+html[data-theme="daylight"] .pill.no{border-color:#f0b4b0;background:#fdeceb}
+html[data-theme="daylight"] .pill.warn,html[data-theme="daylight"] .pill.anytime{border-color:#e8cf94;background:#fdf5e3}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .bar{height:8px;border-radius:6px;background:var(--sunken);overflow:hidden;border:1px solid var(--line)}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--green2),var(--green))}
 .scorebig{font-size:40px;font-weight:800;line-height:1}
@@ -1920,7 +1932,31 @@ async function applyScoreGate(txt, jd, vr, mode){
   /* A separate marker from [data-violations] so copyText can tell "the writing
      is wrong" apart from "it did not clear the bar". */
   var old=card.querySelector('[data-score-block]'); if(old) old.parentNode.removeChild(old);
-  if(!verdict.canSend && vr.ok){
+  var oldAct=card.querySelector('[data-blocked-actions]'); if(oldAct) oldAct.parentNode.removeChild(oldAct);
+  /* The way out of a block. Rewrite is offered only when a real score came back:
+     with the scorer down a rewrite would be unscoreable and therefore blocked
+     too, so "Score again" is the honest option there and it costs nothing.
+     CL_REWRITE_SYSTEM enforces the mechanical rules as well as the rubric, so a
+     rewrite is the right answer to a length or dash violation, not just to a low
+     score. */
+  var actionsHtml='<div class="flex" data-blocked-actions style="margin-top:10px">'
+    +(sc?'<button class="btn" data-rewrite>Rewrite to clear the bar</button>':'')
+    +'<button class="btn ghost" data-regen>Generate a new draft</button></div>';
+  function wireActions(host){
+    if(!host) return;
+    var rw=host.querySelector('[data-rewrite]');
+    if(rw) rw.onclick=function(){ rewriteToClear(mode); };
+    var rg=host.querySelector('[data-regen]');
+    if(rg) rg.onclick=function(){ genProposal(mode==='speed'?'speed':'priority'); };
+  }
+  if(!verdict.canSend && !vr.ok){
+    /* The violations card already names the problems, so the actions go INTO it
+       rather than stacking a second red card underneath saying the same thing.
+       Without this the card's own footer offered a Rewrite button that was never
+       rendered on this path. */
+    var vioCard=card.querySelector('[data-violations]');
+    if(vioCard){ vioCard.insertAdjacentHTML('beforeend', actionsHtml); wireActions(vioCard); }
+  } else if(!verdict.canSend){
     var blk=document.createElement('div');
     blk.setAttribute('data-score-block','');
     blk.className='card tight';
@@ -1933,14 +1969,9 @@ async function applyScoreGate(txt, jd, vr, mode){
       +' Nothing under the bar goes to a client, so Copy stays off.</p>'
       +scoreBreakdownHtml(sc)
       +(sc?'<div class="src" style="margin-top:8px">Rewrite feeds this draft back through the rubric and scores it again, which is cheaper and better aimed than starting over. Either way the words stay written by the model. Nobody retypes or patches them by hand.</div>':'')
-      +'<div class="flex" style="margin-top:10px">'
-      +(sc?'<button class="btn" data-rewrite>Rewrite to clear the bar</button>':'')
-      +'<button class="btn ghost" data-regen>Generate a new draft</button></div>';
+      +actionsHtml;
     slot.appendChild(blk);
-    var rw=blk.querySelector('[data-rewrite]');
-    if(rw) rw.onclick=function(){ rewriteToClear(mode); };
-    var rg=blk.querySelector('[data-regen]');
-    if(rg) rg.onclick=function(){ genProposal(mode==='speed'?'speed':'priority'); };
+    wireActions(blk);
   }
   if(btn){
     btn.disabled=!verdict.canSend;
