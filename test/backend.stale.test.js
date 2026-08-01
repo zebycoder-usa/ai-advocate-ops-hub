@@ -108,6 +108,79 @@ describe('All Jobs against a stale backend', () => {
   });
 });
 
+describe('the warning survives everything a person does next', () => {
+  // The bug this pins: loadJobs wrote the warning, then ANY later renderJobs
+  // replaced it with "No jobs match these filters". Touching a date filter was
+  // enough. So the app said "the backend is stale" once, immediately contradicted
+  // itself, and left the reader hunting through filters for rows that were never
+  // coming. Reported from production on 1 Aug 2026.
+  const stale = (t) => /older than this app/i.test(t);
+  const jobsText = () => doc.getElementById('jobs-out').textContent;
+
+  it('a date filter does not overwrite it', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    expect(stale(jobsText())).toBe(true);
+    w.setVal('jf-from', '2026-07-17');
+    w.renderJobs();
+    expect(stale(jobsText())).toBe(true);
+  });
+
+  it('a search does not overwrite it', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    w.setVal('jf-q', 'anything');
+    w.renderJobs();
+    expect(stale(jobsText())).toBe(true);
+  });
+
+  it('sorting does not overwrite it', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    w.sortJobs('date');
+    expect(stale(jobsText())).toBe(true);
+  });
+
+  it('clearing the filters does not overwrite it', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    w.clearJobFilters();
+    expect(stale(jobsText())).toBe(true);
+  });
+
+  it('never claims "no jobs match these filters" when the backend is the problem', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    w.setVal('jf-from', '2026-07-17');
+    w.renderJobs();
+    expect(jobsText()).not.toMatch(/no jobs match/i);
+  });
+
+  it('clears the summary counts, so 0 hired is not read as a real number', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    w.renderJobs();
+    expect(doc.getElementById('jobs-summary').innerHTML).toBe('');
+  });
+
+  it('sessions behaves the same on re-render', async () => {
+    stubBackend(NO_OP);
+    await w.loadSessions(true);
+    w.renderSessions();
+    expect(stale(doc.getElementById('sessions-out').textContent)).toBe(true);
+  });
+
+  it('and the warning goes away once the backend answers properly', async () => {
+    stubBackend(NO_OP);
+    await w.loadJobs(true);
+    expect(stale(jobsText())).toBe(true);
+    stubBackend({ ok: true, rows: [] });
+    await w.loadJobs(true);
+    w.renderJobs();
+    expect(stale(jobsText())).toBe(false);
+  });
+});
+
 describe('a genuine error is still an error', () => {
   it('does not mistake ok:false for a stale backend', async () => {
     stubBackend({ ok: false, error: 'Bad secret' });
