@@ -2212,11 +2212,25 @@ async function loadSessions(force){
   }
 }
 
+/* Sign-in times are a SHARED record, so they must read the same for everyone.
+   This used to format in the viewer's own timezone with no label, so Saqib in
+   Texas and the team in Karachi opened the same row and saw times ten hours
+   apart with nothing on screen saying which was which. On a log whose whole
+   purpose is settling who held the profile when, that is not cosmetic.
+   Everything is shown in PKT, the timezone the team works in and the one the
+   sheet already uses for its "Time PKT" column, and it is labelled. */
 function fmtWhen(v){
   if(v==null||v==='') return '-';
   var d=new Date(v);
   if(isNaN(d.getTime())) return String(v);
-  return d.toLocaleDateString()+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  try{
+    return d.toLocaleString('en-GB',{timeZone:'Asia/Karachi',
+      day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})
+      .replace(',','');
+  }catch(e){
+    /* A browser without full timezone data must not blank the column. */
+    return d.toLocaleDateString()+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }
 }
 
 function renderSessions(){
@@ -2231,7 +2245,7 @@ function renderSessions(){
     : '<div class="note">Nothing in this range.</div>';
 
   if(!rows.length){ out.innerHTML='<div class="note">No sessions match these filters.</div>'; return; }
-  out.innerHTML='<table><thead><tr><th>Member</th><th>Signed in</th><th>Signed out</th><th>Duration</th><th>Status</th></tr></thead><tbody>'
+  out.innerHTML='<table><thead><tr><th>Member</th><th>Signed in (PKT)</th><th>Signed out (PKT)</th><th>Duration</th><th>Status</th></tr></thead><tbody>'
     +rows.slice().reverse().map(function(r){
       var st=String(r[SESSION_IDX.status]||'').toUpperCase();
       var col=st==='ACTIVE'?'var(--green)':st==='TIMED OUT'?'var(--amber)':'var(--muted)';
