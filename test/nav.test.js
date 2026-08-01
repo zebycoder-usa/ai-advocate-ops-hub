@@ -23,7 +23,7 @@ const activeView = () =>
     .getAttribute?.('data-view');
 
 describe('every screen is visible at once', () => {
-  it('shows all thirteen views, none hidden behind a menu', () => {
+  it('shows all twelve views, none hidden behind a menu', () => {
     expect(items()).toHaveLength(w.VIEWS.length);
   });
 
@@ -55,7 +55,12 @@ describe('grouped by what each screen is for', () => {
   });
 
   it('the daily loop comes first', () => {
-    expect(names().slice(0, 4)).toEqual(['command', 'evaluate', 'jobs', 'clscore']);
+    expect(names().slice(0, 3)).toEqual(['command', 'evaluate', 'jobs']);
+  });
+
+  it('CL Score is gone, because scoring now happens inside Propose', () => {
+    expect(names()).not.toContain('clscore');
+    expect(doc.querySelector('.view[data-view="clscore"]')).toBeNull();
   });
 
   it('reference material is grouped away from the work', () => {

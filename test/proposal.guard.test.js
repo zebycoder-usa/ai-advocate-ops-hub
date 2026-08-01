@@ -511,19 +511,34 @@ describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
 
   // Renders a draft through the REAL genProposal() with a local stub standing in
   // for the /api/claude response. No network: the stub resolves in-process.
-  async function render(draftText, mode = 'priority') {
+  // A rubric reply that clears the bar. The scorer and the writer share one
+  // endpoint, so the stub has to tell them apart by what was asked.
+  const PASSING_RUBRIC = '{"hook":2,"proof":2,"plan":2,"close":1.5,"style":1.5,"len":1,"summary":"Strong."}';
+
+  async function render(draftText, mode = 'priority', scoreReply = PASSING_RUBRIC) {
     w.setVal('job-text', JOB_TEXT);
-    w.fetch = async (url) => {
+    w.fetch = async (url, opts) => {
       stubCalls.push(String(url));
+      const body = String((opts && opts.body) || '');
+      const isScorer = body.includes('COVER LETTER / PROPOSAL');
       return {
         ok: true,
         status: 200,
-        json: async () => ({ content: [{ type: 'text', text: draftText }] }),
+        json: async () => ({ content: [{ type: 'text', text: isScorer ? scoreReply : draftText }] }),
         text: async () => '',
       };
     };
     await w.genProposal(mode);
     return w.document.getElementById('prop-out');
+  }
+
+  // genProposal defers applyScoreGate by a setTimeout(0) so the bidder sees the
+  // draft before the second model call finishes. Anything asserting the SETTLED
+  // state of the copy control has to let that land first.
+  async function flushGate() {
+    await new Promise((r) => setTimeout(r, 0));
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
   }
 
   function copyButton(out) {
@@ -601,11 +616,47 @@ describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
     expect(writes).toEqual([]);
   });
 
-  it('a clean draft leaves the copy control enabled', async () => {
+  it('a clean draft starts locked and only unlocks once it has cleared the bar', async () => {
+    // The control is disabled the instant the card renders, before the scorer has
+    // said anything. It used to render enabled and stay enabled for the whole
+    // scorer round trip, so an unscored draft was one fast click from the
+    // clipboard. applyScoreGate is now the only thing that can enable it.
     const out = await render(CLEAN_PROPOSAL);
     const btn = copyButton(out);
     expect(btn).toBeDefined();
-    expect(btn.disabled).toBe(false);
+    expect(btn.disabled).toBe(true);
+    await flushGate();
+    expect(copyButton(out).disabled).toBe(false);
+  });
+
+  it('refuses to copy during the scoring window, even called directly', async () => {
+    const out = await render(CLEAN_PROPOSAL);
+    expect(out.querySelector('[data-scoring]')).not.toBeNull();
+    w.copyText(copyButton(out));
+    expect(writes).toEqual([]);          // nothing reached the clipboard
+    await flushGate();
+    expect(out.querySelector('[data-scoring]')).toBeNull();
+  });
+
+  it('keeps copy locked when the draft is clean but scores under the bar', async () => {
+    const low = '{"hook":1,"proof":1,"plan":1,"close":0.5,"style":1.5,"len":1,"summary":"Thin proof."}';
+    const out = await render(CLEAN_PROPOSAL, 'priority', low);
+    await flushGate();
+    expect(copyButton(out).disabled).toBe(true);
+    expect(out.querySelector('[data-score-block]')).not.toBeNull();
+    w.copyText(copyButton(out));
+    expect(writes).toEqual([]);
+  });
+
+  it('offers a rewrite rather than only a regenerate when a clean draft misses the bar', async () => {
+    // Deleting the CL Score tab took the rewrite loop with it. Without this the
+    // only recourse at 6.0 is a blind full-price regeneration.
+    const low = '{"hook":1,"proof":1,"plan":1,"close":0.5,"style":1.5,"len":1,"summary":"Thin proof."}';
+    const out = await render(CLEAN_PROPOSAL, 'priority', low);
+    await flushGate();
+    const blk = out.querySelector('[data-score-block]');
+    expect(blk.querySelector('[data-rewrite]')).not.toBeNull();
+    expect(blk.querySelector('[data-regen]')).not.toBeNull();
   });
 
   it('a clean draft shows no violations region', async () => {
@@ -613,18 +664,22 @@ describe('integration: genProposal -> copy control (RED until Stage 4)', () => {
     expect(out.querySelector('[data-violations]')).toBeNull();
   });
 
-  it('copyText() does hand over a clean draft', async () => {
+  it('copyText() does hand over a clean draft once it has cleared the bar', async () => {
     const out = await render(CLEAN_PROPOSAL);
+    await flushGate();
     w.copyText(copyButton(out));
     expect(writes).toHaveLength(1);
     expect(writes[0]).toContain('parse accuracy');
   });
 
   it('a speed bid under 120 words is not blocked by the length rule', async () => {
-    // mode 'speed' renders through the same card; the length rule must not
-    // disable the copy control for a deliberately short bid.
+    // mode 'speed' renders through the same card. A speed bid is deliberately
+    // ~50 words and the rubric's length dimension is calibrated for 120 to 180,
+    // so it can never reach 9.0; only the mechanical checks may gate it.
     const short = 'PROPOSAL\nWe can start on your intake today, and we ship the first slice early.';
-    const out = await render(short, 'speed');
+    const low = '{"hook":2,"proof":2,"plan":1,"close":1.5,"style":1.5,"len":0,"summary":"Short by design."}';
+    const out = await render(short, 'speed', low);
+    await flushGate();
     const btn = copyButton(out);
     expect(btn).toBeDefined();
     expect(btn.disabled).toBe(false);
