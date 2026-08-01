@@ -331,12 +331,15 @@ code.block{display:block;white-space:pre-wrap;background:#0f231b;border:1px soli
           <option value="">Applied or not</option><option value="yes">Applied</option><option value="no">Not applied</option>
         </select>
         <select id="jf-status" class="field" style="max-width:170px" onchange="renderJobs()"><option value="">Any status</option></select>
-        <input id="jf-q" class="field" style="max-width:230px" placeholder="Search title or reason" oninput="renderJobs()">
+        <input id="jf-q" class="field" style="max-width:260px" placeholder="Search any column" oninput="renderJobs()" onkeydown="if(event.key==='Enter')renderJobs()">
+        <button class="btn" onclick="renderJobs()">Search</button>
         <button class="btn ghost" onclick="clearJobFilters()">Clear</button>
       </div>
+      <div id="jobs-filter-state" class="note" style="margin-top:8px"></div>
 
       <div id="jobs-summary" style="margin-top:12px"></div>
       <div id="jobs-out" style="margin-top:10px;overflow-x:auto"></div>
+      <div id="job-editor"></div>
     </div>
 
     <div class="card" style="margin-top:12px">
@@ -2300,8 +2303,13 @@ function listJobs(filters, rows){
     }
     if(f.status && normStatus(r[CLEVAL_IDX.proposalStatus])!==f.status) return false;
     if(q){
-      var hay=(String(r[CLEVAL_IDX.jobTitle]||'')+' '+String(r[CLEVAL_IDX.reason]||'')).toLowerCase();
-      if(hay.indexOf(q)<0) return false;
+      /* Search every cell, not just title and reason. Searching two of twenty-five
+         columns meant a client name, a rate, a bid or a job link simply could not
+         be found, and the box gave no sign it had only looked in two places.
+         Every term must match somewhere, so "sadia rag" narrows instead of widening. */
+      var hay=r.join(' ').toLowerCase();
+      var terms=q.split(/\s+/).filter(Boolean);
+      for(var t=0;t<terms.length;t++){ if(hay.indexOf(terms[t])<0) return false; }
     }
     return true;
   });
@@ -2313,7 +2321,59 @@ function jobFilters(){
 }
 function clearJobFilters(){
   ['jf-person','jf-from','jf-to','jf-applied','jf-status','jf-q'].forEach(function(id){ setVal(id,''); });
+  JOBS_SORT={key:null,dir:1};
   renderJobs();
+}
+
+/* Which column the table is sorted by, and which way. Null means the natural
+   order the rows arrived in, newest first, which is what it always did. */
+var JOBS_SORT={key:null,dir:1};
+
+/* Every sortable column: the label in the header, and how to pull a comparable
+   value out of a row. Dates, money and counts must not sort as text, or "$9K"
+   lands above "$85K" and 7/9/2026 above 7/31/2026. */
+var JOBS_SORT_KEYS={
+  date:    function(r){ return jobsDayNum(r[CLEVAL_IDX.date])||0; },
+  who:     function(r){ return String(r[CLEVAL_IDX.assignee]||'').toLowerCase(); },
+  title:   function(r){ return String(r[CLEVAL_IDX.jobTitle]||'').toLowerCase(); },
+  rate:    function(r){ return numish(r[CLEVAL_IDX.hiringRate]); },
+  spend:   function(r){ return moneyish(r[CLEVAL_IDX.totalSpend]); },
+  props:   function(r){ return numish(r[CLEVAL_IDX.proposals]); },
+  applied: function(r){ return /^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''))?1:0; },
+  connects:function(r){ return numish(r[CLEVAL_IDX.connects]); },
+  status:  function(r){ return String(normStatus(r[CLEVAL_IDX.proposalStatus])||'').toLowerCase(); },
+  flag:    function(r){ return String(r[CLEVAL_IDX.flag]||'').toLowerCase(); }
+};
+
+/* "73%" -> 73, "5-10" -> 5, "less than 5" -> 5, "" -> -1 so blanks sink. */
+function numish(v){
+  var m=String(v==null?'':v).match(/-?\d+(\.\d+)?/);
+  return m?parseFloat(m[0]):-1;
+}
+/* "$85K" -> 85000, "$1.7M" -> 1700000, "not shown" -> -1. */
+function moneyish(v){
+  var s=String(v==null?'':v).trim();
+  var m=s.match(/([\d.]+)\s*([KkMm])?/);
+  if(!m) return -1;
+  var n=parseFloat(m[1]); if(isNaN(n)) return -1;
+  var u=(m[2]||'').toLowerCase();
+  return u==='k'?n*1e3:u==='m'?n*1e6:n;
+}
+
+function sortJobs(key){
+  if(JOBS_SORT.key===key) JOBS_SORT.dir=-JOBS_SORT.dir;
+  else { JOBS_SORT.key=key; JOBS_SORT.dir=1; }
+  renderJobs();
+}
+
+function applyJobsSort(rows){
+  if(!JOBS_SORT.key || !JOBS_SORT_KEYS[JOBS_SORT.key]) return rows.slice().reverse();
+  var get=JOBS_SORT_KEYS[JOBS_SORT.key], dir=JOBS_SORT.dir;
+  return rows.slice().sort(function(a,b){
+    var x=get(a), y=get(b);
+    if(typeof x==='number'&&typeof y==='number') return (x-y)*dir;
+    return String(x).localeCompare(String(y))*dir;
+  });
 }
 
 /* An Apps Script deployment that predates an action does not fail: it answers
@@ -2381,9 +2441,34 @@ function renderJobs(){
     +'<span class="note" style="color:'+(known.length<applied.length?'var(--amber)':'var(--muted)')+'"><b>'
       +(applied.length?Math.round(100*known.length/applied.length):0)+'%</b> of applications have an outcome recorded</span></div>';
 
-  if(!rows.length){ out.innerHTML='<div class="note">No jobs match these filters.</div>'; renderJobsDaily(rows); return; }
+  /* Say out loud what is being filtered and how much it removed. Without this the
+     search box gave no sign it had done anything, so nobody could tell an empty
+     result from a search that never ran. */
+  var fs=document.getElementById('jobs-filter-state');
+  if(fs){
+    var f=jobFilters(), total=(CLEVAL_ROWS||[]).length, bits=[];
+    if(f.q)       bits.push('matching <b>'+esc(f.q)+'</b>');
+    if(f.person)  bits.push('by <b>'+esc(f.person)+'</b>');
+    if(f.applied) bits.push(f.applied==='yes'?'<b>applied</b>':'<b>not applied</b>');
+    if(f.status)  bits.push('status <b>'+esc(f.status)+'</b>');
+    if(f.from||f.to) bits.push('between <b>'+esc(f.from||'the start')+'</b> and <b>'+esc(f.to||'today')+'</b>');
+    fs.innerHTML = bits.length
+      ? 'Showing <b>'+rows.length+'</b> of '+total+' jobs, '+bits.join(', ')
+        +(JOBS_SORT.key?', sorted by <b>'+esc(JOBS_SORT.key)+'</b> '+(JOBS_SORT.dir>0?'ascending':'descending'):'')
+        +'. <a href="#" onclick="clearJobFilters();return false;">Clear filters</a>'
+      : 'Showing all <b>'+total+'</b> jobs'
+        +(JOBS_SORT.key?', sorted by <b>'+esc(JOBS_SORT.key)+'</b> '+(JOBS_SORT.dir>0?'ascending':'descending'):'. Click any column heading to sort.');
+  }
 
-  var body=rows.slice().reverse().map(function(r){
+  if(!rows.length){
+    out.innerHTML='<div class="note">No jobs match these filters. <a href="#" onclick="clearJobFilters();return false;">Clear them</a> to see all '+((CLEVAL_ROWS||[]).length)+'.</div>';
+    renderJobsDaily(rows); return;
+  }
+
+  /* The editor addresses rows by their position in CLEVAL_ROWS, which sorting
+     and filtering must not disturb, so resolve the original index per row. */
+  var indexOf=function(r){ return (CLEVAL_ROWS||[]).indexOf(r); };
+  var body=applyJobsSort(rows).map(function(r){
     var link=String(r[CLEVAL_IDX.jobLink]||'');
     var evId=clevalId([ String(r[CLEVAL_IDX.assignee]||''), link, String(r[CLEVAL_IDX.jobTitle]||''),
                         String(r[CLEVAL_IDX.date]||''), (/^\s*yes\s*$/i.test(String(r[CLEVAL_IDX.applied]||''))?'APPLY':'SKIP') ]);
@@ -2393,17 +2478,173 @@ function renderJobs(){
       +'<td>'+esc(String(r[CLEVAL_IDX.assignee]||''))+'</td>'
       +'<td style="max-width:320px">'+(link?'<a href="'+esc(link)+'" target="_blank" rel="noopener">'+esc(String(r[CLEVAL_IDX.jobTitle]||'(untitled)'))+'</a>':esc(String(r[CLEVAL_IDX.jobTitle]||'(untitled)')))+'</td>'
       +'<td>'+esc(String(r[CLEVAL_IDX.hiringRate]||'-'))+'</td>'
+      /* Client spend, proposal count and flag were in the sheet and the CSV but
+         never on this screen, so anyone judging a row had to leave the app. */
+      +'<td>'+esc(String(r[CLEVAL_IDX.totalSpend]||'-'))+'</td>'
+      +'<td>'+esc(String(r[CLEVAL_IDX.proposals]||'-'))+'</td>'
+      +'<td>'+flagPill(r[CLEVAL_IDX.flag])+'</td>'
       +'<td>'+esc(String(r[CLEVAL_IDX.applied]||'-'))+'</td>'
       +'<td>'+esc(String(r[CLEVAL_IDX.connects]||'-'))+'</td>'
       +'<td><select class="field" style="min-width:150px" data-evid="'+esc(evId)+'" onchange="setJobStatus(this)">'
         +CLEVAL_STATUS_OPTIONS.map(function(s){ return '<option value="'+esc(s)+'"'+(s===st?' selected':'')+'>'+esc(s)+'</option>'; }).join('')
         +'</select><div class="note" data-status-note></div></td>'
       +'<td style="max-width:260px">'+esc(String(r[CLEVAL_IDX.reason]||''))+'</td>'
+      +'<td><button class="btn ghost" style="padding:4px 10px;font-size:12px" onclick="openJobEditor('+indexOf(r)+')">Edit</button></td>'
       +'</tr>';
   }).join('');
 
-  out.innerHTML='<table><thead><tr><th>Date</th><th>Who</th><th>Job</th><th>Rate</th><th>Applied</th><th>Connects</th><th>Status</th><th>Reason</th></tr></thead><tbody>'+body+'</tbody></table>';
+  /* Click a header to sort, click again to reverse, exactly like the spreadsheet
+     these rows came from. The arrow says which column is driving the order,
+     because a table that silently reordered itself is worse than one that does
+     not sort at all. */
+  function th(key,label,align){
+    var on=JOBS_SORT.key===key;
+    var arrow=on?(JOBS_SORT.dir>0?' ▲':' ▼'):'';
+    return '<th style="cursor:pointer;user-select:none;white-space:nowrap'+(align?';text-align:'+align:'')+'"'
+      +' title="Sort by '+esc(label)+'" onclick="sortJobs(\''+key+'\')">'
+      +(on?'<span style="color:var(--green)">':'<span>')+esc(label)+arrow+'</span></th>';
+  }
+  out.innerHTML='<table><thead><tr>'
+    +th('date','Date')+th('who','Who')+th('title','Job')+th('rate','Hire rate')
+    +th('spend','Client spend')+th('props','Proposals')+th('flag','Flag')
+    +th('applied','Applied')+th('connects','Connects')+th('status','Status')
+    +'<th>Reason</th><th></th></tr></thead><tbody>'+body+'</tbody></table>';
   renderJobsDaily(rows);
+}
+
+/* Edit every column of a row, not just the status.
+   The table shows eleven of the twenty-five columns because a 25-column table is
+   unreadable, but "unreadable" is not the same as "unavailable": anything the
+   sheet holds has to be editable here or people go back to the sheet, and the
+   two records drift apart again. So the table stays narrow and the whole row
+   opens in a panel. */
+var JOB_EDIT_ROW=null;
+
+/* Which fields are free text, which are a fixed vocabulary. Anything with a
+   closed set gets a dropdown, because typing "green" or "GREEN" into a column
+   the filters match exactly is how a row becomes invisible to its own team. */
+var JOB_EDIT_FIELDS=[
+  ['jobTitle','Job title','text'],
+  ['jobLink','Job link','text'],
+  ['assignee','Assignee','person'],
+  ['date','Date','text'],
+  ['timePkt','Time PKT','text'],
+  ['flag','Flag',['','Green','Red','Amber']],
+  ['applied','Applied?',['','Yes','No']],
+  ['proposalStatus','Proposal status','status'],
+  ['hiringRate','Hire rate','text'],
+  ['clientRatings','Client rating','text'],
+  ['payVerified','Payment verified',['','Yes','No']],
+  ['totalSpend','Total spend','text'],
+  ['proposals','Proposals','text'],
+  ['interviewing','Interviewing','text'],
+  ['invitesSent','Invites sent','text'],
+  ['unansweredInvites','Unanswered invites','text'],
+  ['fixedHourly','Fixed / Hourly',['','Fixed','Hourly']],
+  ['highBid','High bid','text'],
+  ['avgBid','Avg bid','text'],
+  ['lowBid','Low bid','text'],
+  ['connects','Connects used','text'],
+  ['bid','Price / Rate','text'],
+  ['jobPosted','Job posted','text'],
+  ['openJobs','Open jobs','text'],
+  ['reason','Reason / remarks','area']
+];
+
+function openJobEditor(rowNumber){
+  var r=(CLEVAL_ROWS||[])[rowNumber]; if(!r) return;
+  JOB_EDIT_ROW=rowNumber;
+  var box=document.getElementById('job-editor'); if(!box) return;
+  var v=function(f){ var i=CLEVAL_IDX[f]; return i==null?'':String(r[i]==null?'':r[i]); };
+
+  var body=JOB_EDIT_FIELDS.map(function(f){
+    var key=f[0], label=f[1], kind=f[2], cur=v(key), id='je-'+key;
+    var input;
+    if(kind==='area'){
+      input='<textarea id="'+id+'" class="field" style="min-height:80px">'+esc(cur)+'</textarea>';
+    } else if(kind==='status'){
+      input='<select id="'+id+'" class="field">'+CLEVAL_STATUS_OPTIONS.map(function(s){
+        return '<option value="'+esc(s)+'"'+(normStatus(cur)===s?' selected':'')+'>'+esc(s)+'</option>'; }).join('')+'</select>';
+    } else if(kind==='person'){
+      input='<select id="'+id+'" class="field">'+['']. concat(TEAM.map(function(t){return t.name;})).map(function(p){
+        return '<option value="'+esc(p)+'"'+(cur===p?' selected':'')+'>'+esc(p||'(unassigned)')+'</option>'; }).join('')+'</select>';
+    } else if(Array.isArray(kind)){
+      var opts=kind.slice();
+      if(cur && opts.indexOf(cur)<0) opts.push(cur);   /* never silently drop a value the sheet already holds */
+      input='<select id="'+id+'" class="field">'+opts.map(function(o){
+        return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o||'(blank)')+'</option>'; }).join('')+'</select>';
+    } else {
+      input='<input id="'+id+'" class="field" value="'+esc(cur)+'">';
+    }
+    return '<div><label class="lbl">'+esc(label)+'</label>'+input+'</div>';
+  }).join('');
+
+  box.innerHTML='<div class="card" style="margin-top:12px;border-color:var(--gold)">'
+    +'<div class="flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap">'
+    +'<div class="eyebrow">Editing: '+esc(v('jobTitle')||'(untitled)')+'</div>'
+    +'<button class="btn ghost" onclick="closeJobEditor()">Close</button></div>'
+    +'<div class="grid g3" style="margin-top:10px;gap:10px">'+body+'</div>'
+    +'<div class="flex" style="margin-top:12px"><button class="btn" onclick="saveJobEditor()">Save all changes</button>'
+    +'<button class="btn ghost" onclick="closeJobEditor()">Cancel</button></div>'
+    +'<div id="job-editor-msg" class="note" style="margin-top:8px"></div></div>';
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function closeJobEditor(){
+  JOB_EDIT_ROW=null;
+  var box=document.getElementById('job-editor'); if(box) box.innerHTML='';
+}
+
+/* Only the fields that actually changed are sent. Sending all 25 every time would
+   overwrite a column somebody else edited between this row loading and Save. */
+function jobEditorPatch(){
+  var r=(CLEVAL_ROWS||[])[JOB_EDIT_ROW]; if(!r) return null;
+  var patch={};
+  JOB_EDIT_FIELDS.forEach(function(f){
+    var el=document.getElementById('je-'+f[0]); if(!el) return;
+    var i=CLEVAL_IDX[f[0]]; if(i==null) return;
+    var before=String(r[i]==null?'':r[i]), after=String(el.value==null?'':el.value);
+    if(before!==after) patch[f[0]]=after;
+  });
+  return patch;
+}
+
+async function saveJobEditor(){
+  var msg=document.getElementById('job-editor-msg');
+  var r=(CLEVAL_ROWS||[])[JOB_EDIT_ROW];
+  if(!r){ if(msg) msg.textContent='That row is no longer loaded. Refresh and try again.'; return; }
+  var patch=jobEditorPatch();
+  if(!patch || !Object.keys(patch).length){ if(msg) msg.textContent='Nothing changed.'; return; }
+  if(msg) msg.textContent='Saving '+Object.keys(patch).length+' field(s)...';
+
+  try{
+    var resp=await apiFetch(CLEVAL_PROXY,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'updateCLEvalRow', name:(ME?ME.name:''),
+        rowNumber:JOB_EDIT_ROW+2,                       /* +1 header, +1 to 1-index */
+        expectTitle:String(r[CLEVAL_IDX.jobTitle]||''), /* refuses if the row moved */
+        row:patch})});
+    var data=await readJson(resp,'The save');
+    if(!data||!data.ok){
+      if(msg) msg.innerHTML='<span style="color:var(--red)">Not saved: '+esc((data&&data.error)||('HTTP '+resp.status))+'</span>';
+      return;
+    }
+    /* Reflect it locally so the table updates without a full reload. */
+    Object.keys(patch).forEach(function(f){ var i=CLEVAL_IDX[f]; if(i!=null) r[i]=patch[f]; });
+    if(msg) msg.innerHTML='<span style="color:var(--green)">Saved '+(data.changed||0)+' field(s).</span>';
+    renderJobs();
+  }catch(e){
+    if(msg) msg.innerHTML='<span style="color:var(--red)">Not saved: '+esc(String(e&&e.message?e.message:e))+'</span>';
+  }
+}
+
+/* Green and Red are the team's own words from the sheet, so keep them, but make
+   them readable at a glance instead of a bare word in a column of words. */
+function flagPill(v){
+  var s=String(v==null?'':v).trim();
+  if(!s) return '-';
+  var k=s.toLowerCase();
+  var cls=k==='green'?'ok':k==='red'?'no':'warn';
+  return '<span class="pill '+cls+'">'+esc(s)+'</span>';
 }
 
 /* Team effort by day: what each person reviewed and applied to, per date. */
