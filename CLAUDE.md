@@ -74,7 +74,7 @@ When working across VS Code Claude, Claude Code web, or Claude.ai:
 - IMPORTANT: This app's theme is GREEN. Read the file's own :root CSS variables and reuse them (var(--green), var(--gold), var(--card), etc.). NEVER hardcode colors or paste a different palette.
 - YOU MUST verify facts before stating them. NEVER invent a metric, tool, employer, title, credential, or result. Use only facts true of Saqib and present on the live Upwork profile.
 - After any edit, run `npm run build`. If it fails, report the error. NEVER push a broken build.
-- NEVER deploy to `main` without the owner's exact phrase: APPROVED - DEPLOY.
+- NEVER merge or deploy to `main` unless asked to in that turn. Any clear instruction counts: "merge", "ship it", "push it live". No set phrase is required. What is NOT an instruction: a green build, a passing suite, an approved plan, or Claude deciding the work looks finished.
 
 ## Proposal and cover-letter output (whenever generating them)
 - Proof points come ONLY from the **AGENCY_PROOF_BANK** constant in `index.html` (real results published on the agency's live Upwork profile) or from facts in the user's own letter. Pick the ONE bank entry matching the job's domain, never list all. NEVER invent a number not in the bank or the user's text. Platform badges (Job Success Score, Rising Talent, star ratings) are NOT proof.
@@ -103,7 +103,7 @@ When working across VS Code Claude, Claude Code web, or Claude.ai:
 
 ## Git and deployment workflow
 - Dev branch: `claude/upwork-app-full-build-jazm8a` — all new work goes here
-- Never push to `main` directly. Never deploy to `main` without owner's exact phrase: **APPROVED - DEPLOY**
+- Never push to `main` directly, and never merge or deploy on your own initiative. When asked to merge, in whatever words, merge. Verify first: `npm run build` and the full suite must pass, and say so in the same reply.
 - After editing: run `npm run build`. If it fails, fix before committing. Never push a broken build.
 - Push order: Claude Code web generates files → VS Code Claude commits and pushes → PR created → owner approves → merge to main → Vercel auto-deploys
 - GAS backend update is independent of git — paste `Code.gs` into Apps Script editor and redeploy
@@ -118,7 +118,7 @@ When working across VS Code Claude, Claude Code web, or Claude.ai:
 ## What Claude must NEVER do
 - Touch `src/App.jsx`, `api/claude.js`, `vercel.json` unless explicitly told
 - Change scoring logic, ban lists, or Connect rules without explicit instruction
-- Push to `main` without "APPROVED - DEPLOY" from Saqib
+- Merge or deploy to `main` without being asked to in that turn
 - Invent facts about Saqib (credentials, numbers, employers, tools not in the job post)
 - Create a second clone of the repo (OneDrive copy is the single source of truth)
 - Use em dashes or en dashes in any proposal or cover letter output

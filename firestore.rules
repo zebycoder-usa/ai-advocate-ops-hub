@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// DENY EVERYTHING. This is correct, not a placeholder, and it must stay this way.
+//
+// Nothing in this app talks to Firestore from the browser. Every read and every
+// write goes through the serverless functions in api/, which use the Firebase
+// Admin SDK. The Admin SDK bypasses security rules by design, so locking the
+// client out costs the server nothing and closes the database to everyone else.
+//
+// Why that matters here specifically: this app has NO authentication. Identity is
+// a dropdown in index.html, so anyone opening the site can claim to be any team
+// member, including the owner. Rules cannot tell those users apart, because none
+// of them ever authenticated. A rule like `allow read: if true` would therefore
+// publish every job, every proposal and every sign-in to anyone with the URL.
+//
+// If you are here because you want the browser to read Firestore directly, that
+// is a real and reasonable goal, but it requires Firebase Auth first. Add the
+// sign-in, then write rules against request.auth. Do not loosen this file to make
+// a feature work in the meantime.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

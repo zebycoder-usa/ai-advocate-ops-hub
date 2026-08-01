@@ -29,7 +29,31 @@ export function loadGas({ logSecret } = {}) {
             for (let i = 0; i < nr; i++) {
               const row = rows[r - 1 + i] || [];
               const seg = [];
-              for (let j = 0; j < nc; j++) seg.push(row[c - 1 + j] !== undefined ? row[c - 1 + j] : '');
+              for (let j = 0; j < nc; j++) {
+                const cell = row[c - 1 + j];
+                if (cell === undefined) { seg.push(''); continue; }
+                // A rich-text cell reads back as its DISPLAY TEXT, never as the link.
+                // This is what Sheets does, and reproducing it is the whole point.
+                seg.push(cell && typeof cell === 'object' && cell.text !== undefined ? cell.text : cell);
+              }
+              out.push(seg);
+            }
+            return out;
+          },
+          // The only way to recover a hyperlink target from a rich-text cell.
+          getRichTextValues() {
+            const out = [];
+            for (let i = 0; i < nr; i++) {
+              const row = rows[r - 1 + i] || [];
+              const seg = [];
+              for (let j = 0; j < nc; j++) {
+                const cell = row[c - 1 + j];
+                const isRich = cell && typeof cell === 'object' && cell.text !== undefined;
+                seg.push({
+                  getText() { return isRich ? cell.text : (cell === undefined ? '' : String(cell)); },
+                  getLinkUrl() { return isRich ? (cell.link || null) : null },
+                });
+              }
               out.push(seg);
             }
             return out;
@@ -44,6 +68,15 @@ export function loadGas({ logSecret } = {}) {
           setRichTextValue(v) {
             if (!rows[r - 1]) rows[r - 1] = [];
             // Store an inspectable {text, link} so tests can verify the "URL" link.
+            //
+            // FAITHFULNESS WARNING. Real Apps Script does NOT return this object from
+            // getValues(): it returns the DISPLAY TEXT only, so a cell written as
+            // setText("URL").setLinkUrl(realUrl) reads back as the bare string "URL"
+            // and the link is reachable only via getRichTextValues(). This mock used to
+            // hand the whole object back from getValues(), which is more generous than
+            // reality, and it hid a live bug: listCLEval returned "URL" for every Job
+            // Link in production, so duplicate detection could never match. getValues()
+            // below now returns the text, exactly as Sheets does.
             rows[r - 1][c - 1] = v && v._text !== undefined ? { text: v._text, link: v._link } : v;
             return this;
           },

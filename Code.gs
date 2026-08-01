@@ -392,6 +392,35 @@ function handleListCLEval_(data){
   var limit=Math.min(Math.max(parseInt(data.limit,10)||500,1),2000);
   var all=s.getRange(2,1,last-1,TABS.CLEval.length).getValues();
 
+  /* Job Link is written as a rich-text cell whose DISPLAY TEXT is the word "URL"
+     and whose link carries the real address, so the sheet stays in the format the
+     team already reads. getValues() returns display text, so every Job Link came
+     back here as the literal string "URL": findDuplicateJob then extracted a job
+     id from "URL", found none, and could never match. Duplicate detection was
+     dead from the day it shipped and no test could see it, because the test mock
+     handed back the whole rich-text object instead of the display text.
+     Recover the real address from the link, and leave a cell that was written as
+     plain text exactly as it is. */
+  var linkCol=TABS.CLEval.indexOf('Job Link');
+  if(linkCol>=0){
+    /* Recovering the link is an improvement on the row, not a precondition for
+       returning it. If this throws, the history still comes back with "URL" in the
+       link column, which is the old behaviour: duplicate detection stays blind but
+       All Jobs still loads. Taking the whole history read down to save a hyperlink
+       would be a bad trade. */
+    try{
+      var rng=s.getRange(2,linkCol+1,last-1,1);
+      var rich=rng.getRichTextValues ? rng.getRichTextValues() : null;
+      if(rich){
+        for(var i=0;i<all.length;i++){
+          var cell=rich[i] && rich[i][0];
+          var u=(cell && cell.getLinkUrl) ? cell.getLinkUrl() : null;
+          if(u) all[i][linkCol]=u;
+        }
+      }
+    }catch(e){ /* keep the display text */ }
+  }
+
   /* since filters on the Date column (2), so the client can pull just this week.
      Compared by CALENDAR DAY, never by timestamp. data.since arrives as ISO
      ("2026-07-15"), which Date parses as UTC midnight, while the Date column

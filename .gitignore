@@ -8,3 +8,10 @@ dist/
 # Local-dev-only CLEval staging config (never commit; may contain a staging secret)
 public/cleval.local.js
 *.local.js
+
+# Personal Claude Code permissions, not for the team
+.claude/settings.local.json
+
+# Exported client data, never committed
+data-export/
+*.csv
