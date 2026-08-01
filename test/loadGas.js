@@ -40,6 +40,15 @@ export function loadGas({ logSecret } = {}) {
             }
             return out;
           },
+          // Single-cell reads. Real Apps Script Range has all four of getValue,
+          // getValues, getDisplayValue and getDisplayValues; the mock only had the
+          // plural ones, so server code calling the singular form threw here while
+          // working perfectly in production. Same shape of harness gap as the
+          // rich-text one above: the mock was not the thing it was standing in for.
+          getValue() { return this.getValues()[0][0]; },
+          setValue(v) { return this.setValues([[v]]); },
+          getDisplayValue() { return String(this.getValues()[0][0] ?? ''); },
+          getDisplayValues() { return this.getValues().map((r) => r.map((c) => String(c ?? ''))); },
           // The only way to recover a hyperlink target from a rich-text cell.
           getRichTextValues() {
             const out = [];

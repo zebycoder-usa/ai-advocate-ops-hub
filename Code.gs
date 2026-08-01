@@ -26,7 +26,9 @@ var TABS = {
      CLEval must stay exactly 25 columns to match the format the team already
      uses, and a single "updated at" cell would throw away the timeline. Keeping
      every change is what makes time-to-reply and time-to-hire computable. */
-  _StatusLog:  ["evaluationId","status","at","by"]
+  _StatusLog:  ["evaluationId","status","at","by"],
+  /* Every field edit, so a shared sheet never changes silently. */
+  _RowLog:     ["evaluationId","row","field","from","to","at","by"]
 };
 
 /* Owner decision, 31 July 2026: admins are Usman, Saqib and Waqas. Jahanzaib
@@ -256,6 +258,10 @@ function json_(o){return ContentService.createTextOutput(JSON.stringify(o)).setM
    Writes all 25 columns in TABS.CLEval order. Assignee, Date (M/d/yyyy),
    Time PKT (HH:mm Asia/Karachi) and the default "Ptoposal Status" are set here
    server-side, never trusted from the browser. */
+/* Field name per CLEval column, in column order. MUST stay aligned with
+   TABS.CLEval above and with CLEVAL_COLUMNS in index.html: the three are one
+   contract split across two files, and a mismatch writes to the wrong column. */
+var CLEVAL_FIELDS = ["assignee", "date", "timePkt", "jobTitle", "jobLink", "hiringRate", "clientRatings", "payVerified", "totalSpend", "proposals", "interviewing", "invitesSent", "unansweredInvites", "flag", "applied", "fixedHourly", "highBid", "avgBid", "lowBid", "connects", "bid", "reason", "jobPosted", "openJobs", "proposalStatus"];
 var CLEVAL_ALLOWED_TABS = {"CLEval":1, "CLEval_StagingTest":1}; /* destination fixed; only these are writable */
 function resolveCLEvalSheet_(name){
   return sheet_((name && CLEVAL_ALLOWED_TABS[name]) ? name : "CLEval");
@@ -469,6 +475,78 @@ function handleUpdateCLEvalStatus_(data, actor){
   } finally { lock.releaseLock(); }
 }
 
+/* Edit any column on an existing row.
+   =====================================================================
+   Addressing is the whole problem here. updateCLEvalStatus finds its row through
+   the _Idempotency ledger, which only has entries for rows the APP wrote. The
+   hundreds of rows the team typed by hand have no ledger entry at all, so every
+   one of them answers "unknown evaluationId" and cannot be touched. An edit
+   feature that only works on rows nobody needs to edit is no feature.
+
+   So this accepts a row NUMBER as well, and guards it. Row numbers drift when
+   anyone inserts or deletes a line in the sheet, and a drifted write would
+   silently overwrite somebody else's job. The client must therefore send the job
+   title it believes is on that row, and the write is refused if it does not
+   match. Wrong row is a far worse outcome than a refused edit. */
+function handleUpdateCLEvalRow_(data, actor){
+  var want=PropertiesService.getScriptProperties().getProperty('LOG_SECRET');
+  if(!want || !data || data.secret!==want) return {ok:false,error:'unauthorized'};
+  var patch=data.row;
+  if(!patch || typeof patch!=='object') return {ok:false,error:'row is required'};
+
+  var lock=LockService.getScriptLock();
+  try{ lock.waitLock(LOCK_MS); } catch(e){ return {ok:false,error:'CLEval busy, try again in a moment.'}; }
+  try{
+    var s=resolveCLEvalSheet_(data.sheet), last=s.getLastRow();
+    var row=0;
+
+    var evId=String(data.evaluationId||'');
+    if(evId){ var ex=idemFind_(evId); if(ex && ex.rowNumber) row=parseInt(ex.rowNumber,10); }
+    if(!row && data.rowNumber) row=parseInt(data.rowNumber,10);
+    if(!(row>1) || row>last) return {ok:false,error:'row not found'};
+
+    /* The guard. expectTitle is what the client saw when it opened the editor. */
+    var titleCol=TABS.CLEval.indexOf('Job Title')+1;
+    if(data.expectTitle!==undefined && titleCol>0){
+      var actual=String(s.getRange(row,titleCol).getDisplayValue()||'').trim();
+      if(actual!==String(data.expectTitle||'').trim()){
+        return {ok:false,error:'row moved, reload before editing',expected:data.expectTitle,found:actual};
+      }
+    }
+
+    var byField={};
+    CLEVAL_FIELDS.forEach(function(f,i){ byField[f]=i+1; });   /* field -> column */
+
+    var changed=[];
+    Object.keys(patch).forEach(function(f){
+      var c=byField[f]; if(!c) return;                          /* unknown field, ignore */
+      var v=patch[f];
+      if(f==='proposalStatus' && CLEVAL_STATUSES.indexOf(String(v))<0) return;  /* keep the vocabulary closed */
+      var before=String(s.getRange(row,c).getDisplayValue()||'');
+      if(f==='jobLink'){
+        /* Keep the team's clickable "URL" format rather than dumping a raw link
+           into a sheet everyone reads. */
+        if(isUpworkHttps_(v)){
+          s.getRange(row,c).setRichTextValue(
+            SpreadsheetApp.newRichTextValue().setText("URL").setLinkUrl(String(v)).build());
+        } else s.getRange(row,c).setValue(neutralizeCell_(v));
+      } else {
+        s.getRange(row,c).setValue(neutralizeCell_(v));
+      }
+      var after=String(v==null?'':v);
+      if(before!==after) changed.push({field:f,from:before,to:after});
+    });
+
+    /* Every edit is recorded. A shared sheet with silent edits is a sheet nobody
+       can trust, and "who changed this and when" is the first question asked. */
+    if(changed.length){
+      var log=sheet_("_RowLog");
+      changed.forEach(function(c){ log.appendRow([evId||('row'+row), row, c.field, c.from, c.to, new Date(), actor||'']); });
+    }
+    return {ok:true,row:row,changed:changed.length,fields:changed.map(function(c){return c.field;})};
+  } finally { lock.releaseLock(); }
+}
+
 /* On-demand 24->25 header repair. Idempotent: no-op once headers already match.
    Run on the STAGING clone first; existing rows keep their first 24 values and
    get a blank 25th column. */
@@ -504,6 +582,7 @@ function handle_(data){
   if(action==="listCLEval") return handleListCLEval_(data);
   if(action==="listSessions") return handleListSessions_(data);
   if(action==="updateCLEvalStatus") return handleUpdateCLEvalStatus_(data, name);
+  if(action==="updateCLEvalRow") return handleUpdateCLEvalRow_(data, name);
   if(!GATE_ACTIONS[action]) return {ok:true,note:"no-op"};
 
   var lock=LockService.getScriptLock();
@@ -551,7 +630,7 @@ function doPost(e){
    POST so a stray link or prefetch cannot release a seat, write a CLEval row, or
    spend Claude tokens (R4). Only genuinely read-only actions may run on GET. */
 var POST_ONLY = {login:1, logout:1, heartbeat:1, gateAccept:1, gateDecline:1, forceRelease:1,
-                 log:1, claude:1, logCLEval:1, listCLEval:1, updateCLEvalStatus:1, listSessions:1};
+                 log:1, claude:1, logCLEval:1, listCLEval:1, updateCLEvalStatus:1, updateCLEvalRow:1, listSessions:1};
 function doGet(e){
   var p=(e&&e.parameter)||{};
   if(POST_ONLY[p.action]) return json_({ok:false,error:"This action requires POST."});
