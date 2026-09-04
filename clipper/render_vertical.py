@@ -21,7 +21,6 @@ captions.txt: one caption per line, START END TEXT (seconds)
 import argparse
 import subprocess
 import tempfile
-import textwrap
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -75,6 +74,22 @@ def probe_duration(path):
     return int(h) * 3600 + int(mnt) * 60 + float(sec)
 
 
+def wrap_px(text, size, font=FONT_BOLD, max_w=W - 100):
+    """Greedy word wrap by rendered pixel width, not character count."""
+    f = ImageFont.truetype(font, size)
+    d = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    lines, cur = [], ""
+    for word in text.split():
+        trial = (cur + " " + word).strip()
+        if d.textlength(trial, font=f) <= max_w or not cur:
+            cur = trial
+        else:
+            lines.append(cur); cur = word
+    if cur:
+        lines.append(cur)
+    return lines
+
+
 def read_captions(path):
     caps = []
     if not path:
@@ -115,7 +130,7 @@ def main():
 
     # Headline: big gold, up to 3 lines, sitting just above the video.
     head_text = a.headline if a.keep_case else a.headline.upper()
-    head_lines = textwrap.wrap(head_text, 18)[:3]
+    head_lines = wrap_px(head_text, 84)[:3]
     p = tmp / "head.png"
     h = text_png(head_lines, 84, p, color=GOLD)
     head_y = VIDEO_Y - 48 - h
@@ -124,13 +139,13 @@ def main():
     # Sub line: smaller white, above the headline.
     if a.sub:
         p = tmp / "sub.png"
-        h = text_png(textwrap.wrap(a.sub, 36)[:2], 44, p, font=FONT, stroke=4)
+        h = text_png(wrap_px(a.sub, 44, font=FONT)[:2], 44, p, font=FONT, stroke=4)
         overlays.append((p, head_y - 24 - h, None))
 
     # Captions: below the video, still in the middle band.
     for i, (start, end, text) in enumerate(read_captions(a.captions)):
         p = tmp / f"cap{i:03d}.png"
-        text_png(textwrap.wrap(text, 26)[:2], 62, p)
+        text_png(wrap_px(text, 62)[:2], 62, p)
         overlays.append((p, VIDEO_Y + VIDEO_H + 56, f"gte(t,{start})*lt(t,{end})"))
 
     if a.brand:
