@@ -128,7 +128,7 @@ def main():
     for i, (start, end, text) in enumerate(read_captions(a.captions)):
         p = tmp / f"cap{i:03d}.png"
         text_png(textwrap.wrap(text, 26)[:2], 62, p)
-        overlays.append((p, VIDEO_Y + VIDEO_H + 56, f"between(t,{start},{end})"))
+        overlays.append((p, VIDEO_Y + VIDEO_H + 56, f"gte(t,{start})*lt(t,{end})"))
 
     if a.brand:
         p = tmp / "brand.png"
