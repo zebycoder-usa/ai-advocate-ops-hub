@@ -84,6 +84,9 @@ def main():
     ap.add_argument("--sub", default="")
     ap.add_argument("--captions", help="captions.txt: START END TEXT per line")
     ap.add_argument("--brand", default="@itech.cuts")
+    ap.add_argument("--already-vertical", action="store_true",
+                    help="source is already 1080x1920 with the 16:9 frame centred "
+                         "(e.g. vidIQ output); only add the text overlays")
     a = ap.parse_args()
 
     tmp = Path(tempfile.mkdtemp(prefix="render_"))
@@ -117,12 +120,15 @@ def main():
     inputs = ["-i", a.src]
     for p, _, _ in overlays:
         inputs += ["-i", str(p)]
-    graph = [
-        f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
-        f"boxblur=30:6,eq=brightness=-0.25[bg]",
-        f"[0:v]scale={W}:-2[fg]",
-        "[bg][fg]overlay=(W-w)/2:(H-h)/2[v0]",
-    ]
+    if a.already_vertical:
+        graph = [f"[0:v]scale={W}:{H}[v0]"]
+    else:
+        graph = [
+            f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+            f"boxblur=30:6,eq=brightness=-0.25[bg]",
+            f"[0:v]scale={W}:-2[fg]",
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2[v0]",
+        ]
     for i, (_, y, enable) in enumerate(overlays, start=1):
         en = f":enable='{enable}'" if enable else ""
         graph.append(f"[v{i-1}][{i}:v]overlay=0:{y}{en}[v{i}]")
