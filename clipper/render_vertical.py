@@ -155,7 +155,8 @@ def main():
 
     cmd = [ffmpeg_bin(), "-y", *inputs, "-filter_complex", ";".join(graph),
            "-map", last, "-map", "0:a?", "-c:v", "libx264", "-preset", "medium",
-           "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+           "-crf", "22", "-maxrate", "3500k", "-bufsize", "7000k",
+           "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
            "-movflags", "+faststart", a.out]
     print("  $ ffmpeg ... ->", a.out)
     subprocess.run(cmd, check=True, capture_output=True)
