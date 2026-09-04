@@ -63,6 +63,18 @@ def text_png(lines, size, path, font=FONT_BOLD, color=WHITE, stroke=6,
     return h
 
 
+def probe_duration(path):
+    """Clip length in seconds via ffmpeg's banner (works without ffprobe)."""
+    import re
+    out = subprocess.run([ffmpeg_bin(), "-i", str(path)], capture_output=True,
+                         text=True).stderr
+    m = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", out)
+    if not m:
+        return None
+    h, mnt, sec = m.groups()
+    return int(h) * 3600 + int(mnt) * 60 + float(sec)
+
+
 def read_captions(path):
     caps = []
     if not path:
@@ -87,7 +99,14 @@ def main():
     ap.add_argument("--already-vertical", action="store_true",
                     help="source is already 1080x1920 with the 16:9 frame centred "
                          "(e.g. vidIQ output); only add the text overlays")
+    ap.add_argument("--min-seconds", type=float, default=30.0,
+                    help="refuse to render clips shorter than this (default 30)")
     a = ap.parse_args()
+
+    dur = probe_duration(a.src)
+    if dur is not None and dur < a.min_seconds:
+        raise SystemExit(f"clip is {dur:.1f}s, under the {a.min_seconds:.0f}s minimum; "
+                         "pick a longer moment")
 
     tmp = Path(tempfile.mkdtemp(prefix="render_"))
     overlays = []   # (png path, y, enable-expression or None)
