@@ -99,6 +99,8 @@ def main():
     ap.add_argument("--already-vertical", action="store_true",
                     help="source is already 1080x1920 with the 16:9 frame centred "
                          "(e.g. vidIQ output); only add the text overlays")
+    ap.add_argument("--keep-case", action="store_true",
+                    help="do not uppercase the headline (for units like kWh)")
     ap.add_argument("--min-seconds", type=float, default=30.0,
                     help="refuse to render clips shorter than this (default 30)")
     a = ap.parse_args()
@@ -112,7 +114,8 @@ def main():
     overlays = []   # (png path, y, enable-expression or None)
 
     # Headline: big gold, up to 3 lines, sitting just above the video.
-    head_lines = textwrap.wrap(a.headline.upper(), 18)[:3]
+    head_text = a.headline if a.keep_case else a.headline.upper()
+    head_lines = textwrap.wrap(head_text, 18)[:3]
     p = tmp / "head.png"
     h = text_png(head_lines, 84, p, color=GOLD)
     head_y = VIDEO_Y - 48 - h
